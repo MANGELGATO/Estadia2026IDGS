@@ -1,0 +1,204 @@
+.footer {
+  background-color: var(--navy);
+  color: rgba(255,255,255,0.75);
+  font-size: 0.9rem;
+}
+
+/* ─── Main section ─── */
+.main {
+  padding: 3.5rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.main .container {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1.4fr;
+  gap: 3rem;
+}
+
+@media (max-width: 768px) {
+  .main .container {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+}
+
+/* ─── Brand col ─── */
+.brandLogo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.brandName {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.brandDesc {
+  line-height: 1.7;
+  margin-bottom: 1.5rem;
+  color: rgba(255,255,255,0.65);
+}
+
+.socials {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.socialIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background-color: var(--primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+}
+
+.socialIcon:hover {
+  background-color: #fff;
+  color: var(--primary);
+}
+
+/* ─── Other cols ─── */
+.col {
+  display: flex;
+  flex-direction: column;
+}
+
+.colTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 1.25rem;
+}
+
+.colNav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.colNav a {
+  color: rgba(255,255,255,0.65);
+  transition: color 0.2s;
+}
+
+.colNav a:hover { color: #fff; }
+
+/* ─── Contact ─── */
+.contactList {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.contactItem {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+}
+
+.contactIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: rgba(168,30,113,0.3);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.contactLabel {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 0.3rem;
+}
+
+.contactValue {
+  color: rgba(255,255,255,0.65);
+  line-height: 1.7;
+  font-size: 0.87rem;
+}
+
+/* ─── Logos bar ─── */
+.logosBar {
+  padding: 2rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.logos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.logoItem {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.5);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ─── Bottom bar ─── */
+.bottom {
+  padding: 1.5rem 0;
+}
+
+.bottom .container {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.copyright {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.45);
+}
+
+.bottomRight {
+  display: flex;
+  gap: 3rem;
+  align-items: flex-start;
+}
+
+.privacyLink {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.55);
+  transition: color 0.2s;
+}
+
+.privacyLink:hover { color: #fff; }
+
+.hours {
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.55);
+  line-height: 1.7;
+}
+
+.hoursTitle {
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 0.25rem;
+}

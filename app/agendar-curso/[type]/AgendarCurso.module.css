@@ -1,0 +1,227 @@
+.hero {
+  background: linear-gradient(135deg, var(--navy) 0%, color-mix(in srgb, var(--primary) 70%, var(--navy)) 100%);
+  padding: 4rem 0 5rem;
+  color: white;
+  position: relative;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: var(--bg-light);
+  clip-path: ellipse(55% 100% at 50% 100%);
+}
+
+.heroContainer {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  text-align: center;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: rgba(255,255,255,0.8);
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 2rem;
+  transition: var(--transition);
+}
+.backLink:hover { color: white; }
+
+.heroPreTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.7);
+  font-family: var(--font-heading);
+  margin-bottom: 0.5rem;
+}
+
+.heroTitle {
+  font-size: 3rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  margin-bottom: 1rem;
+  line-height: 1.1;
+}
+
+.heroDesc {
+  font-size: 1.1rem;
+  opacity: 0.9;
+  line-height: 1.6;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.content {
+  padding: 0 0 5rem;
+  background-color: var(--bg-light);
+}
+
+.formContainer {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  margin-top: -3rem;
+  position: relative;
+  z-index: 10;
+}
+
+.formCard {
+  background: white;
+  border-radius: var(--radius-xl);
+  padding: 3rem;
+  box-shadow: 0 16px 40px rgba(27,54,93,0.06);
+  border: 1px solid var(--border-light);
+}
+
+.formTitle {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-navy);
+  font-family: var(--font-heading);
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+@media (min-width: 600px) {
+  .row { grid-template-columns: 1fr 1fr; }
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-navy);
+  font-family: var(--font-heading);
+}
+
+.label svg { color: var(--primary); }
+
+.input, .select, .textarea {
+  padding: 0.8rem 1.1rem;
+  border: 1.5px solid var(--border-light);
+  border-radius: 0.75rem;
+  font-size: 0.95rem;
+  color: var(--text-navy);
+  background: #fff;
+  outline: none;
+  transition: var(--transition);
+  font-family: var(--font-body);
+}
+
+.input::placeholder, .textarea::placeholder { color: var(--text-light); }
+
+.input:focus, .select:focus, .textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(168,30,113,0.08);
+}
+
+.textarea { resize: vertical; }
+
+.submitBtn {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: var(--primary);
+  color: white;
+  border-radius: 9999px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  font-family: var(--font-heading);
+  transition: var(--transition);
+  cursor: pointer;
+  border: none;
+  width: 100%;
+}
+.submitBtn:hover {
+  background-color: var(--navy);
+  transform: translateY(-2px);
+}
+
+/* ── Success State ── */
+.successState {
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background-color: var(--bg-light);
+}
+
+.successCard {
+  background: white;
+  border-radius: var(--radius-xl);
+  padding: 4rem 3rem;
+  box-shadow: 0 16px 40px rgba(27,54,93,0.06);
+  border: 1px solid var(--border-light);
+  text-align: center;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: slideUp 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.successIcon {
+  color: #15803d;
+  margin-bottom: 1.5rem;
+}
+
+.successTitle {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--text-navy);
+  font-family: var(--font-heading);
+  margin-bottom: 1rem;
+}
+
+.successText {
+  font-size: 1.05rem;
+  color: var(--text-gray);
+  line-height: 1.6;
+  margin-bottom: 2.5rem;
+}
+
+.homeBtn {
+  padding: 0.9rem 2.5rem;
+  background-color: var(--navy);
+  color: white;
+  border-radius: 9999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-family: var(--font-heading);
+  transition: var(--transition);
+}
+.homeBtn:hover { background-color: var(--primary); }
