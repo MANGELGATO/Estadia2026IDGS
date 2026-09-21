@@ -1,0 +1,132 @@
+.container {
+  background-color: var(--card-bg, #FFFFFF);
+  border-radius: var(--radius-xl, 1rem);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+}
+
+.header {
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  color: var(--text-navy);
+  font-weight: 700;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.tableWrapper {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table th, .table td {
+  padding: 1rem 1.5rem;
+}
+
+.table th {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  color: var(--text-light);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  background-color: var(--bg-light);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.table td {
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-gray);
+  font-size: 0.875rem;
+}
+
+.table tbody tr {
+  transition: var(--transition);
+}
+
+.table tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badgeActive {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10B981;
+}
+
+.badgeMaintenance {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #F59E0B;
+}
+
+.badgeInactive {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #EF4444;
+}
+
+.actionBtn {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  padding: 0.25rem;
+  font-size: 1.25rem;
+  border-radius: 0.25rem;
+  transition: var(--transition);
+}
+
+.actionBtn:hover {
+  color: var(--primary);
+  background-color: rgba(168, 30, 113, 0.1);
+}
+
+.actionBtnDanger:hover {
+  color: #EF4444;
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.primaryBtn {
+  background-color: var(--primary);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: var(--transition);
+}
+
+.primaryBtn:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-1px);
+}
