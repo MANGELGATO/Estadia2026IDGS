@@ -1,13 +1,13 @@
 'use client';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle2, User, Building, Mail, BookOpen, Calendar, Users } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, User, Building, Mail, BookOpen, Calendar, Users, Briefcase, GraduationCap, FileText, Target } from 'lucide-react';
 import styles from './AgendarCurso.module.css';
 import { useState, use } from 'react';
 
 export default function AgendarCursoPage({ params }: { params: Promise<{ type: string }> }) {
   const [submitted, setSubmitted] = useState(false);
   const resolvedParams = use(params);
-  const isInstitucion = resolvedParams.type === 'institucion';
+  const isInstitucion = resolvedParams.type === 'academica' || resolvedParams.type === 'institucion';
 
   const typeLabel = isInstitucion ? 'Institución Académica' : 'Empresa / Privado';
   const description = isInstitucion
@@ -56,11 +56,12 @@ export default function AgendarCursoPage({ params }: { params: Promise<{ type: s
             <h2 className={styles.formTitle}>Completa tu solicitud</h2>
             
             <form className={styles.form} onSubmit={handleSubmit}>
+              {/* Campos comunes base */}
               <div className={styles.formGroup}>
                 <label className={styles.label}>
                   <User size={15} /> Nombre del solicitante
                 </label>
-                <input type="text" className={styles.input} placeholder="Tu nombre completo" required />
+                <input type="text" className={styles.input} placeholder={isInstitucion ? "Nombre del docente o coordinador" : "Nombre del solicitante"} required />
               </div>
 
               <div className={styles.row}>
@@ -78,20 +79,86 @@ export default function AgendarCursoPage({ params }: { params: Promise<{ type: s
                 </div>
               </div>
 
-              <div className={styles.formGroup}>
-                <label className={styles.label}>
-                  <BookOpen size={15} /> Tema o área de interés
-                </label>
-                <select className={styles.select} required defaultValue="">
-                  <option value="" disabled>Selecciona un tema...</option>
-                  <option value="vr">Realidad Virtual e Inmersiva</option>
-                  <option value="robotica">Robótica y Automatización</option>
-                  <option value="impresion">Fabricación Digital e Impresión 3D</option>
-                  <option value="drones">Pilotaje y Mapeo con Drones</option>
-                  <option value="otro">Otro (especificar en comentarios)</option>
-                </select>
-              </div>
+              {/* CAMPOS ESPECÍFICOS: INSTITUCIÓN EDUCATIVA */}
+              {isInstitucion && (
+                <>
+                  <div className={styles.formGroup} style={{ marginBottom: '1rem' }}>
+                    <label className={styles.label}>
+                      <FileText size={15} /> Clave de Escuela (CCT)
+                    </label>
+                    <input type="text" className={styles.input} placeholder="Clave del Centro de Trabajo (10 caracteres)" required minLength={10} maxLength={10} />
+                  </div>
+                  <div className={styles.row}>
+                    <div className={styles.formGroup}>
+                      <label className={styles.label}>
+                        <GraduationCap size={15} /> Nivel Educativo
+                      </label>
+                      <select className={styles.select} required defaultValue="">
+                        <option value="" disabled>Selecciona un nivel...</option>
+                        <option value="primaria">Primaria</option>
+                        <option value="secundaria">Secundaria</option>
+                        <option value="preparatoria">Preparatoria / Bachillerato</option>
+                        <option value="universidad">Universidad / Superior</option>
+                        <option value="posgrado">Posgrado</option>
+                      </select>
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label className={styles.label}>
+                        <BookOpen size={15} /> Materia o Asignatura
+                      </label>
+                      <input type="text" className={styles.input} placeholder="Ej. Ciencias, Informática, Diseño" required />
+                    </div>
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>
+                      <Target size={15} /> Objetivo de la visita
+                    </label>
+                    <select className={styles.select} required defaultValue="">
+                      <option value="" disabled>¿Qué buscas lograr con los estudiantes?</option>
+                      <option value="recorrido">Recorrido introductorio al laboratorio</option>
+                      <option value="taller_basico">Taller básico / Demostración VR</option>
+                      <option value="proyecto">Desarrollo de un proyecto escolar</option>
+                    </select>
+                  </div>
+                </>
+              )}
 
+              {/* CAMPOS ESPECÍFICOS: EMPRESA */}
+              {!isInstitucion && (
+                <>
+                  <div className={styles.row}>
+                    <div className={styles.formGroup}>
+                      <label className={styles.label}>
+                        <Briefcase size={15} /> Sector o Giro
+                      </label>
+                      <input type="text" className={styles.input} placeholder="Ej. Tecnología, Manufactura, Diseño" required />
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label className={styles.label}>
+                        <Target size={15} /> Objetivo de capacitación
+                      </label>
+                      <select className={styles.select} required defaultValue="">
+                        <option value="" disabled>Selecciona el objetivo...</option>
+                        <option value="team_building">Team Building / Integración con VR</option>
+                        <option value="capacitacion_tecnica">Capacitación técnica en software</option>
+                        <option value="prototipado">Uso de equipo para prototipado</option>
+                        <option value="renta">Renta de espacio corporativo</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>
+                      <FileText size={15} /> Requiere Facturación
+                    </label>
+                    <select className={styles.select} required defaultValue="no">
+                      <option value="no">No, es solicitud general</option>
+                      <option value="si">Sí, requeriremos factura fiscal (RFC)</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {/* Campos comunes finales */}
               <div className={styles.row}>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>
@@ -103,13 +170,13 @@ export default function AgendarCursoPage({ params }: { params: Promise<{ type: s
                   <label className={styles.label}>
                     <Calendar size={15} /> Fecha tentativa
                   </label>
-                  <input type="date" className={styles.input} />
+                  <input type="date" className={styles.input} required />
                 </div>
               </div>
 
               <div className={styles.formGroup}>
                 <label className={styles.label}>Comentarios adicionales</label>
-                <textarea className={styles.textarea} rows={4} placeholder="Detalles de lo que esperan aprender, requerimientos especiales..."></textarea>
+                <textarea className={styles.textarea} rows={4} placeholder={isInstitucion ? "Detalles del grupo escolar, requerimientos especiales o dudas..." : "Detalles específicos del proyecto o capacitación, áreas de interés de su equipo..."}></textarea>
               </div>
 
               <button type="submit" className={styles.submitBtn}>

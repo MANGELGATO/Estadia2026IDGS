@@ -2,8 +2,8 @@ import AgendarCursoClient from './client';
 
 export function generateStaticParams() {
   return [
-    { type: 'institucion' },
-    { type: 'empresa' }
+    { type: 'academica' },
+    { type: 'privada' }
   ];
 }
 
