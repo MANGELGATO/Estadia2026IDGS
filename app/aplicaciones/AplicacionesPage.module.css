@@ -1,6 +1,6 @@
 .hero {
   background: linear-gradient(135deg, var(--navy) 0%, color-mix(in srgb, var(--primary) 50%, var(--navy)) 100%);
-  padding: 4rem 0 4rem;
+  padding: 4rem 0 4.5rem;
   color: white;
   position: relative;
   overflow: hidden;
@@ -34,9 +34,7 @@
   transition: var(--transition);
 }
 
-.backLink:hover {
-  color: white;
-}
+.backLink:hover { color: white; }
 
 .heroTitle {
   font-size: 3rem;
@@ -47,12 +45,29 @@
 }
 
 .heroDesc {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   opacity: 0.9;
-  max-width: 550px;
+  max-width: 560px;
   line-height: 1.7;
+  margin-bottom: 2rem;
 }
 
+.heroStats {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.heroStats span {
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: rgba(255,255,255,0.12);
+  padding: 0.4rem 1rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+/* ── Content ── */
 .content {
   padding: 3rem 0 5rem;
   background-color: var(--bg-light);
@@ -64,78 +79,160 @@
   padding: 0 1.5rem;
 }
 
+/* ── Filters ── */
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.filterBtn {
+  padding: 0.45rem 1rem;
+  border-radius: 9999px;
+  font-family: var(--font-heading);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-gray);
+  background: var(--card-bg);
+  border: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.filterBtn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.filterBtnActive {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(168, 30, 113, 0.25);
+}
+
+.filterBtnActive:hover { color: white; }
+
+.filterCount {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--text-light);
+  font-weight: 600;
+}
+
+/* ── Grid ── */
 .grid {
   display: grid;
   grid-template-columns: repeat(1, 1fr);
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 @media (min-width: 600px) {
-  .grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (min-width: 900px) {
-  .grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
+  .grid { grid-template-columns: repeat(3, 1fr); }
 }
 
+/* ── Card ── */
 .card {
   background: white;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
-  padding: 1.5rem;
+  padding: 1.25rem;
   display: flex;
-  gap: 1.25rem;
+  gap: 1rem;
   align-items: flex-start;
   transition: var(--transition);
 }
 
 .card:hover {
-  box-shadow: 0 12px 32px rgba(27,54,93,0.06);
-  border-color: rgba(168,30,113,0.25);
+  box-shadow: 0 12px 32px rgba(27, 54, 93, 0.07);
+  border-color: rgba(168, 30, 113, 0.25);
   transform: translateY(-3px);
 }
 
 .cardIcon {
-  width: 54px;
-  height: 54px;
+  width: 50px;
+  height: 50px;
   background: var(--bg-light);
-  border-radius: 14px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.8rem;
+  font-size: 1.75rem;
   flex-shrink: 0;
 }
 
 .cardBody {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.cardMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .category {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 800;
-  color: var(--primary);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   font-family: var(--font-heading);
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+}
+
+.platformBadge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-light);
+  font-family: var(--font-heading);
+  white-space: nowrap;
 }
 
 .title {
-  font-size: 1.15rem;
+  font-size: 1rem;
   font-weight: 800;
   color: var(--text-navy);
   font-family: var(--font-heading);
   line-height: 1.2;
 }
 
+.developer {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  margin: 0;
+}
+
 .description {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--text-gray);
   line-height: 1.5;
+}
+
+.cardFooter {
+  margin-top: 0.5rem;
+}
+
+.ageBadge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-light);
+  background: var(--bg-light);
+  border: 1px solid var(--border-light);
+  border-radius: 9999px;
+  padding: 0.15rem 0.65rem;
 }
