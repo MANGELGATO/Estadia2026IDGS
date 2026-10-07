@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import styles from './ReservationForm.module.css';
 import { DeviceItem } from '../../lib/mockData';
-import { X, CheckCircle2, Calendar, Clock, User, FileText } from 'lucide-react';
+import { X, CheckCircle2, Calendar, Clock, User, FileText, Image as ImageIcon, ShieldCheck, Download } from 'lucide-react';
 
 interface Props {
   device: DeviceItem;
@@ -11,6 +11,34 @@ interface Props {
 
 export default function ReservationForm({ device, onClose }: Props) {
   const [submitted, setSubmitted] = useState(false);
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+
+  const handleEndTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEnd = e.target.value;
+    if (startTime && newEnd) {
+      const [startH, startM] = startTime.split(':').map(Number);
+      const [endH, endM] = newEnd.split(':').map(Number);
+      
+      const startTotalMins = startH * 60 + startM;
+      const endTotalMins = endH * 60 + endM;
+      
+      const diffMins = endTotalMins - startTotalMins;
+      
+      if (diffMins > 120) {
+        alert("El tiempo máximo de préstamo es de 2 horas. Por favor selecciona un horario menor.");
+        setEndTime('');
+        return;
+      }
+      
+      if (diffMins <= 0) {
+        alert("La hora de fin debe ser mayor a la hora de inicio.");
+        setEndTime('');
+        return;
+      }
+    }
+    setEndTime(newEnd);
+  };
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -84,13 +112,31 @@ export default function ReservationForm({ device, onClose }: Props) {
               <label className={styles.label}>
                 <Clock size={14} /> Hora de inicio
               </label>
-              <input type="time" className={styles.input} required id="res-start" />
+              <input 
+                type="time" 
+                className={styles.input} 
+                required 
+                id="res-start"
+                value={startTime}
+                onChange={(e) => {
+                  setStartTime(e.target.value);
+                  setEndTime(''); // Reset end time when start changes to enforce re-validation
+                }}
+              />
             </div>
             <div className={styles.formGroup}>
               <label className={styles.label}>
                 <Clock size={14} /> Hora de fin
               </label>
-              <input type="time" className={styles.input} required id="res-end" />
+              <input 
+                type="time" 
+                className={styles.input} 
+                required 
+                id="res-end"
+                value={endTime}
+                onChange={handleEndTimeChange}
+                disabled={!startTime}
+              />
             </div>
           </div>
 
@@ -108,6 +154,42 @@ export default function ReservationForm({ device, onClose }: Props) {
           </div>
 
           <div className={styles.formGroup}>
+            <label className={styles.label}>
+              <ImageIcon size={14} /> Identificación Oficial (INE)
+            </label>
+            <div className={styles.fileRow}>
+              <div className={styles.fileUpload}>
+                <span className={styles.fileLabel}>Parte Frontal</span>
+                <input type="file" className={styles.fileInput} accept="image/*" required />
+              </div>
+              <div className={styles.fileUpload}>
+                <span className={styles.fileLabel}>Parte Trasera</span>
+                <input type="file" className={styles.fileInput} accept="image/*" required />
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label className={styles.label}>
+              <FileText size={14} /> Carta Responsiva
+            </label>
+            <div className={styles.responsivaContainer}>
+              <p className={styles.responsivaText}>
+                Descarga la plantilla, fírmala y sube el documento escaneado (PDF o Imagen).
+              </p>
+              <div className={styles.responsivaActions}>
+                <a href="#" className={styles.downloadBtn}>
+                  <Download size={16} /> Descargar Plantilla
+                </a>
+                <div className={styles.fileUpload} style={{ flex: 2 }}>
+                  <span className={styles.fileLabel}>Subir Carta Firmada</span>
+                  <input type="file" className={styles.fileInput} accept=".pdf,image/*" required />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.formGroup}>
             <label className={styles.label}>Observaciones (opcional)</label>
             <textarea
               className={styles.textarea}
@@ -115,6 +197,13 @@ export default function ReservationForm({ device, onClose }: Props) {
               placeholder="Requerimientos especiales, número de participantes, etc."
               id="res-notes"
             />
+          </div>
+
+          <div className={styles.checkboxGroup}>
+            <input type="checkbox" id="res-privacy" required className={styles.checkbox} />
+            <label htmlFor="res-privacy" className={styles.checkboxLabel}>
+              <ShieldCheck size={14} /> Acepto el <a href="#" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>Aviso de Privacidad</a>
+            </label>
           </div>
 
           <div className={styles.actions}>

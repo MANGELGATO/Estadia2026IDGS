@@ -86,7 +86,6 @@ export default function AgendarCursoPage({ params }: { params: Promise<{ type: s
                   <option value="" disabled>Selecciona un tema...</option>
                   <option value="vr">Realidad Virtual e Inmersiva</option>
                   <option value="robotica">Robótica y Automatización</option>
-                  <option value="impresion">Fabricación Digital e Impresión 3D</option>
                   <option value="drones">Pilotaje y Mapeo con Drones</option>
                   <option value="otro">Otro (especificar en comentarios)</option>
                 </select>

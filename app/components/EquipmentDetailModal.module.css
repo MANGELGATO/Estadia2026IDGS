@@ -188,6 +188,69 @@
   font-size: 0.78rem;
   font-weight: 600;
   font-family: var(--font-heading);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  position: relative;
+}
+
+.infoWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.infoIcon {
+  cursor: help;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.infoIcon:hover {
+  opacity: 1;
+}
+
+.tooltip {
+  visibility: hidden;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(5px);
+  background: var(--text-navy);
+  color: white;
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: normal;
+  width: max-content;
+  max-width: 220px;
+  text-align: center;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+  pointer-events: none;
+  font-family: var(--font-sans);
+  line-height: 1.4;
+}
+
+.tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: var(--text-navy) transparent transparent transparent;
+}
+
+.infoWrapper:hover .tooltip {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 /* ── Footer ── */

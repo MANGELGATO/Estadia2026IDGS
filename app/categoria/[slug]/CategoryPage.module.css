@@ -214,47 +214,16 @@
   margin-bottom: 1.5rem;
 }
 
-.successCards {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.successCard {
+.videoContainer {
   background: white;
-  border-radius: var(--radius);
-  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  padding: 1rem;
   border: 1px solid var(--border-light);
-  position: relative;
-  overflow: hidden;
   box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.successCard:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 30px rgba(0,0,0,0.08);
-}
-
-.successCardAccent {
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 4px;
-}
-
-.successCard h4 {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 0.5rem;
-}
-
-.successCard p {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .catalogSection {
@@ -285,4 +254,171 @@
   justify-content: center;
   min-height: 60vh;
   gap: 1rem;
+}
+
+/* ── Extras Fabricación Digital ── */
+.fabDigitalExtras {
+  margin-top: 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.extraSectionRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2.5rem;
+}
+
+@media (max-width: 1024px) {
+  .extraSectionRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.inventorySection, .recommendationsSection, .quotationSection {
+  background: white;
+  border-radius: var(--radius-xl);
+  padding: 2.5rem;
+  border: 1px solid var(--border-light);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.03);
+}
+
+.filamentGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.filamentItem {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--bg-light);
+  border-radius: var(--radius-lg);
+  transition: transform 0.2s ease;
+}
+
+.filamentItem:hover {
+  transform: translateY(-2px);
+}
+
+.filamentColor {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+  flex-shrink: 0;
+}
+
+.filamentItem strong {
+  font-size: 0.95rem;
+  color: var(--text-navy);
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.filamentItem p {
+  font-size: 0.8rem;
+  color: var(--text-gray);
+  margin: 0;
+}
+
+.recommendationsList {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-top: 1rem;
+  list-style: none;
+  padding: 0;
+}
+
+.recommendationsList li {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--text-gray);
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+.recommendationsList li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--primary);
+  font-weight: bold;
+}
+
+.recommendationsList li strong {
+  color: var(--text-navy);
+}
+
+.quoteCard {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.quoteCard p {
+  font-size: 1rem;
+  color: var(--text-gray);
+}
+
+.quoteForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  background: var(--bg-light);
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.formGroup label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-navy);
+}
+
+.quoteInput {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  font-family: inherit;
+  width: 100%;
+  background: white;
+  transition: border-color 0.2s;
+}
+
+.quoteInput:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.quoteBtn {
+  margin-top: 0.5rem;
+  padding: 0.8rem 1.5rem;
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+  align-self: flex-start;
+}
+
+.quoteBtn:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
 }

@@ -1,8 +1,8 @@
 'use client';
 import { useEffect } from 'react';
 import styles from './EquipmentDetailModal.module.css';
-import { DeviceItem } from '../../lib/mockData';
-import { X, MapPin, Box, Cpu, Laptop2, Calendar, Tag } from 'lucide-react';
+import { DeviceItem, mockApps } from '../../lib/mockData';
+import { X, MapPin, Box, Cpu, Laptop2, Calendar, Tag, Info } from 'lucide-react';
 
 interface Props {
   device: DeviceItem;
@@ -89,9 +89,19 @@ export default function EquipmentDetailModal({ device, onClose, onReserve }: Pro
             <div className={styles.section}>
               <h3 className={styles.sectionTitle}><Laptop2 size={16} className={styles.icon} /> Aplicaciones</h3>
               <div className={styles.tags}>
-                {device.apps.map((a, i) => (
-                  <span key={i} className={styles.tag}>{a}</span>
-                ))}
+                {device.apps.map((a, i) => {
+                  const appData = mockApps.find(app => app.name === a);
+                  const description = appData?.description || 'Aplicación compatible con este equipo.';
+                  return (
+                    <span key={i} className={styles.tag}>
+                      {a}
+                      <div className={styles.infoWrapper}>
+                        <Info size={14} className={styles.infoIcon} />
+                        <div className={styles.tooltip}>{description}</div>
+                      </div>
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}

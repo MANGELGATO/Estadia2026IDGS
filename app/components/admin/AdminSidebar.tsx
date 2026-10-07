@@ -12,6 +12,7 @@ import {
 
 const navItems = [
   { name: "Dashboard", href: "/admin", icon: <RiDashboardLine /> },
+  { name: "Categorías", href: "/admin/categorias", icon: <RiAppsLine /> },
   { name: "Inventario", href: "/admin/inventario", icon: <RiComputerLine /> },
   { name: "Aplicaciones", href: "/admin/aplicaciones", icon: <RiAppsLine /> },
   { name: "Configuración", href: "/admin/configuracion", icon: <RiSettings4Line /> },

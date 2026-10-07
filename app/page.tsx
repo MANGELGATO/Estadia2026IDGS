@@ -17,16 +17,24 @@ export default function Home() {
       <HeroSection />
 
       {/* Carrusel de navegación a categorías */}
-      <CategoryCarousel />
+      <div id="categorias">
+        <CategoryCarousel />
+      </div>
 
       {/* Grid de dispositivos (solo vista de catálogo) */}
-      <EquipmentFilterGrid />
+      <div id="equipos">
+        <EquipmentFilterGrid />
+      </div>
 
       {/* Carrusel de Aplicaciones */}
-      <AppCarousel />
+      <div id="aplicaciones">
+        <AppCarousel />
+      </div>
 
       {/* CTA para agendar cursos */}
-      <CourseCallout />
+      <div id="cursos">
+        <CourseCallout />
+      </div>
 
       {/* Botón flotante de accesibilidad */}
       <AccessibilityButton />

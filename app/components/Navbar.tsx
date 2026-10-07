@@ -25,9 +25,10 @@ export default function Navbar() {
 
         <nav className={styles.nav}>
           <Link href="/" className={styles.navLink}>Inicio</Link>
-          <Link href="#ejes" className={styles.navLink}>Ejes temáticos</Link>
-          <Link href="#sobre" className={styles.navLink}>Sobre nosotros</Link>
-          <Link href="#contacto" className={styles.navLink}>Contacto</Link>
+          <Link href="/espacios" className={styles.navLink}>Espacios</Link>
+          <a href="/#categorias" className={styles.navLink}>Categorías</a>
+          <a href="/#aplicaciones" className={styles.navLink}>Aplicaciones</a>
+          <a href="/#contacto" className={styles.navLink}>Contacto</a>
         </nav>
 
         <Link href="/login" className={styles.loginBtn} id="nav-login">

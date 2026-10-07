@@ -1,0 +1,326 @@
+.page {
+  background-color: var(--bg-color);
+  min-height: 100vh;
+  padding-bottom: 5rem;
+}
+
+.hero {
+  background: linear-gradient(135deg, var(--text-navy), #0f172a);
+  color: white;
+  padding: 6rem 2rem 4rem;
+  text-align: center;
+}
+
+.heroContainer {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.heroTitle {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+}
+
+.heroDesc {
+  font-size: 1.1rem;
+  color: #cbd5e1;
+  line-height: 1.6;
+}
+
+.content {
+  max-width: 1200px;
+  margin: -3rem auto 0;
+  padding: 0 2rem;
+  position: relative;
+  z-index: 10;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+}
+
+.card {
+  background: white;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.12);
+}
+
+.cardHeader {
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.cardIcon {
+  width: 48px;
+  height: 48px;
+  opacity: 0.9;
+}
+
+.cardBody {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.cardTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-navy);
+  margin-bottom: 0.5rem;
+}
+
+.cardDesc {
+  font-size: 0.9rem;
+  color: var(--text-gray);
+  line-height: 1.5;
+  margin-bottom: 1rem;
+  flex: 1;
+}
+
+.cardInfo {
+  margin-bottom: 1rem;
+}
+
+.capacityBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background-color: var(--bg-light);
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.featuresList {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.featuresList li {
+  font-size: 0.85rem;
+  color: var(--text-gray);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.checkIcon {
+  flex-shrink: 0;
+}
+
+.reserveBtn {
+  width: 100%;
+  padding: 0.8rem;
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.reserveBtn:hover {
+  opacity: 0.9;
+}
+
+/* Modal styles */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modalContent {
+  background: white;
+  width: 100%;
+  max-width: 600px;
+  border-radius: var(--radius-xl);
+  padding: 2rem;
+  position: relative;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+}
+
+.closeBtn {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-gray);
+}
+
+.modalHeader {
+  margin-bottom: 1.5rem;
+  border-left: 4px solid;
+  padding-left: 1rem;
+}
+
+.modalHeader h2 {
+  font-size: 1.5rem;
+  color: var(--text-navy);
+  margin-bottom: 0.3rem;
+}
+
+.modalHeader p {
+  font-size: 0.9rem;
+  color: var(--text-gray);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.formGroup label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-navy);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.input, .textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  font-size: 0.9rem;
+  font-family: inherit;
+  background-color: var(--bg-light);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input:focus, .textarea:focus {
+  outline: none;
+  border-color: #cbd5e1;
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
+}
+
+.row {
+  display: flex;
+  gap: 1rem;
+}
+
+.row > * {
+  flex: 1;
+}
+
+@media (max-width: 600px) {
+  .row {
+    flex-direction: column;
+  }
+}
+
+.checkboxGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.8rem;
+  background: var(--bg-light);
+  border-radius: var(--radius-lg);
+}
+
+.checkboxLabel {
+  font-size: 0.85rem;
+  color: var(--text-navy);
+  display: flex;
+  align-items: center;
+}
+
+.submitBtn {
+  margin-top: 1rem;
+  padding: 1rem;
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.submitBtn:hover {
+  opacity: 0.9;
+}
+
+.successState {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.successIcon {
+  margin: 0 auto 1.5rem;
+}
+
+.successState h2 {
+  font-size: 1.5rem;
+  color: var(--text-navy);
+  margin-bottom: 1rem;
+}
+
+.successState p {
+  color: var(--text-gray);
+  line-height: 1.5;
+  margin-bottom: 2rem;
+}
+
+.successBtn {
+  padding: 0.8rem 2rem;
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.successBtn:hover {
+  opacity: 0.9;
+}

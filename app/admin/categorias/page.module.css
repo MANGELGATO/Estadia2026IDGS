@@ -1,0 +1,141 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  color: var(--text-navy);
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  color: var(--text-light);
+  font-size: 1rem;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.card {
+  background-color: var(--card-bg);
+  border-radius: var(--radius-xl);
+  padding: 2rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 800px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  font-weight: 600;
+  color: var(--text-navy);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.icon {
+  color: var(--primary);
+}
+
+.select, .input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  font-size: 1rem;
+  color: var(--text-primary);
+  background-color: var(--bg-color);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.select:focus, .input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.helpText {
+  font-size: 0.85rem;
+  color: var(--text-light);
+}
+
+.saveBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+  align-self: flex-start;
+}
+
+.saveBtn:hover {
+  background-color: var(--primary-dark);
+  transform: translateY(-2px);
+}
+
+.successMessage {
+  color: var(--success);
+  font-weight: 500;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background-color: rgba(16, 185, 129, 0.1);
+  border-radius: var(--radius-lg);
+}
+
+.previewContainer {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-light);
+}
+
+.previewTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-navy);
+  margin-bottom: 1rem;
+}
+
+.videoWrapper {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  background-color: black;
+}
+
+.emptyPreview {
+  background-color: var(--bg-color);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 3rem;
+  text-align: center;
+  color: var(--text-light);
+}

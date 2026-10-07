@@ -129,6 +129,143 @@
 
 .textarea { resize: none; }
 
+/* ── File Upload ── */
+.fileRow {
+  display: flex;
+  gap: 1rem;
+}
+
+.fileUpload {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1.5px dashed var(--border-color);
+  border-radius: 0.65rem;
+  background-color: var(--bg-color);
+  text-align: center;
+  transition: var(--transition);
+}
+
+.fileUpload:hover {
+  border-color: var(--primary);
+  background-color: rgba(168, 30, 113, 0.02);
+}
+
+.fileLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+
+.fileInput {
+  font-size: 0.75rem;
+  color: var(--text-gray);
+  cursor: pointer;
+}
+
+.fileInput::file-selector-button {
+  padding: 0.4rem 0.8rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border-color);
+  background: white;
+  color: var(--text-navy);
+  font-weight: 600;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-right: 0.5rem;
+}
+
+.fileInput::file-selector-button:hover {
+  background: var(--bg-light);
+  border-color: var(--text-gray);
+}
+
+/* ── Checkbox ── */
+.checkboxGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background-color: rgba(168, 30, 113, 0.04);
+  border-radius: 0.5rem;
+  border: 1px solid rgba(168, 30, 113, 0.1);
+}
+
+.checkbox {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.checkboxLabel {
+  font-size: 0.85rem;
+  color: var(--text-navy);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.checkboxLabel svg {
+  color: var(--primary);
+}
+
+/* ── Carta Responsiva ── */
+.responsivaContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background-color: var(--bg-light);
+  padding: 1.25rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--border-light);
+}
+
+.responsivaText {
+  font-size: 0.85rem;
+  color: var(--text-gray);
+  line-height: 1.5;
+}
+
+.responsivaActions {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+@media (max-width: 640px) {
+  .responsivaActions {
+    flex-direction: column;
+  }
+}
+
+.downloadBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background-color: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  border-radius: 0.65rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-decoration: none;
+  transition: var(--transition);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+}
+
+.downloadBtn:hover {
+  background-color: rgba(37, 99, 235, 0.15);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
 /* ── Actions ── */
 .actions {
   display: flex;

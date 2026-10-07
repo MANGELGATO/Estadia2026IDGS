@@ -3,7 +3,7 @@ import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { mockDevices } from '../../../lib/mockData';
 import styles from './CategoryPage.module.css';
-import { ArrowLeft, MapPin, Cpu, Lightbulb, Users, Target, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Cpu, Lightbulb, Users, Target, CheckCircle2, Download, Printer, Box, Layers, Coins } from 'lucide-react';
 import EquipmentCard from '../../components/EquipmentCard';
 import EquipmentDetailModal from '../../components/EquipmentDetailModal';
 import ReservationForm from '../../components/ReservationForm';
@@ -83,11 +83,18 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
 
   const [selectedDetailsId, setSelectedDetailsId] = useState<string | null>(null);
   const [selectedReserveId, setSelectedReserveId]  = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string>('https://www.youtube.com/embed/dQw4w9WgXcQ');
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     setIsLoaded(true);
-  }, []);
+    if (typeof window !== 'undefined') {
+      const savedVideo = localStorage.getItem(`category_video_${resolvedParams.slug}`);
+      if (savedVideo) {
+        setVideoUrl(savedVideo);
+      }
+    }
+  }, [resolvedParams.slug]);
 
   const deviceForDetails = mockDevices.find(d => d.id === selectedDetailsId);
   const deviceForReserve = mockDevices.find(d => d.id === selectedReserveId);
@@ -152,18 +159,23 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
               </div>
             </div>
 
-            {/* Casos de Éxito Mockup */}
+            {/* Video Configurable desde Dashboard */}
             <div className={styles.sideInfo}>
               <div className={styles.successSection}>
                 <h3 className={styles.sideTitle}>Casos de Éxito Destacados</h3>
-                <div className={styles.successCards}>
-                  {meta.successCases.map((caseItem, idx) => (
-                    <div key={idx} className={styles.successCard}>
-                      <div className={styles.successCardAccent} style={{ backgroundColor: meta.color }}></div>
-                      <h4>{caseItem.title}</h4>
-                      <p>{caseItem.desc}</p>
-                    </div>
-                  ))}
+                <div className={styles.videoContainer}>
+                  {isLoaded && (
+                    <iframe
+                      width="100%"
+                      height="315"
+                      src={videoUrl.includes('watch?v=') ? videoUrl.replace("watch?v=", "embed/") : videoUrl}
+                      title="Video de categoría"
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      style={{ borderRadius: 'var(--radius-lg)' }}
+                    ></iframe>
+                  )}
                 </div>
               </div>
             </div>
@@ -191,6 +203,97 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
               </div>
             )}
           </div>
+
+          {/* Secciones específicas para Fabricación Digital */}
+          {resolvedParams.slug === 'fabricacion-digital' && (
+            <div className={styles.fabDigitalExtras}>
+              
+              <div className={styles.extraSectionRow}>
+                <div className={styles.inventorySection}>
+                  <div className={styles.sectionHeader}>
+                    <Box className={styles.sectionIcon} style={{ color: meta.color }} />
+                    <h2 className={styles.sectionTitle}>Inventario de Filamentos</h2>
+                  </div>
+                  <div className={styles.filamentGrid}>
+                    <div className={styles.filamentItem}>
+                      <div className={styles.filamentColor} style={{ backgroundColor: '#ff0000' }}></div>
+                      <div>
+                        <strong>PLA Rojo</strong>
+                        <p>1.75mm - 800g disponibles</p>
+                      </div>
+                    </div>
+                    <div className={styles.filamentItem}>
+                      <div className={styles.filamentColor} style={{ backgroundColor: '#000000' }}></div>
+                      <div>
+                        <strong>PLA Negro</strong>
+                        <p>1.75mm - 1.2kg disponibles</p>
+                      </div>
+                    </div>
+                    <div className={styles.filamentItem}>
+                      <div className={styles.filamentColor} style={{ backgroundColor: '#ffffff', border: '1px solid #ddd' }}></div>
+                      <div>
+                        <strong>PETG Blanco</strong>
+                        <p>1.75mm - 450g disponibles</p>
+                      </div>
+                    </div>
+                    <div className={styles.filamentItem}>
+                      <div className={styles.filamentColor} style={{ backgroundColor: '#3b82f6' }}></div>
+                      <div>
+                        <strong>TPU Azul (Flexible)</strong>
+                        <p>1.75mm - 600g disponibles</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.recommendationsSection}>
+                  <div className={styles.sectionHeader}>
+                    <Layers className={styles.sectionIcon} style={{ color: meta.color }} />
+                    <h2 className={styles.sectionTitle}>Recomendaciones de Impresión</h2>
+                  </div>
+                  <ul className={styles.recommendationsList}>
+                    <li><strong>Formatos admitidos:</strong> Exporta tu modelo en formato .STL, .OBJ o .3MF.</li>
+                    <li><strong>Verifica las normales:</strong> Asegúrate de que tu malla sea "manifold" (cerrada) y no tenga caras invertidas.</li>
+                    <li><strong>Soportes:</strong> Considera la orientación para minimizar el uso de soportes, ahorrarás material y tiempo.</li>
+                    <li><strong>Tolerancias:</strong> Deja al menos 0.2mm de tolerancia para piezas que deben embonar.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className={styles.quotationSection}>
+                <div className={styles.sectionHeader}>
+                  <Coins className={styles.sectionIcon} style={{ color: meta.color }} />
+                  <h2 className={styles.sectionTitle}>Cotización de Impresión 3D</h2>
+                </div>
+                <div className={styles.quoteCard}>
+                  <p>¿Tienes un diseño listo pero no necesitas solicitar el equipo completo? Podemos imprimirlo por ti.</p>
+                  <form className={styles.quoteForm} onSubmit={(e) => { e.preventDefault(); alert('Solicitud de cotización enviada.'); }}>
+                    <div className={styles.formGroup}>
+                      <label>Archivo 3D (.stl, .obj)</label>
+                      <input type="file" accept=".stl,.obj,.3mf" className={styles.quoteInput} required />
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>Material deseado</label>
+                      <select className={styles.quoteInput}>
+                        <option>PLA</option>
+                        <option>PETG</option>
+                        <option>TPU (Flexible)</option>
+                        <option>ABS</option>
+                      </select>
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>Detalles adicionales</label>
+                      <textarea className={styles.quoteInput} placeholder="Ej. Relleno al 20%, color preferido..." rows={2}></textarea>
+                    </div>
+                    <button type="submit" className={styles.quoteBtn} style={{ backgroundColor: meta.color }}>
+                      Solicitar Cotización
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+            </div>
+          )}
         </div>
       </div>
 
