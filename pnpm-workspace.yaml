@@ -1,0 +1,4 @@
+# pnpm 11 bloquea scripts de build por defecto. unrs-resolver (dependencia de eslint-config-next)
+# trae binarios precompilados, por lo que su script de postinstall no es necesario.
+allowBuilds:
+  unrs-resolver: false
