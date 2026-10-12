@@ -6,10 +6,8 @@ import EquipmentFilterGrid from './components/EquipmentFilterGrid';
 import AppCarousel from './components/AppCarousel';
 import CourseCallout from './components/CourseCallout';
 import AccessibilityButton from './components/AccessibilityButton';
-import { useRouter } from 'next/navigation';
 
 export default function Home() {
-  const router = useRouter();
 
   return (
     <>

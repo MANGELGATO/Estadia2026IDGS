@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import styles from './page.module.css';
 import DataTable, { Column } from '../../components/admin/DataTable';
 import StatCard from '../../components/admin/StatCard';
-import { RiUserLine, RiUserSettingsLine, RiShieldUserLine, RiUserForbidLine } from 'react-icons/ri';
+import { RiUserLine, RiUserSettingsLine, RiShieldUserLine } from 'react-icons/ri';
 
 type UserRole = 'Administrador' | 'Colaborador' | 'Usuario Final';
 type UserStatus = 'Activo' | 'Inactivo';

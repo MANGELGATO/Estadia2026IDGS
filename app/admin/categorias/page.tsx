@@ -12,18 +12,29 @@ const categories = [
   { id: 'computo-multimedia', name: 'Cómputo / Multimedia' }
 ];
 
+const readSavedVideo = (categoryId: string): string => {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem(`category_video_${categoryId}`) || '';
+};
+
 export default function CategoriasConfigPage() {
   const [selectedCategory, setSelectedCategory] = useState(categories[0].id);
   const [videoUrl, setVideoUrl] = useState('');
   const [savedMessage, setSavedMessage] = useState(false);
 
+  // Carga inicial desde localStorage (solo cliente, diferida para evitar setState síncrono en el efecto)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(`category_video_${selectedCategory}`);
-      setVideoUrl(saved || '');
-    }
+    const frame = requestAnimationFrame(() => {
+      setVideoUrl(readSavedVideo(categories[0].id));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  const handleCategoryChange = (categoryId: string) => {
+    setSelectedCategory(categoryId);
+    setVideoUrl(readSavedVideo(categoryId));
     setSavedMessage(false);
-  }, [selectedCategory]);
+  };
 
   const handleSave = () => {
     if (typeof window !== 'undefined') {
@@ -49,7 +60,7 @@ export default function CategoriasConfigPage() {
             <select 
               className={styles.select}
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              onChange={(e) => handleCategoryChange(e.target.value)}
             >
               {categories.map(cat => (
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
@@ -68,7 +79,7 @@ export default function CategoriasConfigPage() {
               value={videoUrl}
               onChange={(e) => setVideoUrl(e.target.value)}
             />
-            <p className={styles.helpText}>Ingresa el enlace del video de YouTube que quieres mostrar en la sección "Casos de Éxito Destacados".</p>
+            <p className={styles.helpText}>Ingresa el enlace del video de YouTube que quieres mostrar en la sección &quot;Casos de Éxito Destacados&quot;.</p>
           </div>
 
           <button className={styles.saveBtn} onClick={handleSave}>

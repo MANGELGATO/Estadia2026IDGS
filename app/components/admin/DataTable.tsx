@@ -2,6 +2,9 @@ import React from 'react';
 import styles from './DataTable.module.css';
 import { RiEdit2Line, RiDeleteBinLine, RiAddLine } from 'react-icons/ri';
 
+/* eslint-disable @typescript-eslint/no-explicit-any --
+   Tabla genérica: las páginas admin pasan filas de distintas interfaces.
+   Pendiente tipar con genéricos al integrar la capa de datos real. */
 export type Column = {
   key: string;
   label: string;
@@ -17,6 +20,7 @@ type DataTableProps = {
   onDelete?: (item: any) => void;
   addActionLabel?: string;
 };
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 export default function DataTable({ 
   title, 

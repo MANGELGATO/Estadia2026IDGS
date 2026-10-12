@@ -3,7 +3,7 @@ import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { mockDevices } from '../../../lib/mockData';
 import styles from './CategoryPage.module.css';
-import { ArrowLeft, MapPin, Cpu, Lightbulb, Users, Target, CheckCircle2, Download, Printer, Box, Layers, Coins } from 'lucide-react';
+import { ArrowLeft, Lightbulb, Target, CheckCircle2, Box, Layers, Coins } from 'lucide-react';
 import EquipmentCard from '../../components/EquipmentCard';
 import EquipmentDetailModal from '../../components/EquipmentDetailModal';
 import ReservationForm from '../../components/ReservationForm';
@@ -87,13 +87,15 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    setIsLoaded(true);
-    if (typeof window !== 'undefined') {
+    // Diferido a un callback para no llamar setState de forma síncrona dentro del efecto
+    const frame = requestAnimationFrame(() => {
+      setIsLoaded(true);
       const savedVideo = localStorage.getItem(`category_video_${resolvedParams.slug}`);
       if (savedVideo) {
         setVideoUrl(savedVideo);
       }
-    }
+    });
+    return () => cancelAnimationFrame(frame);
   }, [resolvedParams.slug]);
 
   const deviceForDetails = mockDevices.find(d => d.id === selectedDetailsId);
@@ -253,7 +255,7 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
                   </div>
                   <ul className={styles.recommendationsList}>
                     <li><strong>Formatos admitidos:</strong> Exporta tu modelo en formato .STL, .OBJ o .3MF.</li>
-                    <li><strong>Verifica las normales:</strong> Asegúrate de que tu malla sea "manifold" (cerrada) y no tenga caras invertidas.</li>
+                    <li><strong>Verifica las normales:</strong> Asegúrate de que tu malla sea &quot;manifold&quot; (cerrada) y no tenga caras invertidas.</li>
                     <li><strong>Soportes:</strong> Considera la orientación para minimizar el uso de soportes, ahorrarás material y tiempo.</li>
                     <li><strong>Tolerancias:</strong> Deja al menos 0.2mm de tolerancia para piezas que deben embonar.</li>
                   </ul>

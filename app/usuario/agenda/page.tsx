@@ -35,7 +35,7 @@ export default function AgendaPage() {
       </div>
 
       <div className={styles.timeline}>
-        {cursos.map((curso, index) => (
+        {cursos.map((curso) => (
           <div key={curso.id} className={styles.timelineItem}>
             <div className={styles.timelineIcon}>{curso.icon}</div>
             <div className={styles.timelineContent}>

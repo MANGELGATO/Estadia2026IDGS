@@ -1,5 +1,4 @@
 'use client';
-import { useState } from 'react';
 import Link from 'next/link';
 import styles from './CategoryCarousel.module.css';
 import { Headset, Bot, Monitor, Plane, Printer, ArrowRight } from 'lucide-react';

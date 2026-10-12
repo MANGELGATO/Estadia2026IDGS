@@ -1,7 +1,6 @@
 'use client';
 import { useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, Users, Calendar, MapPin, Building, ArrowRight, ShieldCheck, CheckCircle2, Clock } from 'lucide-react';
+import { Users, Calendar, Building, ShieldCheck, CheckCircle2, Clock } from 'lucide-react';
 import styles from './Espacios.module.css';
 
 const espaciosMock = [
