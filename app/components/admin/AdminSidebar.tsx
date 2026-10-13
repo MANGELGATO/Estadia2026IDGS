@@ -11,7 +11,9 @@ import {
   RiUserSettingsLine,
   RiToolsLine,
   RiBarChartLine,
+  RiLogoutBoxRLine,
 } from "react-icons/ri";
+import { useSession, signOut } from "next-auth/react";
 
 const navSections = [
   {
@@ -47,6 +49,10 @@ const navSections = [
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+
+  const userName = session?.user?.name || "Administrador";
+  const userInitial = userName.charAt(0).toUpperCase();
 
   return (
     <aside className="sticky top-[70px] flex h-auto w-full flex-col overflow-y-auto border-r border-white/5 bg-gradient-to-b from-[#162E50] to-[#1B365D] p-4 text-white shadow-[4px_0_20px_rgba(0,0,0,0.15)] [scrollbar-color:rgba(255,255,255,0.2)_transparent] [scrollbar-width:thin] md:h-[calc(100vh-70px)] md:w-[260px] md:p-6">
@@ -82,14 +88,27 @@ export default function AdminSidebar() {
           </div>
         ))}
       </nav>
-      <div className="mt-4 hidden items-center gap-3 rounded-xl border-t border-white/[0.08] p-4 md:flex">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-plai to-[#c42585] font-heading text-base font-bold text-white">
-          A
+      <div className="mt-4 flex items-center justify-between gap-2 rounded-xl border-t border-white/[0.08] p-3 md:p-4">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-plai to-[#c42585] font-heading text-base font-bold text-white shadow-sm">
+            {userInitial}
+          </div>
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate font-heading text-[0.8rem] font-semibold text-white/90">
+              {userName}
+            </span>
+            <span className="truncate text-[0.68rem] text-white/40">
+              {session?.user?.email || "Super Admin"}
+            </span>
+          </div>
         </div>
-        <div className="flex min-w-0 flex-col gap-[0.1rem]">
-          <span className="truncate font-heading text-[0.8rem] font-semibold text-white/90">Administrador</span>
-          <span className="text-[0.7rem] text-white/40">Super Admin</span>
-        </div>
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          title="Cerrar sesión"
+          className="rounded-lg p-2 text-white/50 transition hover:bg-white/10 hover:text-red-300"
+        >
+          <RiLogoutBoxRLine size={18} />
+        </button>
       </div>
     </aside>
   );

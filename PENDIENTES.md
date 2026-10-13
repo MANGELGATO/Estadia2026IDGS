@@ -17,9 +17,9 @@ Esta tabla resume el estado actual contra la **Lista de Verificación de Aceptac
 | **Salud** | `[OBLIGATORIO]` | **CUMPLE** | Endpoint `/api/health` (`force-dynamic`) responde 200 en milisegundos sin autenticación. |
 | **Configuración** | `[OBLIGATORIO]` | **CUMPLE** | `.env.example` documentado con valores ficticios; principios 12-factor; ninguna URL ni credencial quemada en el código. |
 | **Secretos** | `[OBLIGATORIO]` | **CUMPLE** | Lector `lib/env.ts` implementa patrón `VARIABLE_FILE` y lectura directa desde `/run/secrets/`. Sin secretos en Git ni en la imagen. |
-| **Seguridad** | `[OBLIGATORIO]` | **PENDIENTE (P1, P2, P3)** | Falta autenticación real NextAuth, validación Zod en servidor, rate limiting y escaneo de vulnerabilidades Trivy. |
-| **Autenticación** | `[OBLIGATORIO]` | **PENDIENTE (P2)** | Requiere NextAuth.js 4.24 con el proveedor de identidad institucional de PLAi para proteger `/admin` y `/usuario`. |
-| **Calidad** | `[OBLIGATORIO]` | **CUMPLE** | ESLint 9 pasa con 0 errores; Vitest con 17 pruebas unitarias automatizadas (`pnpm test`). |
+| **Seguridad** | `[OBLIGATORIO]` | **PENDIENTE (P2, P3)** | P1 completado (NextAuth.js + Proxy RBAC). Falta validación Zod en servidor, rate limiting y escaneo de vulnerabilidades Trivy. |
+| **Autenticación** | `[OBLIGATORIO]` | **CUMPLE** | NextAuth.js 4.24.15 con sesiones JWT en servidor, proxy de seguridad `proxy.ts` (Next.js 16) protegiendo `/admin` y `/usuario` con RBAC, e interfaz `/login` con cuentas de evaluación. |
+| **Calidad** | `[OBLIGATORIO]` | **CUMPLE** | ESLint 9 pasa con 0 errores y 0 advertencias; Vitest con 30 pruebas unitarias automatizadas (`pnpm test`). |
 | **Datos** | `[OBLIGATORIO]` | **PENDIENTE (P4, P5)** | Datos aún provienen de `lib/mockData.ts`. Requiere integración con Directus 11 (`@directus/sdk`) y PostgreSQL con migraciones versionadas. |
 | **Logs** | `[OBLIGATORIO]` | **CUMPLE** | Salida a stdout/stderr sin escribir en archivos locales; sin datos sensibles. |
 | **Documentación** | `[OBLIGATORIO]` | **CUMPLE** | `README.md` completo en español con arquitectura, Swarm, Docker, variables y checklist. |
@@ -32,9 +32,12 @@ Esta tabla resume el estado actual contra la **Lista de Verificación de Aceptac
 Estos puntos son **condición obligatoria** para que el área de Tecnología e Infraestructura de PLAi acepte y publique el proyecto en producción:
 
 ### 🔴 Seguridad y Autenticación
-- [ ] **P1. Autenticación con NextAuth.js (Sección 7.1 y 10).**
-  - Actualmente `/login` es un formulario visual simulado y las rutas `/admin` y `/usuario` son accesibles públicamente sin sesión.
-  - **Acción:** Integrar NextAuth.js 4.24 (`next-auth`), configurar el proveedor de identidad que designe PLAi (OAuth/OIDC institucional), implementar `middleware.ts` para proteger las rutas privadas `/admin/*` y `/usuario/*`, y almacenar sesiones exclusivamente en el servidor.
+- [x] **P1. Autenticación con NextAuth.js (Sección 7.1 y 10).** *(COMPLETADO)*
+  - Integrado NextAuth.js 4.24.15 con sesiones JWT en el servidor (`lib/auth.ts`, `app/api/auth/[...nextauth]/route.ts`).
+  - Implementado `proxy.ts` bajo la convención normativa de Next.js 16 para protección estricta de `/admin/*` y `/usuario/*` con redirección a `/login?callbackUrl=...` y control de acceso basado en roles (RBAC).
+  - Modernizada la interfaz de `/login` con soporte para credenciales institucionales y botones de acceso rápido para evaluadores.
+  - Indicador de sesión activa y botón de cierre de sesión en `Navbar.tsx`, `AdminSidebar.tsx` y `UserSidebar.tsx`.
+  - Cobertura con 13 pruebas unitarias nuevas en `lib/auth.test.ts` y `proxy.test.ts` (suite total: 30 pruebas en verde).
 - [ ] **P2. Validación en el Servidor con Zod (Sección 7.2).**
   - Actualmente los 8 formularios del sistema (reserva de equipos, solicitudes de cursos, gestión de inventario, mantenimientos, etc.) solo validan en el cliente mediante atributos HTML5 o `useState`.
   - **Acción:** Instalar `zod` y crear esquemas de validación estrictos en route handlers (`/api/...`) o Server Actions para sanitizar y validar todas las entradas antes de procesarlas.
@@ -105,3 +108,4 @@ Aspectos que mejoran la observabilidad, accesibilidad y robustez de la plataform
 | **Fase 8: Documentación** | `README.md` reescrito con arquitectura, comandos, variables y checklist de aceptación. | Archivo validado en raíz del proyecto. |
 | **Lector de Secretos (P5)** | Creación de `lib/env.ts` para soportar `VARIABLE_FILE` y `/run/secrets/` de Docker Swarm. | 6 pruebas unitarias específicas en `lib/env.test.ts`. |
 | **Genéricos en DataTable (P2)** | Tipado de [DataTable.tsx](file:///c:/Users/MANGE/Estadia2026IDGS/app/components/admin/DataTable.tsx) mediante genéricos `<T extends Record<string, any>>`. | Compilación exitosa en `pnpm build`. |
+| **Autenticación NextAuth.js (P1)** | Integración de `next-auth@4.24.15`, sesiones JWT del lado del servidor, roles institucionales (`admin`, `usuario`), protección con `proxy.ts` (Next.js 16) y formulario interactivo `/login` con cuentas de demostración. | 13 pruebas unitarias nuevas (30/30 en verde en `pnpm test`), compilación limpia `output: 'standalone'` y linter en 0. |

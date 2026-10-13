@@ -3,6 +3,7 @@ import { Montserrat, Mulish } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import SessionProviderWrapper from "./components/SessionProviderWrapper";
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -29,9 +30,11 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${montserrat.variable} ${mulish.variable}`}>
       <body>
-        <Navbar />
-        <main>{children}</main>
-        <Footer />
+        <SessionProviderWrapper>
+          <Navbar />
+          <main>{children}</main>
+          <Footer />
+        </SessionProviderWrapper>
       </body>
     </html>
   );

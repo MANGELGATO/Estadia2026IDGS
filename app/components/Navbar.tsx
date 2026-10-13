@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { UserCircle2 } from 'lucide-react';
+import NavAuthStatus from './NavAuthStatus';
 
 const navLinkClass =
   "relative text-[0.95rem] font-medium text-plai-gray transition-all duration-200 hover:text-plai " +
@@ -35,14 +35,7 @@ export default function Navbar() {
           <Link href="/#contacto" className={navLinkClass}>Contacto</Link>
         </nav>
 
-        <Link
-          href="/login"
-          id="nav-login"
-          className="btn btn-primary btn-sm h-auto shrink-0 whitespace-nowrap rounded-full border-0 px-[1.4rem] py-[0.55rem] text-[0.9rem] font-semibold shadow-none transition-all hover:-translate-y-px hover:bg-navy"
-        >
-          <UserCircle2 size={18} />
-          Iniciar Sesión
-        </Link>
+        <NavAuthStatus />
       </div>
     </header>
   );
