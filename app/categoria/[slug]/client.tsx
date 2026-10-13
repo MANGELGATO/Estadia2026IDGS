@@ -2,7 +2,6 @@
 import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { mockDevices } from '../../../lib/mockData';
-import styles from './CategoryPage.module.css';
 import { ArrowLeft, Lightbulb, Target, CheckCircle2, Box, Layers, Coins } from 'lucide-react';
 import EquipmentCard from '../../components/EquipmentCard';
 import EquipmentDetailModal from '../../components/EquipmentDetailModal';
@@ -74,7 +73,6 @@ const categoryToDeviceCategory: Record<string, string> = {
   'computo-multimedia': 'Cómputo',
 };
 
-
 export default function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = use(params);
   const meta = categoryMeta[resolvedParams.slug];
@@ -87,7 +85,6 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    // Diferido a un callback para no llamar setState de forma síncrona dentro del efecto
     const frame = requestAnimationFrame(() => {
       setIsLoaded(true);
       const savedVideo = localStorage.getItem(`category_video_${resolvedParams.slug}`);
@@ -103,57 +100,64 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
 
   if (!meta) {
     return (
-      <div className={styles.notFound}>
-        <p>Categoría no encontrada.</p>
-        <Link href="/" className={styles.backLink}><ArrowLeft size={16} /> Volver al inicio</Link>
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
+        <p className="text-xl font-bold text-navy">Categoría no encontrada.</p>
+        <Link href="/" className="inline-flex items-center gap-2 font-heading font-semibold text-plai hover:underline">
+          <ArrowLeft size={16} /> Volver al inicio
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className={isLoaded ? styles.pageLoaded : styles.pageInitial}>
+    <div className={isLoaded ? 'translate-y-0 opacity-100 transition-all duration-700 ease-out' : 'translate-y-2 opacity-0'}>
       {/* Dynamic Hero Section */}
-      <div className={styles.hero} style={{ '--cat-color': meta.color } as React.CSSProperties}>
-        <div className={styles.heroBgEffect}></div>
-        <div className={styles.heroContainer}>
-          <Link href="/#dispositivos" className={styles.backLink}>
+      <div
+        className="relative overflow-hidden py-16 text-white after:absolute after:-bottom-px after:inset-x-0 after:h-16 after:bg-[#F4F6F9] after:[clip-path:polygon(0_100%,100%_100%,100%_40%,0%_100%)] bg-[linear-gradient(135deg,var(--primary)_0%,color-mix(in_srgb,var(--cat-color)_60%,var(--primary))_100%)]"
+        style={{ '--cat-color': meta.color } as React.CSSProperties}
+      >
+        <div className="pointer-events-none absolute -left-[20%] -top-[50%] h-[200%] w-[140%] rotate-[15deg] bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.1)_0%,transparent_60%)]" />
+        <div className="relative z-10 mx-auto max-w-[1440px] px-6">
+          <Link href="/#dispositivos" className="mb-8 inline-flex items-center gap-[0.4rem] font-heading text-[0.9rem] font-semibold text-white/80 transition-all hover:-translate-x-1 hover:text-white">
             <ArrowLeft size={18} /> Volver al Catálogo
           </Link>
-          <div className={styles.heroContent}>
-            <div className={styles.badgeLabel}>Saber Más</div>
-            <h1 className={styles.heroTitle}>{meta.name}</h1>
-            <p className={styles.heroDesc}>{meta.description}</p>
-            <div className={styles.heroStats}>
-              <div className={styles.stat}>
-                <span className={styles.statValue}>{devices.length}</span>
-                <span className={styles.statLabel}>Equipos Disponibles</span>
+          <div className="max-w-[800px]">
+            <div className="mb-6 inline-block rounded-full border border-white/30 bg-white/20 px-4 py-[0.4rem] font-heading text-[0.85rem] font-bold uppercase tracking-[0.05em] backdrop-blur-md">
+              Saber Más
+            </div>
+            <h1 className="mb-4 font-heading text-4xl font-black leading-[1.1] tracking-[-0.03em] drop-shadow-[0_4px_20px_rgba(0,0,0,0.15)] sm:text-[3.5rem]">{meta.name}</h1>
+            <p className="mb-8 max-w-[650px] text-lg leading-[1.6] opacity-95 sm:text-[1.25rem]">{meta.description}</p>
+            <div className="mt-10 flex flex-wrap gap-12">
+              <div className="flex flex-col">
+                <span className="mb-1 font-heading text-4xl font-extrabold leading-none">{devices.length}</span>
+                <span className="font-heading text-[0.9rem] font-medium uppercase tracking-[0.05em] opacity-80">Equipos Disponibles</span>
               </div>
-              <div className={styles.stat}>
-                <span className={styles.statValue}>{meta.successCases.length}+</span>
-                <span className={styles.statLabel}>Casos de Éxito</span>
+              <div className="flex flex-col">
+                <span className="mb-1 font-heading text-4xl font-extrabold leading-none">{meta.successCases.length}+</span>
+                <span className="font-heading text-[0.9rem] font-medium uppercase tracking-[0.05em] opacity-80">Casos de Éxito</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className={styles.content}>
-        <div className={styles.contentContainer}>
+      <div className="bg-[#F4F6F9] pb-24 pt-12">
+        <div className="mx-auto max-w-[1440px] px-6">
           
-          <div className={styles.twoColumnLayout}>
+          <div className="mb-16 grid grid-cols-1 gap-10 lg:grid-cols-[2fr_1fr]">
             {/* Información general de uso en PLAi */}
-            <div className={styles.mainInfo}>
-              <div className={styles.usageSection}>
-                <div className={styles.sectionHeader}>
-                  <Lightbulb className={styles.sectionIcon} style={{ color: meta.color }} />
-                  <h2 className={styles.sectionTitle}>Aplicación en PLAi</h2>
+            <div className="h-full">
+              <div className="h-full rounded-2xl border border-black/[0.08] bg-white p-8 shadow-[0_10px_40px_rgba(0,0,0,0.04)] md:p-12">
+                <div className="mb-6 flex items-center gap-4">
+                  <Lightbulb className="size-8 shrink-0" style={{ color: meta.color }} />
+                  <h2 className="font-heading text-2xl font-extrabold tracking-[-0.02em] text-navy sm:text-[1.8rem]">Aplicación en PLAi</h2>
                 </div>
-                <p className={styles.usageText}>{meta.plaiUsage}</p>
+                <p className="mb-10 text-lg leading-[1.8] text-plai-gray">{meta.plaiUsage}</p>
                 
-                <div className={styles.benefitsList}>
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   {meta.benefits.map((benefit, idx) => (
-                    <div key={idx} className={styles.benefitItem}>
-                      <CheckCircle2 size={18} style={{ color: meta.color }} />
+                    <div key={idx} className="flex items-center gap-3 rounded-xl bg-[#F4F6F9] px-5 py-4 font-heading text-[1.05rem] font-semibold text-navy transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_6px_15px_rgba(0,0,0,0.05)]">
+                      <CheckCircle2 size={18} className="shrink-0" style={{ color: meta.color }} />
                       <span>{benefit}</span>
                     </div>
                   ))}
@@ -162,10 +166,10 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
             </div>
 
             {/* Video Configurable desde Dashboard */}
-            <div className={styles.sideInfo}>
-              <div className={styles.successSection}>
-                <h3 className={styles.sideTitle}>Casos de Éxito Destacados</h3>
-                <div className={styles.videoContainer}>
+            <div>
+              <div className="rounded-2xl border border-black/[0.08] bg-white p-8 shadow-[0_10px_40px_rgba(0,0,0,0.04)]">
+                <h3 className="mb-6 font-heading text-[1.2rem] font-extrabold text-navy">Casos de Éxito Destacados</h3>
+                <div className="flex items-center justify-center overflow-hidden rounded-2xl border border-black/[0.08] bg-white p-4 shadow-[0_4px_15px_rgba(0,0,0,0.03)]">
                   {isLoaded && (
                     <iframe
                       width="100%"
@@ -175,7 +179,7 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
                       frameBorder="0"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen
-                      style={{ borderRadius: 'var(--radius-lg)' }}
+                      className="rounded-xl"
                     ></iframe>
                   )}
                 </div>
@@ -184,16 +188,18 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
           </div>
 
           {/* Catálogo de Equipos de la categoría */}
-          <div className={styles.catalogSection}>
-            <div className={styles.sectionHeader}>
-              <Target className={styles.sectionIcon} style={{ color: meta.color }} />
-              <h2 className={styles.sectionTitle}>Equipos Disponibles para Solicitar</h2>
+          <div className="mt-8">
+            <div className="mb-6 flex items-center gap-4">
+              <Target className="size-8 shrink-0" style={{ color: meta.color }} />
+              <h2 className="font-heading text-2xl font-extrabold tracking-[-0.02em] text-navy sm:text-[1.8rem]">Equipos Disponibles para Solicitar</h2>
             </div>
             
             {devices.length === 0 ? (
-              <div className={styles.empty}>No hay equipos registrados en esta categoría todavía.</div>
+              <div className="rounded-2xl border border-dashed border-black/[0.12] bg-white p-16 text-center text-base text-plai-muted">
+                No hay equipos registrados en esta categoría todavía.
+              </div>
             ) : (
-              <div className={styles.grid}>
+              <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 {devices.map(device => (
                   <EquipmentCard
                     key={device.id}
@@ -208,86 +214,86 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
 
           {/* Secciones específicas para Fabricación Digital */}
           {resolvedParams.slug === 'fabricacion-digital' && (
-            <div className={styles.fabDigitalExtras}>
+            <div className="mt-16 flex flex-col gap-10">
               
-              <div className={styles.extraSectionRow}>
-                <div className={styles.inventorySection}>
-                  <div className={styles.sectionHeader}>
-                    <Box className={styles.sectionIcon} style={{ color: meta.color }} />
-                    <h2 className={styles.sectionTitle}>Inventario de Filamentos</h2>
+              <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
+                <div className="rounded-2xl border border-black/[0.08] bg-white p-8 shadow-[0_8px_30px_rgba(0,0,0,0.03)] md:p-10">
+                  <div className="mb-6 flex items-center gap-4">
+                    <Box className="size-8 shrink-0" style={{ color: meta.color }} />
+                    <h2 className="font-heading text-2xl font-extrabold tracking-[-0.02em] text-navy sm:text-[1.8rem]">Inventario de Filamentos</h2>
                   </div>
-                  <div className={styles.filamentGrid}>
-                    <div className={styles.filamentItem}>
-                      <div className={styles.filamentColor} style={{ backgroundColor: '#ff0000' }}></div>
+                  <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <div className="flex items-center gap-4 rounded-xl bg-[#F4F6F9] p-4 transition-transform hover:-translate-y-0.5">
+                      <div className="size-10 shrink-0 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]" style={{ backgroundColor: '#ff0000' }}></div>
                       <div>
-                        <strong>PLA Rojo</strong>
-                        <p>1.75mm - 800g disponibles</p>
+                        <strong className="block font-heading text-[0.95rem] text-navy">PLA Rojo</strong>
+                        <p className="m-0 text-[0.8rem] text-plai-gray">1.75mm - 800g disponibles</p>
                       </div>
                     </div>
-                    <div className={styles.filamentItem}>
-                      <div className={styles.filamentColor} style={{ backgroundColor: '#000000' }}></div>
+                    <div className="flex items-center gap-4 rounded-xl bg-[#F4F6F9] p-4 transition-transform hover:-translate-y-0.5">
+                      <div className="size-10 shrink-0 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]" style={{ backgroundColor: '#000000' }}></div>
                       <div>
-                        <strong>PLA Negro</strong>
-                        <p>1.75mm - 1.2kg disponibles</p>
+                        <strong className="block font-heading text-[0.95rem] text-navy">PLA Negro</strong>
+                        <p className="m-0 text-[0.8rem] text-plai-gray">1.75mm - 1.2kg disponibles</p>
                       </div>
                     </div>
-                    <div className={styles.filamentItem}>
-                      <div className={styles.filamentColor} style={{ backgroundColor: '#ffffff', border: '1px solid #ddd' }}></div>
+                    <div className="flex items-center gap-4 rounded-xl bg-[#F4F6F9] p-4 transition-transform hover:-translate-y-0.5">
+                      <div className="size-10 shrink-0 rounded-full border border-gray-300 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]" style={{ backgroundColor: '#ffffff' }}></div>
                       <div>
-                        <strong>PETG Blanco</strong>
-                        <p>1.75mm - 450g disponibles</p>
+                        <strong className="block font-heading text-[0.95rem] text-navy">PETG Blanco</strong>
+                        <p className="m-0 text-[0.8rem] text-plai-gray">1.75mm - 450g disponibles</p>
                       </div>
                     </div>
-                    <div className={styles.filamentItem}>
-                      <div className={styles.filamentColor} style={{ backgroundColor: '#3b82f6' }}></div>
+                    <div className="flex items-center gap-4 rounded-xl bg-[#F4F6F9] p-4 transition-transform hover:-translate-y-0.5">
+                      <div className="size-10 shrink-0 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]" style={{ backgroundColor: '#3b82f6' }}></div>
                       <div>
-                        <strong>TPU Azul (Flexible)</strong>
-                        <p>1.75mm - 600g disponibles</p>
+                        <strong className="block font-heading text-[0.95rem] text-navy">TPU Azul (Flexible)</strong>
+                        <p className="m-0 text-[0.8rem] text-plai-gray">1.75mm - 600g disponibles</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className={styles.recommendationsSection}>
-                  <div className={styles.sectionHeader}>
-                    <Layers className={styles.sectionIcon} style={{ color: meta.color }} />
-                    <h2 className={styles.sectionTitle}>Recomendaciones de Impresión</h2>
+                <div className="rounded-2xl border border-black/[0.08] bg-white p-8 shadow-[0_8px_30px_rgba(0,0,0,0.03)] md:p-10">
+                  <div className="mb-6 flex items-center gap-4">
+                    <Layers className="size-8 shrink-0" style={{ color: meta.color }} />
+                    <h2 className="font-heading text-2xl font-extrabold tracking-[-0.02em] text-navy sm:text-[1.8rem]">Recomendaciones de Impresión</h2>
                   </div>
-                  <ul className={styles.recommendationsList}>
-                    <li><strong>Formatos admitidos:</strong> Exporta tu modelo en formato .STL, .OBJ o .3MF.</li>
-                    <li><strong>Verifica las normales:</strong> Asegúrate de que tu malla sea &quot;manifold&quot; (cerrada) y no tenga caras invertidas.</li>
-                    <li><strong>Soportes:</strong> Considera la orientación para minimizar el uso de soportes, ahorrarás material y tiempo.</li>
-                    <li><strong>Tolerancias:</strong> Deja al menos 0.2mm de tolerancia para piezas que deben embonar.</li>
+                  <ul className="mt-4 flex list-none flex-col gap-5 p-0">
+                    <li className="relative pl-6 text-[0.95rem] leading-[1.6] text-plai-gray before:absolute before:left-0 before:top-0 before:font-bold before:text-plai before:content-['✓']"><strong className="text-navy">Formatos admitidos:</strong> Exporta tu modelo en formato .STL, .OBJ o .3MF.</li>
+                    <li className="relative pl-6 text-[0.95rem] leading-[1.6] text-plai-gray before:absolute before:left-0 before:top-0 before:font-bold before:text-plai before:content-['✓']"><strong className="text-navy">Verifica las normales:</strong> Asegúrate de que tu malla sea &quot;manifold&quot; (cerrada) y no tenga caras invertidas.</li>
+                    <li className="relative pl-6 text-[0.95rem] leading-[1.6] text-plai-gray before:absolute before:left-0 before:top-0 before:font-bold before:text-plai before:content-['✓']"><strong className="text-navy">Soportes:</strong> Considera la orientación para minimizar el uso de soportes, ahorrarás material y tiempo.</li>
+                    <li className="relative pl-6 text-[0.95rem] leading-[1.6] text-plai-gray before:absolute before:left-0 before:top-0 before:font-bold before:text-plai before:content-['✓']"><strong className="text-navy">Tolerancias:</strong> Deja al menos 0.2mm de tolerancia para piezas que deben embonar.</li>
                   </ul>
                 </div>
               </div>
 
-              <div className={styles.quotationSection}>
-                <div className={styles.sectionHeader}>
-                  <Coins className={styles.sectionIcon} style={{ color: meta.color }} />
-                  <h2 className={styles.sectionTitle}>Cotización de Impresión 3D</h2>
+              <div className="rounded-2xl border border-black/[0.08] bg-white p-8 shadow-[0_8px_30px_rgba(0,0,0,0.03)] md:p-10">
+                <div className="mb-6 flex items-center gap-4">
+                  <Coins className="size-8 shrink-0" style={{ color: meta.color }} />
+                  <h2 className="font-heading text-2xl font-extrabold tracking-[-0.02em] text-navy sm:text-[1.8rem]">Cotización de Impresión 3D</h2>
                 </div>
-                <div className={styles.quoteCard}>
-                  <p>¿Tienes un diseño listo pero no necesitas solicitar el equipo completo? Podemos imprimirlo por ti.</p>
-                  <form className={styles.quoteForm} onSubmit={(e) => { e.preventDefault(); alert('Solicitud de cotización enviada.'); }}>
-                    <div className={styles.formGroup}>
-                      <label>Archivo 3D (.stl, .obj)</label>
-                      <input type="file" accept=".stl,.obj,.3mf" className={styles.quoteInput} required />
+                <div className="mt-4 flex flex-col gap-6">
+                  <p className="text-base text-plai-gray">¿Tienes un diseño listo pero no necesitas solicitar el equipo completo? Podemos imprimirlo por ti.</p>
+                  <form className="flex flex-col gap-5 rounded-xl bg-[#F4F6F9] p-6" onSubmit={(e) => { e.preventDefault(); alert('Solicitud de cotización enviada.'); }}>
+                    <div className="flex flex-col gap-2">
+                      <label className="font-heading text-[0.9rem] font-bold text-navy">Archivo 3D (.stl, .obj)</label>
+                      <input type="file" accept=".stl,.obj,.3mf" className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] file:mr-4 file:rounded-full file:border-0 file:bg-plai/10 file:px-4 file:py-2 file:font-heading file:font-semibold file:text-plai" required />
                     </div>
-                    <div className={styles.formGroup}>
-                      <label>Material deseado</label>
-                      <select className={styles.quoteInput}>
+                    <div className="flex flex-col gap-2">
+                      <label className="font-heading text-[0.9rem] font-bold text-navy">Material deseado</label>
+                      <select className="w-full cursor-pointer rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] text-navy outline-none focus:border-plai">
                         <option>PLA</option>
                         <option>PETG</option>
                         <option>TPU (Flexible)</option>
                         <option>ABS</option>
                       </select>
                     </div>
-                    <div className={styles.formGroup}>
-                      <label>Detalles adicionales</label>
-                      <textarea className={styles.quoteInput} placeholder="Ej. Relleno al 20%, color preferido..." rows={2}></textarea>
+                    <div className="flex flex-col gap-2">
+                      <label className="font-heading text-[0.9rem] font-bold text-navy">Detalles adicionales</label>
+                      <textarea className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] outline-none focus:border-plai" placeholder="Ej. Relleno al 20%, color preferido..." rows={2}></textarea>
                     </div>
-                    <button type="submit" className={styles.quoteBtn} style={{ backgroundColor: meta.color }}>
+                    <button type="submit" className="mt-2 cursor-pointer self-start rounded-xl px-6 py-3 font-heading text-base font-bold text-white transition-all hover:-translate-y-0.5 hover:opacity-90" style={{ backgroundColor: meta.color }}>
                       Solicitar Cotización
                     </button>
                   </form>

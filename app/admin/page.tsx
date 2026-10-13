@@ -1,7 +1,6 @@
 "use client";
 
 import React from 'react';
-import styles from './page.module.css';
 import StatCard from '../components/admin/StatCard';
 import DataTable, { Column } from '../components/admin/DataTable';
 import {
@@ -64,21 +63,21 @@ export default function AdminDashboard() {
   const router = useRouter();
 
   return (
-    <div className={styles.dashboard}>
-      <div className={styles.header}>
+    <div className="flex animate-pop-in flex-col gap-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className={styles.title}>Dashboard</h1>
-          <p className={styles.subtitle}>Bienvenido al panel de administración de PLAi</p>
+          <h1 className="mb-1 font-heading text-3xl font-extrabold text-navy">Dashboard</h1>
+          <p className="text-sm text-plai-muted md:text-base">Bienvenido al panel de administración de PLAi</p>
         </div>
-        <div className={styles.dateChip}>
+        <div className="rounded-full border border-black/[0.08] bg-white px-4 py-2 text-xs font-semibold capitalize text-plai-muted shadow-plai-sm">
           {new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </div>
       </div>
 
       {/* Stats Row 1 — Inventory */}
-      <div className={styles.statsSection}>
-        <h2 className={styles.statsLabel}>Inventario</h2>
-        <div className={styles.statsGrid}>
+      <div className="flex flex-col gap-3">
+        <h2 className="font-heading text-xs font-bold uppercase tracking-wider text-plai-muted">Inventario</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard title="Total Equipos"     value={124} icon={<RiComputerLine />}    variant="primary" />
           <StatCard title="Equipos Activos"   value={98}  icon={<RiCheckDoubleLine />} variant="success" />
           <StatCard title="En Mantenimiento"  value={15}  icon={<RiAlertLine />}       variant="warning" />
@@ -87,9 +86,9 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stats Row 2 — Operations */}
-      <div className={styles.statsSection}>
-        <h2 className={styles.statsLabel}>Operaciones</h2>
-        <div className={styles.statsGrid}>
+      <div className="flex flex-col gap-3">
+        <h2 className="font-heading text-xs font-bold uppercase tracking-wider text-plai-muted">Operaciones</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard title="Reservaciones Hoy"   value={8}  icon={<RiCalendarCheckLine />} variant="success" />
           <StatCard title="Pendientes Aprobar"  value={2}  icon={<RiTimeLine />}           variant="warning" />
           <StatCard title="Usuarios Activos"    value={24} icon={<RiUserLine />}           variant="primary" />
@@ -97,7 +96,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className={styles.sections}>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Recent Equipment */}
         <DataTable
           title="Equipos Recientes"
@@ -120,18 +119,18 @@ export default function AdminDashboard() {
       </div>
 
       {/* Activity Feed */}
-      <div className={styles.activityCard}>
-        <h3 className={styles.activityTitle}>Actividad Reciente</h3>
-        <ul className={styles.activityList}>
+      <div className="rounded-2xl border border-black/[0.06] bg-white p-6 shadow-plai-sm">
+        <h3 className="mb-5 font-heading text-base font-bold text-navy">Actividad Reciente</h3>
+        <ul className="m-0 flex list-none flex-col divide-y divide-black/[0.06] p-0">
           {recentActivity.map(act => (
-            <li key={act.id} className={styles.activityItem}>
+            <li key={act.id} className="flex items-start gap-4 py-3.5 first:pt-0 last:pb-0">
               <span
-                className={styles.activityDot}
+                className="mt-1.5 size-2.5 shrink-0 rounded-full"
                 style={{ background: activityTypeColor[act.type] }}
               />
-              <div className={styles.activityContent}>
+              <div className="flex flex-col gap-0.5 text-sm text-[#374151]">
                 <span><strong>{act.user}</strong> {act.action}</span>
-                <span className={styles.activityTime}>{act.time}</span>
+                <span className="text-xs text-plai-muted">{act.time}</span>
               </div>
             </li>
           ))}

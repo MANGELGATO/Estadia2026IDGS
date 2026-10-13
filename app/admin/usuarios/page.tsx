@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from 'react';
-import styles from './page.module.css';
 import DataTable, { Column } from '../../components/admin/DataTable';
 import StatCard from '../../components/admin/StatCard';
 import { RiUserLine, RiUserSettingsLine, RiShieldUserLine } from 'react-icons/ri';
@@ -118,38 +117,33 @@ export default function UsuariosPage() {
       key: 'name',
       label: 'Usuario',
       render: (value, item) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #a81e71, #c42585)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'white', fontWeight: 700, fontSize: '0.9rem', flexShrink: 0,
-          }}>
+        <div className="flex items-center gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#a81e71] to-[#c42585] text-sm font-bold text-white">
             {value.charAt(0).toUpperCase()}
           </div>
           <div>
-            <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-navy)' }}>{value}</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-light)' }}>{item.email}</div>
+            <div className="text-sm font-semibold text-navy">{value}</div>
+            <div className="text-xs text-plai-muted">{item.email}</div>
           </div>
         </div>
       ),
     },
     { key: 'role', label: 'Rol', render: (value) => <RoleBadge value={value} /> },
     { key: 'status', label: 'Estado', render: (value) => <StatusDot value={value} /> },
-    { key: 'reservations', label: 'Reservaciones', render: (v) => <span style={{ fontWeight: 600 }}>{v}</span> },
+    { key: 'reservations', label: 'Reservaciones', render: (v) => <span className="font-semibold">{v}</span> },
     { key: 'lastLogin', label: 'Último Acceso' },
   ];
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
+    <div className="flex animate-pop-in flex-col gap-8">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <h1 className={styles.title}>Gestión de Usuarios</h1>
-          <p className={styles.subtitle}>Administra los usuarios y permisos del sistema</p>
+          <h1 className="mb-1 font-heading text-3xl font-extrabold text-navy">Gestión de Usuarios</h1>
+          <p className="text-sm text-plai-muted md:text-base">Administra los usuarios y permisos del sistema</p>
         </div>
       </div>
 
-      <div className={styles.statsGrid}>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Total Usuarios" value={data.length} icon={<RiUserLine />} variant="primary" />
         <StatCard title="Activos" value={activos} icon={<RiUserLine />} variant="success" />
         <StatCard title="Administradores" value={admins} icon={<RiShieldUserLine />} variant="warning" />
@@ -167,48 +161,48 @@ export default function UsuariosPage() {
       />
 
       {isModalOpen && (
-        <div className={styles.modalOverlay} onClick={() => setIsModalOpen(false)}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()}>
-            <h2 className={styles.modalTitle}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-pop-in" onClick={() => setIsModalOpen(false)}>
+          <div className="w-full max-w-[500px] rounded-2xl border border-black/[0.08] bg-white p-6 shadow-2xl md:p-8" onClick={e => e.stopPropagation()}>
+            <h2 className="mb-6 font-heading text-xl font-bold text-navy md:text-2xl">
               {editingItem ? 'Editar Usuario' : 'Nuevo Usuario'}
             </h2>
             <form onSubmit={handleSubmit}>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Nombre completo</label>
-                <input type="text" name="name" className={styles.input} defaultValue={editingItem?.name} required />
+              <div className="mb-4 flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Nombre completo</label>
+                <input type="text" name="name" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem?.name} required />
               </div>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Correo electrónico</label>
-                <input type="email" name="email" className={styles.input} defaultValue={editingItem?.email} required />
+              <div className="mb-4 flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Correo electrónico</label>
+                <input type="email" name="email" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem?.email} required />
               </div>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Rol</label>
-                <select name="role" className={styles.select} defaultValue={editingItem?.role || 'Colaborador'}>
+              <div className="mb-4 flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Rol</label>
+                <select name="role" className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem?.role || 'Colaborador'}>
                   <option value="Administrador">Administrador</option>
                   <option value="Colaborador">Colaborador</option>
                   <option value="Usuario Final">Usuario Final</option>
                 </select>
               </div>
               {editingItem && (
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Estado</label>
-                  <select name="status" className={styles.select} defaultValue={editingItem?.status}>
+                <div className="mb-4 flex flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Estado</label>
+                  <select name="status" className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem?.status}>
                     <option value="Activo">Activo</option>
                     <option value="Inactivo">Inactivo</option>
                   </select>
                 </div>
               )}
-              <div className={styles.roleInfo}>
-                <div className={styles.roleInfoTitle}>Descripción de roles:</div>
-                <div className={styles.roleInfoGrid}>
+              <div className="my-4 rounded-xl border border-black/[0.06] bg-gray-50 p-3.5 text-xs text-gray-600">
+                <div className="mb-1 font-bold text-navy">Descripción de roles:</div>
+                <div className="flex flex-col gap-1">
                   <div><strong>Administrador:</strong> Acceso total al sistema, gestiona recursos y usuarios.</div>
                   <div><strong>Colaborador:</strong> Consulta y solicita reservaciones, gestión limitada.</div>
                   <div><strong>Usuario Final:</strong> Solo consulta información pública.</div>
                 </div>
               </div>
-              <div className={styles.modalActions}>
-                <button type="button" className={styles.btnCancel} onClick={() => setIsModalOpen(false)}>Cancelar</button>
-                <button type="submit" className={styles.btnSubmit}>{editingItem ? 'Guardar Cambios' : 'Crear Usuario'}</button>
+              <div className="mt-6 flex justify-end gap-3">
+                <button type="button" className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100" onClick={() => setIsModalOpen(false)}>Cancelar</button>
+                <button type="submit" className="rounded-lg bg-plai px-5 py-2 text-sm font-semibold text-white shadow-md transition-all hover:bg-plai-dark">{editingItem ? 'Guardar Cambios' : 'Crear Usuario'}</button>
               </div>
             </form>
           </div>

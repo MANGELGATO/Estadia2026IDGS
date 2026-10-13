@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from 'react';
-import styles from './page.module.css';
 import DataTable, { Column } from '../../components/admin/DataTable';
 import StatCard from '../../components/admin/StatCard';
 import { RiToolsLine, RiAlertLine, RiCheckLine, RiTimeLine } from 'react-icons/ri';
@@ -97,44 +96,52 @@ export default function MantenimientoPage() {
   const columns: Column[] = [
     { key: 'equipo', label: 'Equipo', render: (v, item) => (
       <div>
-        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-navy)' }}>{v}</div>
-        <div style={{ fontSize: '0.75rem', color: 'var(--text-light)' }}>{item.categoria}</div>
+        <div className="text-sm font-semibold text-navy">{v}</div>
+        <div className="text-xs text-plai-muted">{item.categoria}</div>
       </div>
     )},
     { key: 'descripcion', label: 'Descripción', render: (v) => (
-      <span style={{ fontSize: '0.85rem', color: 'var(--text-gray)', maxWidth: 220, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
+      <span className="block max-w-[220px] truncate text-xs text-gray-700">{v}</span>
     )},
     { key: 'priority', label: 'Prioridad', render: (v) => {
       const cfg = priorityConfig[v as MaintenancePriority];
-      return <span style={{ display: 'inline-block', padding: '0.2rem 0.6rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: cfg.bg, color: cfg.color }}>{v}</span>;
+      return <span className="inline-block rounded-full px-2.5 py-0.5 text-xs font-bold" style={{ backgroundColor: cfg.bg, color: cfg.color }}>{v}</span>;
     }},
     { key: 'status', label: 'Estado', render: (v) => {
       const cfg = statusConfig[v as MaintenanceStatus];
-      return <span style={{ display: 'inline-block', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 600, backgroundColor: cfg.bg, color: cfg.color }}>{v}</span>;
+      return <span className="inline-block rounded-full px-3 py-1 text-xs font-semibold" style={{ backgroundColor: cfg.bg, color: cfg.color }}>{v}</span>;
     }},
-    { key: 'tecnico', label: 'Técnico', render: (v) => v || <span style={{ color: 'var(--text-light)', fontSize: '0.8rem' }}>Sin asignar</span> },
+    { key: 'tecnico', label: 'Técnico', render: (v) => v || <span className="text-xs text-plai-muted">Sin asignar</span> },
     { key: 'fechaReporte', label: 'Reportado' },
   ];
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
+    <div className="flex animate-pop-in flex-col gap-8">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <h1 className={styles.title}>Mantenimiento</h1>
-          <p className={styles.subtitle}>Registro de incidencias y mantenimiento de equipos</p>
+          <h1 className="mb-1 font-heading text-3xl font-extrabold text-navy">Mantenimiento</h1>
+          <p className="text-sm text-plai-muted md:text-base">Registro de incidencias y mantenimiento de equipos</p>
         </div>
       </div>
 
-      <div className={styles.statsGrid}>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Abiertas" value={abiertas} icon={<RiAlertLine />} variant="danger" />
         <StatCard title="En Proceso" value={enProceso} icon={<RiTimeLine />} variant="warning" />
         <StatCard title="Resueltas" value={resueltas} icon={<RiCheckLine />} variant="success" />
         <StatCard title="Alta Prioridad" value={altaPrioridad} icon={<RiToolsLine />} variant="danger" />
       </div>
 
-      <div className={styles.filterBar}>
+      <div className="flex flex-wrap gap-2">
         {['Todas', 'Abierta', 'En proceso', 'Resuelta', 'Cerrada'].map(s => (
-          <button key={s} className={`${styles.filterBtn} ${filterStatus === s ? styles.filterBtnActive : ''}`} onClick={() => setFilterStatus(s)}>
+          <button 
+            key={s} 
+            className={`cursor-pointer rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
+              filterStatus === s 
+                ? 'bg-plai text-white shadow-sm' 
+                : 'border border-black/[0.08] bg-white text-gray-700 hover:bg-gray-100'
+            }`} 
+            onClick={() => setFilterStatus(s)}
+          >
             {s}
           </button>
         ))}
@@ -151,22 +158,22 @@ export default function MantenimientoPage() {
       />
 
       {isModalOpen && (
-        <div className={styles.modalOverlay} onClick={() => setIsModalOpen(false)}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()}>
-            <h2 className={styles.modalTitle}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-pop-in" onClick={() => setIsModalOpen(false)}>
+          <div className="w-full max-w-[600px] rounded-2xl border border-black/[0.08] bg-white p-6 shadow-2xl md:p-8" onClick={e => e.stopPropagation()}>
+            <h2 className="mb-6 font-heading text-xl font-bold text-navy md:text-2xl">
               {editingItem ? 'Actualizar Registro' : 'Nueva Incidencia'}
             </h2>
             <form onSubmit={handleSubmit}>
               {!editingItem ? (
                 <>
-                  <div className={styles.formGrid}>
-                    <div className={styles.formGroup}>
-                      <label className={styles.label}>Equipo</label>
-                      <input type="text" name="equipo" className={styles.input} required placeholder="Nombre del equipo" />
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-navy">Equipo</label>
+                      <input type="text" name="equipo" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" required placeholder="Nombre del equipo" />
                     </div>
-                    <div className={styles.formGroup}>
-                      <label className={styles.label}>Categoría</label>
-                      <select name="categoria" className={styles.select}>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-navy">Categoría</label>
+                      <select name="categoria" className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20">
                         <option>Realidad Virtual</option>
                         <option>Robótica</option>
                         <option>Fabricación Digital</option>
@@ -176,67 +183,67 @@ export default function MantenimientoPage() {
                         <option>Electrónica</option>
                       </select>
                     </div>
-                    <div className={styles.formGroup}>
-                      <label className={styles.label}>Reportado por</label>
-                      <input type="text" name="reportadoPor" className={styles.input} required placeholder="Nombre del reportante" />
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-navy">Reportado por</label>
+                      <input type="text" name="reportadoPor" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" required placeholder="Nombre del reportante" />
                     </div>
-                    <div className={styles.formGroup}>
-                      <label className={styles.label}>Técnico asignado</label>
-                      <input type="text" name="tecnico" className={styles.input} placeholder="Opcional" />
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-navy">Técnico asignado</label>
+                      <input type="text" name="tecnico" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" placeholder="Opcional" />
                     </div>
-                    <div className={styles.formGroup}>
-                      <label className={styles.label}>Prioridad</label>
-                      <select name="priority" className={styles.select}>
+                    <div className="flex flex-col gap-1.5 sm:col-span-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-navy">Prioridad</label>
+                      <select name="priority" className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20">
                         <option value="Alta">Alta</option>
                         <option value="Media">Media</option>
                         <option value="Baja">Baja</option>
                       </select>
                     </div>
                   </div>
-                  <div className={styles.formGroup}>
-                    <label className={styles.label}>Descripción del problema</label>
-                    <textarea name="descripcion" className={styles.input} rows={3} required placeholder="Describe la falla o problema detectado" style={{ resize: 'vertical' }} />
+                  <div className="mt-4 flex flex-col gap-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-navy">Descripción del problema</label>
+                    <textarea name="descripcion" className="w-full resize-y rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" rows={3} required placeholder="Describe la falla o problema detectado" />
                   </div>
                 </>
               ) : (
                 <>
-                  <div className={styles.equipoLabel}>{editingItem.equipo}</div>
-                  <div className={styles.formGrid}>
-                    <div className={styles.formGroup}>
-                      <label className={styles.label}>Estado</label>
-                      <select name="status" className={styles.select} defaultValue={editingItem.status}>
+                  <div className="mb-4 rounded-lg bg-gray-50 p-3 font-heading text-sm font-bold text-navy">{editingItem.equipo}</div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-navy">Estado</label>
+                      <select name="status" className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem.status}>
                         <option value="Abierta">Abierta</option>
                         <option value="En proceso">En proceso</option>
                         <option value="Resuelta">Resuelta</option>
                         <option value="Cerrada">Cerrada</option>
                       </select>
                     </div>
-                    <div className={styles.formGroup}>
-                      <label className={styles.label}>Prioridad</label>
-                      <select name="priority" className={styles.select} defaultValue={editingItem.priority}>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-navy">Prioridad</label>
+                      <select name="priority" className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem.priority}>
                         <option value="Alta">Alta</option>
                         <option value="Media">Media</option>
                         <option value="Baja">Baja</option>
                       </select>
                     </div>
-                    <div className={styles.formGroup}>
-                      <label className={styles.label}>Técnico</label>
-                      <input type="text" name="tecnico" className={styles.input} defaultValue={editingItem.tecnico} placeholder="Sin asignar" />
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-navy">Técnico</label>
+                      <input type="text" name="tecnico" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem.tecnico} placeholder="Sin asignar" />
                     </div>
-                    <div className={styles.formGroup}>
-                      <label className={styles.label}>Fecha resolución</label>
-                      <input type="date" name="fechaResolucion" className={styles.input} defaultValue={editingItem.fechaResolucion} />
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-navy">Fecha resolución</label>
+                      <input type="date" name="fechaResolucion" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem.fechaResolucion} />
                     </div>
                   </div>
-                  <div className={styles.formGroup}>
-                    <label className={styles.label}>Actualizar descripción</label>
-                    <textarea name="descripcion" className={styles.input} rows={3} defaultValue={editingItem.descripcion} style={{ resize: 'vertical' }} />
+                  <div className="mt-4 flex flex-col gap-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-navy">Actualizar descripción</label>
+                    <textarea name="descripcion" className="w-full resize-y rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" rows={3} defaultValue={editingItem.descripcion} />
                   </div>
                 </>
               )}
-              <div className={styles.modalActions}>
-                <button type="button" className={styles.btnCancel} onClick={() => setIsModalOpen(false)}>Cancelar</button>
-                <button type="submit" className={styles.btnSubmit}>{editingItem ? 'Actualizar' : 'Registrar'}</button>
+              <div className="mt-6 flex justify-end gap-3">
+                <button type="button" className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100" onClick={() => setIsModalOpen(false)}>Cancelar</button>
+                <button type="submit" className="rounded-lg bg-plai px-5 py-2 text-sm font-semibold text-white shadow-md transition-all hover:bg-plai-dark">{editingItem ? 'Actualizar' : 'Registrar'}</button>
               </div>
             </form>
           </div>

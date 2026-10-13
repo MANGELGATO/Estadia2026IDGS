@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from 'react';
-import styles from './page.module.css';
 import { RiSaveLine, RiAddLine, RiDeleteBinLine } from 'react-icons/ri';
 
 type Config = {
@@ -21,12 +20,12 @@ const defaultCategorias = [
 ];
 
 const defaultEstados = [
-  { nombre: 'Disponible',      color: '#059669' },
-  { nombre: 'Reservado',       color: '#4F46E5' },
-  { nombre: 'En uso',          color: '#3B82F6' },
+  { nombre: 'Disponible',       color: '#059669' },
+  { nombre: 'Reservado',        color: '#4F46E5' },
+  { nombre: 'En uso',           color: '#3B82F6' },
   { nombre: 'En mantenimiento', color: '#D97706' },
   { nombre: 'Fuera de servicio', color: '#DC2626' },
-  { nombre: 'No disponible',   color: '#6B7280' },
+  { nombre: 'No disponible',    color: '#6B7280' },
 ];
 
 export default function ConfiguracionPage() {
@@ -62,42 +61,40 @@ export default function ConfiguracionPage() {
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Configuración</h1>
-          <p className={styles.subtitle}>Ajusta los parámetros generales del sistema PLAi</p>
-        </div>
+    <div className="flex animate-pop-in flex-col">
+      <div className="mb-8">
+        <h1 className="mb-1 font-heading text-3xl font-extrabold text-navy">Configuración</h1>
+        <p className="text-sm text-plai-muted md:text-base">Ajusta los parámetros generales del sistema PLAi</p>
       </div>
 
       <form onSubmit={handleSave}>
         {/* General */}
-        <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>🏢 Información General</h2>
-          <div className={styles.formGrid}>
-            <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
-              <label className={styles.label}>Nombre del Laboratorio</label>
+        <div className="mb-6 rounded-2xl border border-black/[0.06] bg-white p-6 shadow-plai-sm md:p-7">
+          <h2 className="mb-5 border-b border-gray-100 pb-3 font-heading text-base font-bold text-navy">🏢 Información General</h2>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div className="flex flex-col gap-1.5 md:col-span-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-navy">Nombre del Laboratorio</label>
               <input
                 type="text"
-                className={styles.input}
+                className="w-full rounded-lg border border-gray-300 bg-gray-50/50 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:bg-white focus:outline-none focus:ring-2 focus:ring-plai/20"
                 value={config.labName}
                 onChange={e => setConfig({ ...config, labName: e.target.value })}
               />
             </div>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Ubicación</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-navy">Ubicación</label>
               <input
                 type="text"
-                className={styles.input}
+                className="w-full rounded-lg border border-gray-300 bg-gray-50/50 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:bg-white focus:outline-none focus:ring-2 focus:ring-plai/20"
                 value={config.labLocation}
                 onChange={e => setConfig({ ...config, labLocation: e.target.value })}
               />
             </div>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Correo Administrativo</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-navy">Correo Administrativo</label>
               <input
                 type="email"
-                className={styles.input}
+                className="w-full rounded-lg border border-gray-300 bg-gray-50/50 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:bg-white focus:outline-none focus:ring-2 focus:ring-plai/20"
                 value={config.adminEmail}
                 onChange={e => setConfig({ ...config, adminEmail: e.target.value })}
               />
@@ -106,128 +103,128 @@ export default function ConfiguracionPage() {
         </div>
 
         {/* Reservations */}
-        <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>📅 Configuración de Reservaciones</h2>
-          <div className={styles.formGrid}>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Máx. horas por reservación</label>
+        <div className="mb-6 rounded-2xl border border-black/[0.06] bg-white p-6 shadow-plai-sm md:p-7">
+          <h2 className="mb-5 border-b border-gray-100 pb-3 font-heading text-base font-bold text-navy">📅 Configuración de Reservaciones</h2>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-navy">Máx. horas por reservación</label>
               <input
                 type="number"
-                className={styles.input}
+                className="w-full rounded-lg border border-gray-300 bg-gray-50/50 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:bg-white focus:outline-none focus:ring-2 focus:ring-plai/20"
                 min={1} max={24}
                 value={config.maxReservationHours}
                 onChange={e => setConfig({ ...config, maxReservationHours: Number(e.target.value) })}
               />
-              <span className={styles.hint}>Límite en horas para una sola reservación</span>
+              <span className="text-xs text-plai-muted">Límite en horas para una sola reservación</span>
             </div>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Máx. días de anticipación</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-navy">Máx. días de anticipación</label>
               <input
                 type="number"
-                className={styles.input}
+                className="w-full rounded-lg border border-gray-300 bg-gray-50/50 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:bg-white focus:outline-none focus:ring-2 focus:ring-plai/20"
                 min={1} max={90}
                 value={config.maxAdvanceDays}
                 onChange={e => setConfig({ ...config, maxAdvanceDays: Number(e.target.value) })}
               />
-              <span className={styles.hint}>¿Con cuántos días de anticipación se puede reservar?</span>
+              <span className="text-xs text-plai-muted">¿Con cuántos días de anticipación se puede reservar?</span>
             </div>
           </div>
-          <div className={styles.toggleGroup}>
-            <label className={styles.toggleLabel}>
-              <div className={styles.toggleInfo}>
-                <span className={styles.label}>Requerir aprobación manual</span>
-                <span className={styles.hint}>Si está activo, las reservaciones requieren ser aprobadas por un admin antes de confirmarse</span>
+          <div className="mt-5 flex flex-col gap-5">
+            <label className="flex cursor-pointer items-start justify-between gap-4">
+              <div className="flex flex-1 flex-col gap-0.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-navy">Requerir aprobación manual</span>
+                <span className="text-xs text-plai-muted">Si está activo, las reservaciones requieren ser aprobadas por un admin antes de confirmarse</span>
               </div>
               <div
-                className={`${styles.toggle} ${config.requireApproval ? styles.toggleOn : ''}`}
+                className={`relative mt-0.5 h-[26px] w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${config.requireApproval ? 'bg-plai' : 'bg-gray-300'}`}
                 onClick={() => setConfig({ ...config, requireApproval: !config.requireApproval })}
                 role="switch"
                 aria-checked={config.requireApproval}
               >
-                <div className={styles.toggleKnob} />
+                <div className={`absolute top-[3px] left-[3px] size-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${config.requireApproval ? 'translate-x-[22px]' : ''}`} />
               </div>
             </label>
-            <label className={styles.toggleLabel}>
-              <div className={styles.toggleInfo}>
-                <span className={styles.label}>Permitir vista pública del inventario</span>
-                <span className={styles.hint}>Los usuarios no autenticados pueden ver el catálogo de recursos</span>
+            <label className="flex cursor-pointer items-start justify-between gap-4">
+              <div className="flex flex-1 flex-col gap-0.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-navy">Permitir vista pública del inventario</span>
+                <span className="text-xs text-plai-muted">Los usuarios no autenticados pueden ver el catálogo de recursos</span>
               </div>
               <div
-                className={`${styles.toggle} ${config.allowPublicView ? styles.toggleOn : ''}`}
+                className={`relative mt-0.5 h-[26px] w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${config.allowPublicView ? 'bg-plai' : 'bg-gray-300'}`}
                 onClick={() => setConfig({ ...config, allowPublicView: !config.allowPublicView })}
                 role="switch"
                 aria-checked={config.allowPublicView}
               >
-                <div className={styles.toggleKnob} />
+                <div className={`absolute top-[3px] left-[3px] size-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${config.allowPublicView ? 'translate-x-[22px]' : ''}`} />
               </div>
             </label>
           </div>
         </div>
 
         {/* Maintenance */}
-        <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>🔧 Alertas de Mantenimiento</h2>
-          <div className={styles.formGrid}>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Alerta preventiva (días)</label>
+        <div className="mb-6 rounded-2xl border border-black/[0.06] bg-white p-6 shadow-plai-sm md:p-7">
+          <h2 className="mb-5 border-b border-gray-100 pb-3 font-heading text-base font-bold text-navy">🔧 Alertas de Mantenimiento</h2>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-navy">Alerta preventiva (días)</label>
               <input
                 type="number"
-                className={styles.input}
+                className="w-full rounded-lg border border-gray-300 bg-gray-50/50 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:bg-white focus:outline-none focus:ring-2 focus:ring-plai/20"
                 min={7} max={365}
                 value={config.maintenanceAlertDays}
                 onChange={e => setConfig({ ...config, maintenanceAlertDays: Number(e.target.value) })}
               />
-              <span className={styles.hint}>Número de días antes del vencimiento para generar una alerta de mantenimiento</span>
+              <span className="text-xs text-plai-muted">Número de días antes del vencimiento para generar una alerta de mantenimiento</span>
             </div>
           </div>
         </div>
 
         {/* Categories */}
-        <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>🏷️ Categorías de Recursos</h2>
-          <div className={styles.categoryList}>
+        <div className="mb-6 rounded-2xl border border-black/[0.06] bg-white p-6 shadow-plai-sm md:p-7">
+          <h2 className="mb-5 border-b border-gray-100 pb-3 font-heading text-base font-bold text-navy">🏷️ Categorías de Recursos</h2>
+          <div className="mb-4 flex flex-wrap gap-2">
             {categorias.map(cat => (
-              <div key={cat} className={styles.categoryTag}>
+              <div key={cat} className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(168,30,113,0.2)] bg-[rgba(168,30,113,0.08)] px-3 py-1 text-xs font-semibold text-plai">
                 <span>{cat}</span>
-                <button type="button" className={styles.tagRemove} onClick={() => removeCategoria(cat)}>
+                <button type="button" className="cursor-pointer text-sm text-plai/60 transition-opacity hover:text-plai" onClick={() => removeCategoria(cat)}>
                   <RiDeleteBinLine />
                 </button>
               </div>
             ))}
           </div>
-          <div className={styles.addCategoryRow}>
+          <div className="flex max-w-md items-center gap-3">
             <input
               type="text"
-              className={styles.input}
+              className="flex-1 rounded-lg border border-gray-300 bg-gray-50/50 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:bg-white focus:outline-none focus:ring-2 focus:ring-plai/20"
               placeholder="Nueva categoría..."
               value={newCategoria}
               onChange={e => setNewCategoria(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCategoria())}
             />
-            <button type="button" className={styles.btnAdd} onClick={addCategoria}>
+            <button type="button" className="flex cursor-pointer items-center gap-1 rounded-lg border border-[rgba(168,30,113,0.25)] bg-[rgba(168,30,113,0.1)] px-4 py-2.5 font-heading text-xs font-semibold text-plai whitespace-nowrap transition-all hover:bg-plai hover:text-white" onClick={addCategoria}>
               <RiAddLine /> Agregar
             </button>
           </div>
         </div>
 
         {/* Equipment States */}
-        <div className={styles.section}>
-          <h2 className={styles.sectionTitle}>🚦 Estados de Equipos</h2>
-          <p className={styles.hint} style={{ marginBottom: '1rem' }}>Estados predefinidos del sistema para clasificar el inventario</p>
-          <div className={styles.statesGrid}>
+        <div className="mb-6 rounded-2xl border border-black/[0.06] bg-white p-6 shadow-plai-sm md:p-7">
+          <h2 className="mb-2 font-heading text-base font-bold text-navy">🚦 Estados de Equipos</h2>
+          <p className="mb-4 text-xs text-plai-muted">Estados predefinidos del sistema para clasificar el inventario</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
             {defaultEstados.map(e => (
-              <div key={e.nombre} className={styles.stateItem}>
-                <span className={styles.stateDot} style={{ background: e.color }} />
-                <span className={styles.stateName}>{e.nombre}</span>
+              <div key={e.nombre} className="flex items-center gap-2.5 rounded-lg border border-black/[0.04] bg-gray-50 p-2.5 text-xs text-navy">
+                <span className="size-2.5 shrink-0 rounded-full" style={{ background: e.color }} />
+                <span className="font-medium">{e.nombre}</span>
               </div>
             ))}
           </div>
         </div>
 
         {/* Save */}
-        <div className={styles.saveBar}>
-          {savedMsg && <span className={styles.savedMsg}>{savedMsg}</span>}
-          <button type="submit" className={styles.btnSave}>
+        <div className="sticky bottom-4 z-20 mt-2 flex items-center justify-end gap-4 rounded-2xl border border-black/[0.08] bg-white/95 p-4 shadow-xl backdrop-blur-md md:p-5">
+          {savedMsg && <span className="animate-pop-in text-sm font-semibold text-emerald-600">{savedMsg}</span>}
+          <button type="submit" className="flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-r from-plai to-[#c42585] px-6 py-2.5 font-heading text-sm font-bold text-white shadow-[0_4px_12px_rgba(168,30,113,0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(168,30,113,0.4)]">
             <RiSaveLine /> Guardar Configuración
           </button>
         </div>

@@ -46,25 +46,14 @@
   }
 }
 
-/* Variables heredadas: los módulos CSS aún sin migrar las siguen usando */
+/* Variables base del tema PLAi */
 :root {
   --primary: #a81e71;
   --primary-hover: #004a87;
   --navy: #1B365D;
   --navy-deep: #162E50;
   --bg-light: #F4F6F9;
-  --bg-white: #FFFFFF;
   --text-navy: #1B365D;
-  --text-gray: #4B5563;
-  --text-light: #6B7280;
-  --border-light: rgba(0,0,0,0.08);
-  --card-bg: #FFFFFF;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.1);
-  --shadow-lg: 0 10px 40px rgba(0,0,0,0.12);
-  --radius-xl: 1rem;
-  --radius-2xl: 1.5rem;
-  --transition: all 0.25s ease;
 
   /* Typography */
   --font-heading: var(--font-montserrat), 'Montserrat', 'Segoe UI', sans-serif;
@@ -91,8 +80,8 @@
     letter-spacing: -0.02em;
   }
 
-  /* Nav, buttons, labels → Montserrat for structure */
-  button, .navLink, label {
+  /* Buttons and labels use font-heading */
+  button, label {
     font-family: var(--font-heading);
   }
 

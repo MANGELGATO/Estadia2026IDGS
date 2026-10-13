@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from 'react';
-import styles from './page.module.css';
 import DataTable, { Column } from '../../components/admin/DataTable';
 
 type Equipment = {
@@ -98,11 +97,11 @@ export default function InventarioPage() {
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
+    <div className="flex animate-pop-in flex-col gap-8">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <h1 className={styles.title}>Gestión de Inventario</h1>
-          <p className={styles.subtitle}>Administra los recursos tecnológicos del laboratorio</p>
+          <h1 className="mb-1 font-heading text-3xl font-extrabold text-navy">Gestión de Inventario</h1>
+          <p className="text-sm text-plai-muted md:text-base">Administra los recursos tecnológicos del laboratorio</p>
         </div>
       </div>
 
@@ -117,45 +116,45 @@ export default function InventarioPage() {
       />
 
       {isModalOpen && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modal}>
-            <h2 className={styles.modalTitle}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-pop-in">
+          <div className="w-full max-w-[500px] rounded-2xl border border-black/[0.08] bg-white p-6 shadow-2xl md:p-8">
+            <h2 className="mb-6 font-heading text-xl font-bold text-navy md:text-2xl">
               {editingItem ? 'Modificar Recurso' : 'Registrar Nuevo Recurso'}
             </h2>
             <form onSubmit={handleSubmit}>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Nombre del Equipo</label>
+              <div className="mb-4 flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Nombre del Equipo</label>
                 <input 
                   type="text" 
                   name="name" 
-                  className={styles.input} 
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" 
                   defaultValue={editingItem?.name} 
                   required 
                 />
               </div>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Categoría</label>
+              <div className="mb-4 flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Categoría</label>
                 <input 
                   type="text" 
                   name="category" 
-                  className={styles.input} 
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" 
                   defaultValue={editingItem?.category} 
                   required 
                 />
               </div>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Estado</label>
-                <select name="status" className={styles.select} defaultValue={editingItem?.status || 'Activo'}>
+              <div className="mb-4 flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Estado</label>
+                <select name="status" className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem?.status || 'Activo'}>
                   <option value="Activo">Activo</option>
                   <option value="En mantenimiento">En mantenimiento</option>
                   <option value="Inactivo">Inactivo (Dado de baja)</option>
                 </select>
               </div>
-              <div className={styles.modalActions}>
-                <button type="button" className={styles.btnCancel} onClick={() => setIsModalOpen(false)}>
+              <div className="mt-6 flex justify-end gap-3">
+                <button type="button" className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100" onClick={() => setIsModalOpen(false)}>
                   Cancelar
                 </button>
-                <button type="submit" className={styles.btnSubmit}>
+                <button type="submit" className="rounded-lg bg-plai px-5 py-2 text-sm font-semibold text-white shadow-md transition-all hover:bg-plai-dark">
                   {editingItem ? 'Guardar Cambios' : 'Registrar'}
                 </button>
               </div>

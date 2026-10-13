@@ -1,27 +1,27 @@
 import React from 'react';
 import { RiEdit2Line, RiDeleteBinLine, RiAddLine } from 'react-icons/ri';
 
-/* eslint-disable @typescript-eslint/no-explicit-any --
-   Tabla genérica: las páginas admin pasan filas de distintas interfaces.
-   Pendiente tipar con genéricos al integrar la capa de datos real. */
-export type Column = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Column<T = any> = {
   key: string;
   label: string;
-  render?: (value: any, item: any) => React.ReactNode;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  render?: (value: any, item: T) => React.ReactNode;
 };
 
-type DataTableProps = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type DataTableProps<T extends Record<string, any> = any> = {
   title: string;
-  columns: Column[];
-  data: any[];
+  columns: Column<T>[];
+  data: T[];
   onAdd?: () => void;
-  onEdit?: (item: any) => void;
-  onDelete?: (item: any) => void;
+  onEdit?: (item: T) => void;
+  onDelete?: (item: T) => void;
   addActionLabel?: string;
 };
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
-export default function DataTable({ 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default function DataTable<T extends Record<string, any> = any>({ 
   title, 
   columns, 
   data, 
@@ -29,7 +29,7 @@ export default function DataTable({
   onEdit, 
   onDelete,
   addActionLabel = 'Agregar'
-}: DataTableProps) {
+}: DataTableProps<T>) {
   return (
     <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-white shadow-plai-sm">
       <div className="flex items-center justify-between border-b border-black/[0.08] p-6">
@@ -63,42 +63,48 @@ export default function DataTable({
             </tr>
           </thead>
           <tbody>
-            {data.map((item, index) => (
-              <tr
-                key={item.id || index}
-                className="transition-colors duration-[250ms] hover:bg-black/[0.02] last:[&>td]:border-b-0"
-              >
-                {columns.map((col) => (
-                  <td key={col.key} className="border-b border-black/[0.08] px-6 py-4 text-sm text-plai-gray">
-                    {col.render ? col.render(item[col.key], item) : item[col.key]}
-                  </td>
-                ))}
-                {(onEdit || onDelete) && (
-                  <td className="border-b border-black/[0.08] px-6 py-4 text-center">
-                    <div className="flex justify-center gap-2">
-                      {onEdit && (
-                        <button 
-                          className="cursor-pointer rounded p-1 text-xl text-plai-muted transition-colors duration-[250ms] hover:bg-plai/10 hover:text-plai" 
-                          onClick={() => onEdit(item)}
-                          title="Editar"
-                        >
-                          <RiEdit2Line />
-                        </button>
-                      )}
-                      {onDelete && (
-                        <button 
-                          className="cursor-pointer rounded p-1 text-xl text-plai-muted transition-colors duration-[250ms] hover:bg-red-500/10 hover:text-red-500" 
-                          onClick={() => onDelete(item)}
-                          title="Eliminar / Dar de baja"
-                        >
-                          <RiDeleteBinLine />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
+            {data.map((item, index) => {
+              const rowKey = typeof item?.id === 'string' || typeof item?.id === 'number' ? item.id : index;
+              return (
+                <tr
+                  key={rowKey}
+                  className="transition-colors duration-[250ms] hover:bg-black/[0.02] last:[&>td]:border-b-0"
+                >
+                  {columns.map((col) => {
+                    const cellVal = item?.[col.key];
+                    return (
+                      <td key={col.key} className="border-b border-black/[0.08] px-6 py-4 text-sm text-plai-gray">
+                        {col.render ? col.render(cellVal, item) : (cellVal != null ? String(cellVal) : null)}
+                      </td>
+                    );
+                  })}
+                  {(onEdit || onDelete) && (
+                    <td className="border-b border-black/[0.08] px-6 py-4 text-center">
+                      <div className="flex justify-center gap-2">
+                        {onEdit && (
+                          <button 
+                            className="cursor-pointer rounded p-1 text-xl text-plai-muted transition-colors duration-[250ms] hover:bg-plai/10 hover:text-plai" 
+                            onClick={() => onEdit(item)}
+                            title="Editar"
+                          >
+                            <RiEdit2Line />
+                          </button>
+                        )}
+                        {onDelete && (
+                          <button 
+                            className="cursor-pointer rounded p-1 text-xl text-plai-muted transition-colors duration-[250ms] hover:bg-red-500/10 hover:text-red-500" 
+                            onClick={() => onDelete(item)}
+                            title="Eliminar / Dar de baja"
+                          >
+                            <RiDeleteBinLine />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
             {data.length === 0 && (
               <tr>
                 <td

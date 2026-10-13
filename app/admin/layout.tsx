@@ -1,6 +1,5 @@
 import React from "react";
 import AdminSidebar from "../components/admin/AdminSidebar";
-import styles from "./layout.module.css";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -14,9 +13,9 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className={styles.layout}>
+    <div className="flex min-h-[calc(100vh-70px)] flex-col bg-[#F4F6F9] md:flex-row">
       <AdminSidebar />
-      <main className={styles.main}>
+      <main className="flex-1 overflow-y-auto p-4 md:p-8">
         {children}
       </main>
     </div>

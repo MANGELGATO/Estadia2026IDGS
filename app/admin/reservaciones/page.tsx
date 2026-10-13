@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from 'react';
-import styles from './page.module.css';
 import DataTable, { Column } from '../../components/admin/DataTable';
 import { RiCalendarCheckLine, RiCheckLine, RiCloseLine, RiTimeLine, RiEyeLine } from 'react-icons/ri';
 import StatCard from '../../components/admin/StatCard';
@@ -127,12 +126,7 @@ export default function ReservacionesPage() {
       render: (_, item) => (
         <button
           onClick={() => handleDetail(item)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '0.25rem',
-            padding: '0.35rem 0.75rem', borderRadius: '0.5rem',
-            background: 'rgba(168,30,113,0.1)', color: 'var(--primary)',
-            fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', border: 'none',
-          }}
+          className="flex items-center gap-1 rounded-lg bg-[rgba(168,30,113,0.1)] px-3 py-1.5 text-xs font-semibold text-plai transition-colors hover:bg-plai hover:text-white"
         >
           <RiEyeLine /> Ver
         </button>
@@ -141,26 +135,30 @@ export default function ReservacionesPage() {
   ];
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
+    <div className="flex animate-pop-in flex-col gap-8">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <h1 className={styles.title}>Reservaciones</h1>
-          <p className={styles.subtitle}>Gestión de solicitudes y reservas de recursos tecnológicos</p>
+          <h1 className="mb-1 font-heading text-3xl font-extrabold text-navy">Reservaciones</h1>
+          <p className="text-sm text-plai-muted md:text-base">Gestión de solicitudes y reservas de recursos tecnológicos</p>
         </div>
       </div>
 
-      <div className={styles.statsGrid}>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Pendientes" value={pendientes} icon={<RiTimeLine />} variant="warning" />
         <StatCard title="Activas" value={aprobadas} icon={<RiCheckLine />} variant="success" />
         <StatCard title="Completadas" value={completadas} icon={<RiCalendarCheckLine />} variant="primary" />
         <StatCard title="Total" value={data.length} icon={<RiCalendarCheckLine />} variant="primary" />
       </div>
 
-      <div className={styles.filterBar}>
+      <div className="flex flex-wrap gap-2">
         {['Todas', 'Pendiente', 'Aprobada', 'En uso', 'Completada', 'Rechazada'].map(s => (
           <button
             key={s}
-            className={`${styles.filterBtn} ${filterStatus === s ? styles.filterBtnActive : ''}`}
+            className={`cursor-pointer rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
+              filterStatus === s 
+                ? 'bg-plai text-white shadow-sm' 
+                : 'border border-black/[0.08] bg-white text-gray-700 hover:bg-gray-100'
+            }`}
             onClick={() => setFilterStatus(s)}
           >
             {s}
@@ -179,52 +177,52 @@ export default function ReservacionesPage() {
 
       {/* Detail/Action Modal */}
       {isDetailOpen && selectedItem && (
-        <div className={styles.modalOverlay} onClick={() => setIsDetailOpen(false)}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>Detalle de Reservación</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-pop-in" onClick={() => setIsDetailOpen(false)}>
+          <div className="w-full max-w-[560px] rounded-2xl border border-black/[0.08] bg-white p-6 shadow-2xl md:p-8" onClick={e => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3">
+              <h2 className="font-heading text-xl font-bold text-navy">Detalle de Reservación</h2>
               <StatusBadge value={selectedItem.status} />
             </div>
-            <div className={styles.detailGrid}>
-              <div className={styles.detailItem}><span className={styles.detailLabel}>Usuario</span><span className={styles.detailValue}>{selectedItem.usuario}</span></div>
-              <div className={styles.detailItem}><span className={styles.detailLabel}>Recurso</span><span className={styles.detailValue}>{selectedItem.recurso}</span></div>
-              <div className={styles.detailItem}><span className={styles.detailLabel}>Categoría</span><span className={styles.detailValue}>{selectedItem.categoria}</span></div>
-              <div className={styles.detailItem}><span className={styles.detailLabel}>Fecha</span><span className={styles.detailValue}>{selectedItem.fecha}</span></div>
-              <div className={styles.detailItem}><span className={styles.detailLabel}>Horario</span><span className={styles.detailValue}>{selectedItem.horaInicio} – {selectedItem.horaFin}</span></div>
-              <div className={styles.detailItem} style={{ gridColumn: '1 / -1' }}><span className={styles.detailLabel}>Actividad</span><span className={styles.detailValue}>{selectedItem.actividad}</span></div>
+            <div className="my-4 grid grid-cols-1 gap-4 rounded-xl border border-black/[0.04] bg-gray-50 p-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1"><span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Usuario</span><span className="text-sm font-semibold text-gray-800">{selectedItem.usuario}</span></div>
+              <div className="flex flex-col gap-1"><span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Recurso</span><span className="text-sm font-semibold text-gray-800">{selectedItem.recurso}</span></div>
+              <div className="flex flex-col gap-1"><span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Categoría</span><span className="text-sm font-semibold text-gray-800">{selectedItem.categoria}</span></div>
+              <div className="flex flex-col gap-1"><span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Fecha</span><span className="text-sm font-semibold text-gray-800">{selectedItem.fecha}</span></div>
+              <div className="flex flex-col gap-1"><span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Horario</span><span className="text-sm font-semibold text-gray-800">{selectedItem.horaInicio} – {selectedItem.horaFin}</span></div>
+              <div className="flex flex-col gap-1 sm:col-span-2"><span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Actividad</span><span className="text-sm font-semibold text-gray-800">{selectedItem.actividad}</span></div>
               {selectedItem.observaciones && (
-                <div className={styles.detailItem} style={{ gridColumn: '1 / -1' }}>
-                  <span className={styles.detailLabel}>Observaciones</span>
-                  <span className={styles.detailValue}>{selectedItem.observaciones}</span>
+                <div className="flex flex-col gap-1 sm:col-span-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Observaciones</span>
+                  <span className="text-sm font-semibold text-gray-800">{selectedItem.observaciones}</span>
                 </div>
               )}
             </div>
             {selectedItem.status === 'Pendiente' && (
-              <div className={styles.actionButtons}>
-                <button className={styles.btnApprove} onClick={() => changeStatus(selectedItem, 'Aprobada')}>
+              <div className="my-4 flex gap-3">
+                <button className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-emerald-700" onClick={() => changeStatus(selectedItem, 'Aprobada')}>
                   <RiCheckLine /> Aprobar
                 </button>
-                <button className={styles.btnReject} onClick={() => changeStatus(selectedItem, 'Rechazada')}>
+                <button className="flex items-center gap-1.5 rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-rose-700" onClick={() => changeStatus(selectedItem, 'Rechazada')}>
                   <RiCloseLine /> Rechazar
                 </button>
               </div>
             )}
             {selectedItem.status === 'Aprobada' && (
-              <div className={styles.actionButtons}>
-                <button className={styles.btnApprove} onClick={() => changeStatus(selectedItem, 'En uso')}>
+              <div className="my-4 flex gap-3">
+                <button className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-indigo-700" onClick={() => changeStatus(selectedItem, 'En uso')}>
                   <RiCheckLine /> Marcar En Uso
                 </button>
               </div>
             )}
             {selectedItem.status === 'En uso' && (
-              <div className={styles.actionButtons}>
-                <button className={styles.btnApprove} onClick={() => changeStatus(selectedItem, 'Completada')}>
+              <div className="my-4 flex gap-3">
+                <button className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-emerald-700" onClick={() => changeStatus(selectedItem, 'Completada')}>
                   <RiCheckLine /> Completar
                 </button>
               </div>
             )}
-            <div className={styles.modalActions}>
-              <button className={styles.btnCancel} onClick={() => setIsDetailOpen(false)}>Cerrar</button>
+            <div className="mt-6 flex justify-end">
+              <button className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100" onClick={() => setIsDetailOpen(false)}>Cerrar</button>
             </div>
           </div>
         </div>
@@ -232,22 +230,22 @@ export default function ReservacionesPage() {
 
       {/* New Reservation Modal */}
       {isModalOpen && (
-        <div className={styles.modalOverlay} onClick={() => setIsModalOpen(false)}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()}>
-            <h2 className={styles.modalTitle}>Nueva Reservación</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-pop-in" onClick={() => setIsModalOpen(false)}>
+          <div className="w-full max-w-[600px] rounded-2xl border border-black/[0.08] bg-white p-6 shadow-2xl md:p-8" onClick={e => e.stopPropagation()}>
+            <h2 className="mb-6 font-heading text-xl font-bold text-navy md:text-2xl">Nueva Reservación</h2>
             <form onSubmit={handleSubmit}>
-              <div className={styles.formGrid}>
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Usuario</label>
-                  <input type="text" name="usuario" className={styles.input} required placeholder="Nombre completo" />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Usuario</label>
+                  <input type="text" name="usuario" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" required placeholder="Nombre completo" />
                 </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Recurso</label>
-                  <input type="text" name="recurso" className={styles.input} required placeholder="Nombre del equipo" />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Recurso</label>
+                  <input type="text" name="recurso" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" required placeholder="Nombre del equipo" />
                 </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Categoría</label>
-                  <select name="categoria" className={styles.select}>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Categoría</label>
+                  <select name="categoria" className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20">
                     <option>Realidad Virtual</option>
                     <option>Robótica</option>
                     <option>Fabricación Digital</option>
@@ -257,30 +255,30 @@ export default function ReservacionesPage() {
                     <option>Electrónica</option>
                   </select>
                 </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Fecha</label>
-                  <input type="date" name="fecha" className={styles.input} required />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Fecha</label>
+                  <input type="date" name="fecha" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" required />
                 </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Hora Inicio</label>
-                  <input type="time" name="horaInicio" className={styles.input} required />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Hora Inicio</label>
+                  <input type="time" name="horaInicio" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" required />
                 </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Hora Fin</label>
-                  <input type="time" name="horaFin" className={styles.input} required />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Hora Fin</label>
+                  <input type="time" name="horaFin" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" required />
                 </div>
-                <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
-                  <label className={styles.label}>Actividad / Propósito</label>
-                  <input type="text" name="actividad" className={styles.input} required placeholder="Describe el uso del recurso" />
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Actividad / Propósito</label>
+                  <input type="text" name="actividad" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" required placeholder="Describe el uso del recurso" />
                 </div>
-                <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
-                  <label className={styles.label}>Observaciones</label>
-                  <textarea name="observaciones" className={styles.input} rows={2} placeholder="Notas adicionales (opcional)" style={{ resize: 'vertical' }} />
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Observaciones</label>
+                  <textarea name="observaciones" className="w-full resize-y rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" rows={2} placeholder="Notas adicionales (opcional)" />
                 </div>
               </div>
-              <div className={styles.modalActions}>
-                <button type="button" className={styles.btnCancel} onClick={() => setIsModalOpen(false)}>Cancelar</button>
-                <button type="submit" className={styles.btnSubmit}>Registrar Solicitud</button>
+              <div className="mt-6 flex justify-end gap-3">
+                <button type="button" className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100" onClick={() => setIsModalOpen(false)}>Cancelar</button>
+                <button type="submit" className="rounded-lg bg-plai px-5 py-2 text-sm font-semibold text-white shadow-md transition-all hover:bg-plai-dark">Registrar Solicitud</button>
               </div>
             </form>
           </div>
