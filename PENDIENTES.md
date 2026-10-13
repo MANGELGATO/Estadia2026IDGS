@@ -1,61 +1,107 @@
-# Pendientes — Alineación con el Estándar PLAi v1.0
+# Lista de Pendientes — Alineación con el Estándar Tecnológico PLAi v1.0
 
-Actualizado tras completar las Fases 1–8 y migración integral a Tailwind CSS 4.x + daisyUI 5.  
-Estado verificado: `pnpm lint` (0 errores), `pnpm test` (17 pruebas en verde) y `pnpm build` (`output: 'standalone'`, 26 rutas estáticas).
+> **Documento normativo de referencia:** `est_ndar_tecnol_gico_plai.md` (Área de Tecnología e Infraestructura, versión 1.0, 7 de octubre de 2026).  
+> **Estado general del repositorio:** Fases 1 a 8 completadas a nivel de código y diseño. Compilación en producción `next build` (`output: 'standalone'`), linter `eslint` (0 errores) y suite de pruebas `vitest run` (17 pruebas en verde) funcionando al 100%.
 
-## Estado por fase
+---
 
-| Fase | Tema | Estado |
+## 1. Matriz de Cumplimiento Normativo (Sección 11 del Estándar)
+
+Esta tabla resume el estado actual contra la **Lista de Verificación de Aceptación** oficial de PLAi:
+
+| Criterio Normativo (Sec. 11) | Nivel de Exigencia | Estado Actual | Detalle técnico |
+| :--- | :--- | :--- | :--- |
+| **Arquitectura** | `[OBLIGATORIO]` | **CUMPLE** | Next.js 16.4 (App Router) + TypeScript 5 + React 19 + Tailwind CSS 4 + daisyUI 5. Sin frameworks monolíticos ni SaaS externos. |
+| **Dockerfile** | `[OBLIGATORIO]` | **CUMPLE (Código)** | Multi-etapa (`deps` -> `build` -> `runner`), base fija `node:22-alpine3.22`, usuario `node` (UID 1001), PID 1 con `tini`, puerto 3000, `HEALTHCHECK`. |
+| **Compose (Swarm)** | `[OBLIGATORIO]` | **CUMPLE (Código)** | `read_only: true`, `cap_drop: [ALL]`, `no-new-privileges`, `tmpfs` en `/tmp` y cache, límites de CPU/RAM, labels Traefik v3, sin `ports` publicados. |
+| **Salud** | `[OBLIGATORIO]` | **CUMPLE** | Endpoint `/api/health` (`force-dynamic`) responde 200 en milisegundos sin autenticación. |
+| **Configuración** | `[OBLIGATORIO]` | **CUMPLE** | `.env.example` documentado con valores ficticios; principios 12-factor; ninguna URL ni credencial quemada en el código. |
+| **Secretos** | `[OBLIGATORIO]` | **CUMPLE** | Lector `lib/env.ts` implementa patrón `VARIABLE_FILE` y lectura directa desde `/run/secrets/`. Sin secretos en Git ni en la imagen. |
+| **Seguridad** | `[OBLIGATORIO]` | **PENDIENTE (P1, P2, P3)** | Falta autenticación real NextAuth, validación Zod en servidor, rate limiting y escaneo de vulnerabilidades Trivy. |
+| **Autenticación** | `[OBLIGATORIO]` | **PENDIENTE (P2)** | Requiere NextAuth.js 4.24 con el proveedor de identidad institucional de PLAi para proteger `/admin` y `/usuario`. |
+| **Calidad** | `[OBLIGATORIO]` | **CUMPLE** | ESLint 9 pasa con 0 errores; Vitest con 17 pruebas unitarias automatizadas (`pnpm test`). |
+| **Datos** | `[OBLIGATORIO]` | **PENDIENTE (P4, P5)** | Datos aún provienen de `lib/mockData.ts`. Requiere integración con Directus 11 (`@directus/sdk`) y PostgreSQL con migraciones versionadas. |
+| **Logs** | `[OBLIGATORIO]` | **CUMPLE** | Salida a stdout/stderr sin escribir en archivos locales; sin datos sensibles. |
+| **Documentación** | `[OBLIGATORIO]` | **CUMPLE** | `README.md` completo en español con arquitectura, Swarm, Docker, variables y checklist. |
+| **Entrega** | `[OBLIGATORIO]` | **PENDIENTE (P9)** | Transferencia del repositorio con su historial limpio a la infraestructura de PLAi. |
+
+---
+
+## 2. Requisitos [OBLIGATORIO] Pendientes para Aceptación Final
+
+Estos puntos son **condición obligatoria** para que el área de Tecnología e Infraestructura de PLAi acepte y publique el proyecto en producción:
+
+### 🔴 Seguridad y Autenticación
+- [ ] **P1. Autenticación con NextAuth.js (Sección 7.1 y 10).**
+  - Actualmente `/login` es un formulario visual simulado y las rutas `/admin` y `/usuario` son accesibles públicamente sin sesión.
+  - **Acción:** Integrar NextAuth.js 4.24 (`next-auth`), configurar el proveedor de identidad que designe PLAi (OAuth/OIDC institucional), implementar `middleware.ts` para proteger las rutas privadas `/admin/*` y `/usuario/*`, y almacenar sesiones exclusivamente en el servidor.
+- [ ] **P2. Validación en el Servidor con Zod (Sección 7.2).**
+  - Actualmente los 8 formularios del sistema (reserva de equipos, solicitudes de cursos, gestión de inventario, mantenimientos, etc.) solo validan en el cliente mediante atributos HTML5 o `useState`.
+  - **Acción:** Instalar `zod` y crear esquemas de validación estrictos en route handlers (`/api/...`) o Server Actions para sanitizar y validar todas las entradas antes de procesarlas.
+- [ ] **P3. Rate Limiting en Endpoints Sensibles (Sección 7.3).**
+  - Proteger los endpoints de login y de envío de solicitudes públicas contra ataques de fuerza bruta o saturación (mediante middleware en Next.js o integración con el proxy Nginx institucional).
+
+### 🔴 Datos, Persistencia e Integración con Directus
+- [ ] **P4. Conexión de Catálogos y Contenidos a Directus 11 (Secciones 4.4 y 10).**
+  - El estándar exige que todos los datos administrables (catálogos de equipos, espacios, categorías, cursos y aplicaciones) residan en el CMS Directus y no en archivos locales (`lib/mockData.ts`).
+  - **Acción:** Conectar el cliente `@directus/sdk` exclusivamente desde Server Components y route handlers (`server-only`), utilizando el token de servicio provisto por PLAi leído mediante `lib/env.ts` (`DIRECTUS_TOKEN` / `/run/secrets/directus_token`).
+- [ ] **P5. Persistencia de Solicitudes y Migraciones de Base de Datos (Sección 9).**
+  - Las reservaciones y solicitudes se pierden al recargar la página.
+  - **Acción:** Definir el modelo de datos en PostgreSQL / Directus para solicitudes, préstamos e incidencias; documentar las migraciones versionadas y scripts de datos iniciales (seed).
+- [ ] **P6. Almacenamiento Seguro de Archivos y Cumplimiento LFPDPPP (Secciones 5.2 y 7.7).**
+  - En `ReservationForm`, la carga de credencial oficial (INE) y carta responsiva no se almacena.
+  - **Acción:** Los archivos deben subirse directamente a las colecciones de archivos de Directus (nunca al contenedor, que opera bajo `read_only: true`). Al contener identificaciones personales oficiales, deben tratarse bajo la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP).
+
+### 🔴 Verificación en Servidor / Host con Docker
+- [ ] **P7. Construcción y Verificación del Contenedor (Sección 5.1).**
+  - El entorno de desarrollo local carece del binario `docker` (`CommandNotFoundException`).
+  - **Acción:** En un host con Docker / servidor de pruebas de PLAi:
+    1. Ejecutar `docker build -t plai-recursos-espacios:0.1.0 .`
+    2. Probar ejecución con las banderas de seguridad exigidas: `docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges:true --tmpfs /tmp --tmpfs /app/.next/cache:size=64M -p 3000:3000 plai-recursos-espacios:0.1.0`
+    3. Verificar que el `HEALTHCHECK` marque estado `(healthy)`.
+- [ ] **P8. Escaneo de Vulnerabilidades con Trivy (Secciones 5.2 y 7.6).**
+  - **Acción:** Ejecutar `trivy image plai-recursos-espacios:0.1.0 --severity HIGH,CRITICAL` y asegurar que no existan vulnerabilidades críticas o altas con parche disponible.
+
+### 🔴 Entrega del Repositorio
+- [ ] **P9. Transferencia del Repositorio a PLAi (Sección 9).**
+  - Realizar commit de todos los cambios de las Fases 1 a 8 con mensajes descriptivos bajo *Conventional Commits* y transferir/vincular el repositorio a la cuenta institucional de PLAi, asegurando que no dependa de credenciales ni servicios a nombre del desarrollador.
+
+---
+
+## 3. Requisitos [RECOMENDADO] y Buenas Prácticas Pendientes
+
+Aspectos que mejoran la observabilidad, accesibilidad y robustez de la plataforma según el estándar:
+
+- [ ] **P10. Páginas Personalizadas de Error y 404 (Sección 7.4).**
+  - Crear `app/not-found.tsx` y `app/error.tsx` con diseño institucional PLAi para asegurar que errores inesperados no revelen trazas de código, versiones de dependencias ni consultas internas al usuario final.
+- [ ] **P11. Logger Estructurado en JSON (Sección 8).**
+  - Implementar un logger ligero que serialice logs en formato JSON hacia `stdout`/`stderr` con campos `timestamp`, `level`, `message`, `path` y `reqId`, facilitando su ingesta en Grafana Loki y Promtail.
+- [ ] **P12. Reemplazar Diálogos Nativos `alert()` y `confirm()` (Sección 7 y UX).**
+  - Reemplazar las alertas nativas del navegador en [ReservationForm.tsx](file:///c:/Users/MANGE/Estadia2026IDGS/app/components/ReservationForm.tsx) y vistas de administración por toasts o componentes visuales daisyUI (`alert`/`modal`) con `role="alert"` para accesibilidad.
+- [ ] **P13. Accesibilidad e Integración del Botón Flotante (Sección 3).**
+  - Asociar `AccessibilityButton.tsx` a controles de accesibilidad reales (alto contraste, incremento de tipografía) y verificar que todos los `<label>` de modales cuenten con `htmlFor` apuntando al `id` del input.
+- [ ] **P14. Publicación de Documentos Oficiales en Enlaces `href="#"`.**
+  - Enlazar la plantilla oficial de la Carta Responsiva y el Aviso de Privacidad oficial de PLAi en los enlaces correspondientes de `ReservationForm.tsx`.
+- [ ] **P15. Pipeline CI/CD Automatizado (Sección 9).**
+  - Crear workflow de GitHub Actions o GitLab CI (`.gitlab-ci.yml`) que ejecute en cada Pull Request: `pnpm lint`, `pnpm test`, `pnpm build` y escaneo Trivy.
+- [ ] **P16. Ampliar Cobertura de Pruebas Unitarias (Sección 9).**
+  - Sumar pruebas en Vitest para `EquipmentFilterGrid.tsx`, `DataTable.tsx` y los route handlers futuros que validen esquemas Zod.
+- [ ] **P17. Validación Visual Interactiva (Preflight de Tailwind).**
+  - Recorrer todas las rutas en navegador para validar que los tamaños tipográficos y márgenes se mantengan consistentes tras la migración a Tailwind CSS 4.
+
+---
+
+## 4. Requisitos Completados al 100% (Historial Verificado)
+
+| Fase / Requisito | Descripción | Verificación |
 | :--- | :--- | :--- |
-| 1 | ESLint y tipado | **Completada**: Lint en 0, `DataTable.tsx` tipado con genéricos `<T>` |
-| 2 | Standalone + `/api/health` | **Completada**: Next.js 16.4 en standalone, endpoint probado |
-| 3 | Firebase y `.env.example` | **Completada**: Sin residuos de Firebase ni `package-lock.json` |
-| 4 | pnpm + Node 22 | **Completada**: pnpm 11.28.5 + Node 22 LTS en engines |
-| 5 | Docker / Swarm | **Completada**: Dockerfile multi-etapa, Swarm compose; pendiente validación en host con Docker (P1) |
-| 6 | Vitest | **Completada**: 17 pruebas unitarias automatizadas (`lib/reservation`, `lib/env`, `/api/health`, `ReservationForm`) |
-| 7 | Tailwind 4 + daisyUI | **Completada**: 100% de los 36 módulos `.module.css` migrados y eliminados |
-| 8 | Documentación técnica | **Completada**: `README.md` reescrito con arquitectura Swarm y checklist normativo |
-
-## Bloqueantes para aceptar el despliegue
-
-- [ ] **P1. Verificar el contenedor en Docker.** Docker no está instalado en la máquina local de desarrollo (`CommandNotFoundException`). Falta ejecutar `docker build`, comprobar estado `(healthy)`, verificar arranque con `--read-only --cap-drop ALL` y ejecutar escaneo de vulnerabilidades `trivy image ... --severity HIGH,CRITICAL`.
-- [x] **P2. Genéricos en DataTable:** Resuelto. `DataTable.tsx` tipado con `<T extends Record<string, any>>`.
-- [ ] **P3. Autenticación (sección 7).** No hay NextAuth.js. `/admin` y `/usuario` son accesibles sin sesión. Requiere el proveedor de identidad que indique PLAi, `middleware`/`proxy` que proteja las rutas y rate limiting en login.
-- [ ] **P4. Datos administrables en Directus (sección 4.4).** Todo viene de `lib/mockData.ts`. Cargar equipos, categorías y espacios desde Directus con `@directus/sdk`, solo desde el servidor y con `server-only`.
-- [x] **P5. Lector de secretos `VARIABLE_FILE` (sección 6).** Resuelto. Implementado en `lib/env.ts` con soporte para `<NAME>_FILE`, `/run/secrets/<name>` y fallback directo, con 6 pruebas unitarias dedicadas en `lib/env.test.ts`.
-- [ ] **P6. Validación en el servidor (sección 7).** Los 8 formularios solo validan en el cliente y no envían nada. Crear route handlers o server actions con esquemas zod para reservas, agendado de cursos y login.
-- [ ] **P7. Persistencia y migraciones (sección 9).** Las reservas se pierden al recargar. Definir el modelo en Directus/PostgreSQL con migraciones versionadas y datos iniciales.
-- [ ] **P8. Subida de archivos.** INE y carta responsiva (`ReservationForm`) hoy no se guardan. Deben ir a Directus, nunca al contenedor (que es de solo lectura). Considerar LFPDPPP: son datos personales sensibles.
-- [ ] **P9. Repositorio y entrega.** Transferir el código con su historial a PLAi y completar el checklist de la sección 11. Hay cambios pendientes de commit en Git.
-
-## Estado de Estilos (Fase 7: 100% Completada)
-
-- [x] **Migración total a Tailwind CSS 4.x + daisyUI 5:**
-  - 36 de 36 módulos CSS eliminados del repositorio.
-  - Componentes públicos y compartidos: `Navbar`, `SubHeader`, `HeroSection`, `Footer`, `AccessibilityButton`, `CategoryCarousel`, `AppCarousel`, `CourseCallout`, `EquipmentCard`, `EquipmentFilterGrid`, `EquipmentDetailModal`, `ReservationForm`.
-  - Componentes de administración y usuario: `AdminSidebar`, `UserSidebar`, `StatCard`, `DataTable`.
-  - Vistas públicas: `login`, `espacios`, `aplicaciones`, `categoria/[slug]`, `agendar-curso/[type]`.
-  - Módulo `/usuario`: `layout`, `dashboard`, `agenda`, `prestamos`.
-  - Módulo `/admin`: `layout`, `dashboard`, `inventario`, `reservaciones`, `usuarios`, `categorias`, `aplicaciones`, `mantenimiento`, `reportes`, `configuracion`.
-  - Limpieza de `globals.css`: variables `:root` redundantes depuradas y selector `.navLink` retirado.
-- [ ] **P11. Revisión visual en navegador.** Recorrer todas las pantallas interactivamente para afinar padding o márgenes tras el preflight de Tailwind.
-- [x] **P12. Lógica de UI en CSS:** Selector global `.navLink` eliminado de `globals.css`.
-
-## Calidad y buenas prácticas
-
-- [ ] **P13. Ampliar pruebas.** Cobertura actual: `lib/reservation.ts` (6), `lib/env.ts` (6), `/api/health` (1) y `ReservationForm` (4). Faltan pruebas para componentes visuales de filtrado y nuevas rutas de backend.
-- [ ] **P14. Reemplazar `alert()`** (`ReservationForm`, `admin/usuarios`) por componentes daisyUI (`alert`/`toast`) con `role="alert"` para accesibilidad.
-- [ ] **P15. `localStorage` en `admin/categorias`** (URL de video por categoría): migrar a Directus (datos administrables, sección 4.4).
-- [ ] **P16. Enlaces `href="#"`** (plantilla de carta responsiva y aviso de privacidad en `ReservationForm`): publicar los documentos reales oficiales.
-- [ ] **P17. Accesibilidad.** Asignar `htmlFor` explícito a todos los `label` en modales y configurar toggle de accesibilidad.
-- [ ] **P18. Imágenes.** Evaluar optimización de imágenes locales si se instala `sharp`.
-- [ ] **P19. Logs estructurados en JSON** (sección 8) y `/metrics` para Prometheus si se implementa backend propio.
-- [ ] **P20. Cabeceras de seguridad y CSP.** Verificar integración con el proxy Nginx institucional de PLAi.
-- [ ] **P21. Fijar el digest `@sha256` de `node:22-alpine3.22`** al momento de publicar la imagen en el registro privado de PLAi.
-- [ ] **P22. Pipeline CI/CD** (lint + test + build + Trivy) en GitLab/GitHub de PLAi.
-- [ ] **P23. Metadata de páginas:** Añadir `metadata` en rutas pendientes y páginas personalizadas `not-found.tsx` y `error.tsx`.
-
-## Entorno
-
-- [ ] **P24.** La máquina de desarrollo usa Node 24 (`v24.13.1`); el estándar exige Node 22 LTS (`engines: { "node": "22.x" }`). Utilizar Node 22 para el empaquetado de producción.
-- [ ] **P25.** Instalar Docker Desktop en la máquina local o desplegar y validar en el servidor Swarm de PLAi.
+| **Fase 1: Linting y Tipado** | Corrección de ESLint 9, eliminación de errores y configuración de tipado. | `pnpm lint` sale con código 0. |
+| **Fase 2: Standalone & Health** | `output: 'standalone'` en `next.config.ts` y creación de `/api/health`. | Verificado en build Turbopack y prueba en Vitest. |
+| **Fase 3: Limpieza de Firebase** | Eliminación de dependencias y código de Firebase; limpieza de `package-lock.json`; creación de `.env.example`. | Sin referencias a Firebase en todo el proyecto. |
+| **Fase 4: Gestor pnpm y Node 22** | Transición a `pnpm@11.28.5`, lockfile versionado y engines fijados a Node `22.x`. | Verificado en `package.json` y lockfile. |
+| **Fase 5: Contenerización Docker** | `Dockerfile` multi-etapa alpine con usuario no root (1001), `tini` y `docker-compose.yml` para Swarm con `read_only: true`. | Archivos validados sintácticamente contra la norma. |
+| **Fase 6: Pruebas con Vitest** | Configuración de Vitest con jsdom y creación de 17 pruebas unitarias automatizadas (`pnpm test`). | 17 pruebas pasan en verde en 1.8 segundos. |
+| **Fase 7: Tailwind CSS 4 & daisyUI** | Migración integral de los 36 módulos CSS a Tailwind 4.x + daisyUI 5; depuración de variables en `globals.css`. | 0 archivos `.module.css` restantes; build sin advertencias. |
+| **Fase 8: Documentación** | `README.md` reescrito con arquitectura, comandos, variables y checklist de aceptación. | Archivo validado en raíz del proyecto. |
+| **Lector de Secretos (P5)** | Creación de `lib/env.ts` para soportar `VARIABLE_FILE` y `/run/secrets/` de Docker Swarm. | 6 pruebas unitarias específicas en `lib/env.test.ts`. |
+| **Genéricos en DataTable (P2)** | Tipado de [DataTable.tsx](file:///c:/Users/MANGE/Estadia2026IDGS/app/components/admin/DataTable.tsx) mediante genéricos `<T extends Record<string, any>>`. | Compilación exitosa en `pnpm build`. |
