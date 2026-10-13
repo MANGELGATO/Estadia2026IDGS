@@ -1,0 +1,67 @@
+# Stack de Docker Swarm (estándar PLAi, sección 5.2). Despliegue: docker stack deploy -c docker-compose.yml plai-recursos
+# PLAi construye y publica la imagen en su registro privado; 'build' no se usa en Swarm.
+# Reemplazar los valores marcados como EJEMPLO por los que indique el área de Tecnología.
+services:
+  app:
+    # Versión fija, nunca :latest
+    image: registry.example.plai.mx/plai-recursos-espacios:0.1.0
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_SITE_URL: https://recursos.example.plai.mx   # EJEMPLO
+    # Secretos: se montan en /run/secrets/<nombre> y la app los lee con el patrón VARIABLE_FILE.
+    # Se activan al integrar Directus / NextAuth (ver .env.example).
+    # secrets:
+    #   - directus_token
+    #   - nextauth_secret
+    volumes:
+      # Único espacio escribible (sistema de archivos de solo lectura)
+      - type: tmpfs
+        target: /tmp
+      - type: tmpfs
+        target: /app/.next/cache
+        tmpfs:
+          size: 67108864
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+      restart_policy:
+        condition: on-failure
+      labels:
+        # Entrada única por Traefik v3 (TLS y dominios los administra PLAi). EJEMPLO de dominio.
+        - traefik.enable=true
+        - traefik.http.routers.plai-recursos.rule=Host(`recursos.example.plai.mx`)
+        - traefik.http.routers.plai-recursos.entrypoints=websecure
+        - traefik.http.routers.plai-recursos.tls=true
+        - traefik.http.services.plai-recursos.loadbalancer.server.port=3000
+    networks:
+      - plai_internal
+    # Sin 'ports:' publicados: el acceso entra por Traefik a través de la red overlay.
+
+networks:
+  plai_internal:
+    external: true   # Red overlay cifrada existente (nombre EJEMPLO)
+
+# secrets:
+#   directus_token:
+#     external: true
+#   nextauth_secret:
+#     external: true

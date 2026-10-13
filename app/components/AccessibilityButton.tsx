@@ -1,9 +1,7 @@
-import styles from './AccessibilityButton.module.css';
-
 export default function AccessibilityButton() {
   return (
     <button
-      className={styles.fab}
+      className="btn btn-circle fixed bottom-6 right-6 z-[90] size-12 border-0 bg-navy text-white shadow-[0_4px_20px_rgba(27,54,93,0.3)] transition-all duration-[250ms] hover:scale-110 hover:bg-plai hover:shadow-[0_6px_24px_rgba(168,30,113,0.35)]"
       aria-label="Opciones de accesibilidad"
       id="accessibility-btn"
       title="Accesibilidad"
