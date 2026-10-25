@@ -26,8 +26,12 @@ Laboratorio de Innovación, Robótica y Tecnologías Inmersivas
    1.5 [Justificación](#15-justificación)  
    1.6 [Alcance del Proyecto](#16-alcance-del-proyecto)  
 2. [Marco Teórico y de Referencia](#2-marco-teórico-y-de-referencia)  
-   2.1 [Marco Teórico](#21-marco-teórico)  
-   2.2 [Marco Contextual e Institucional](#22-marco-contextual-e-institucional)  
+   2.1 [Contexto Institucional y Marco de Referencia (PLAi y SSOT)](#21-contexto-institucional-y-marco-de-referencia)  
+   2.2 [Paradigmas Web y Selección del Stack Tecnológico (Análisis Comparativo)](#22-paradigmas-web-y-selección-del-stack-tecnológico-análisis-comparativo)  
+   2.3 [Diseño de Interfaz, Estilos y Experiencia de Usuario (UI/UX)](#23-diseño-de-interfaz-estilos-y-experiencia-de-usuario-uiux)  
+   2.4 [Gestión de Persistencia y Bases de Datos (RDBMS, ACID y Directus)](#24-gestión-de-persistencia-y-bases-de-datos)  
+   2.5 [Gobernanza de Datos, Seguridad, RBAC y Rate Limiting](#25-gobernanza-de-datos-seguridad-y-control-de-acceso)  
+   2.6 [Metodología de Desarrollo Ágil y Despliegue en la Nube (Scrum y Docker Swarm)](#26-metodología-de-desarrollo-y-despliegue-en-la-nube)  
 3. [Desarrollo: Métodos y Técnicas](#3-desarrollo-métodos-y-técnicas)  
    3.1 [Metodología de Desarrollo](#31-metodología-de-desarrollo)  
    3.2 [Especificación de Requerimientos](#32-especificación-de-requerimientos)  
@@ -136,44 +140,238 @@ Para asegurar la viabilidad técnica y el cumplimiento de los tiempos de estadí
 
 # 2. Marco Teórico y de Referencia
 
-## 2.1 Marco Teórico
+---
 
-### 2.1.1 Arquitectura Web Moderna Basada en Componentes y Next.js
-Tradicionalmente, las aplicaciones web han oscilado entre el renderizado tradicional del lado del servidor (*Server-Side Rendering*, SSR) de páginas monolíticas y las aplicaciones de página única (*Single Page Applications*, SPA) renderizadas en el navegador mediante JavaScript. 
+## 2.1 Contexto Institucional y Marco de Referencia
 
-El presente proyecto adopta **Next.js 16 (App Router)** junto con **React 19**, una arquitectura moderna que integra lo mejor de ambos paradigmas a través de **React Server Components (RSC)**:
-* **Renderizado Híbrido:** Las vistas estáticas y la obtención de datos sensibles se ejecutan en el servidor, generando HTML ligero y seguro que se transmite al navegador sin exponer credenciales ni tokens de base de datos.
-* **Interactividad en el Cliente (*Client Components*):** Los elementos interactivos como filtros dinámicos, carruseles y formularios modales se hidratan selectivamente en el cliente, logrando una experiencia de usuario fluida e instantánea sin recargas de página.
+### 2.1.1 La Plataforma Abierta de Innovación y Desarrollo de Jalisco (PLAi)
+La **Plataforma Abierta de Innovación y Desarrollo de Jalisco (PLAi)** se constituye como un organismo público descentralizado y ecosistema estratégico del Gobierno del Estado de Jalisco, diseñado para impulsar el aprendizaje continuo, el emprendimiento y el desarrollo profesional con un marcado énfasis en la innovación, la tecnología y la creatividad (PLAi, s. f.). Concebida para elevar la competitividad regional y cultivar el talento local para la era digital, PLAi articula sus soluciones mediante tres ejes rectores: **Aprender, Conectar e Innovar** (PLAi, s. f.).
 
-### 2.1.2 Sistemas de Diseño Atómico con Tailwind CSS y daisyUI
-La construcción de la interfaz gráfica se basa en **Tailwind CSS 4.x**, un framework de utilidades CSS de última generación que compila únicamente las clases utilizadas, optimizando el peso de las hojas de estilo y erradicando conflictos de especificidad global. Se complementa con **daisyUI 5**, permitiendo implementar componentes semánticos y accesibles (*modales, tarjetas, botones, badges de estado*) que siguen fielmente la guía de estilo institucional de PLAi (paleta basada en `#a81e71` y `#1B365D`, con tipografías *Montserrat* para encabezados y *Mulish* para lectura).
+Para el cumplimiento de sus objetivos institucionales, PLAi no solo ofrece programas de capacitación virtual, sino que dispone de instalaciones físicas de uso público en la Ciudad Creativa Digital de Guadalajara, destinadas a fomentar el trabajo colaborativo, generar un ambiente de creatividad y propiciar la creación de soluciones e ideas innovadoras (PLAi, s. f.). Entre estas instalaciones se encuentran auditorios, aulas maker, salas de juntas y laboratorios equipados con tecnología de vanguardia (PLAi, s. f.). 
 
-### 2.1.3 Gestión de Activos de Tecnologías de la Información (ITAM)
-La disciplina *IT Asset Management* (ITAM) define las prácticas requeridas para rastrear, gestionar y mantener el ciclo de vida de los activos tecnológicos de una organización. El proyecto implementa los principios de ITAM para garantizar la trazabilidad integral de los equipos:
-* Identificación unívoca (número de serie y clave de inventario).
-* Ciclo de vida operativo (*Alta -> Operación -> Mantenimiento preventivo/correctivo -> Baja definitiva*).
-* Custodia y responsabilidad mediante cartas responsivas digitales.
-
-### 2.1.4 Modelo de Seguridad y Control de Acceso Basado en Roles (RBAC)
-El modelo RBAC (*Role-Based Access Control*) desacopla los privilegios de acceso de los usuarios concretos, asignando permisos a roles definidos formalmente en el sistema:
-* **Administrador:** Control total sobre altas, bajas, modificaciones de inventario, cambio de estados, aprobación de solicitudes y gestión de usuarios.
-* **Colaborador:** Capacidad de solicitar préstamos de equipo, reservar espacios para sus actividades y consultar bitácoras de asignación.
-* **Usuario Final / Visitante:** Acceso de solo lectura al catálogo público de recursos, especificaciones y experiencias tecnológicas disponibles.
-
-### 2.1.5 Contenerización Segura y Despliegue en Docker Swarm
-Conforme a la norma técnica de PLAi, el software se empaqueta como un microservicio en un contenedor Docker optimizado:
-* **Construcción Multi-Etapa (*Multi-stage build*):** Separa las dependencias de compilación del entorno final de producción, reduciendo el tamaño de la imagen final a menos de 180 MB sobre Alpine Linux.
-* **Principio de Menor Privilegio:** Ejecución bajo un usuario del sistema sin privilegios de administrador (`UID 1001`), sistema de archivos montado en modo de solo lectura (`read_only: true`), descarte total de capacidades de kernel (`cap_drop: [ALL]`) y lectura de secretos mediante Docker Secrets montados en tiempo de ejecución.
+La administración eficiente de este patrimonio tecnológico y espacio físico exige un control operativo riguroso que evite la falta de visibilidad en tiempo real sobre la ubicación, número de serie, estado y disponibilidad de los equipos (Guía R-ADC-08-07, s. f.). Por consiguiente, el proyecto busca la transición desde esquemas de gestión manuales hacia una infraestructura digital unificada siguiendo la estructura oficial del formato **R-ADC-08-07** (Guía R-ADC-08-07, s. f.).
 
 ---
 
-## 2.2 Marco Contextual e Institucional
+### 2.1.2 Del Registro Disperso a la Fuente Única de la Verdad (SSOT)
+Históricamente, las organizaciones han gestionado sus inventarios y recursos mediante archivos de hoja de cálculo aislados o bitácoras manuales que generan **silos de datos**, definidos como bases de datos que forman parte de la misma empresa pero que están aisladas y no comparten información entre ellas (Single Source of Truth, s. f.). La existencia de silos de datos puede provocar efectos negativos en una organización, tales como la toma de decisiones erróneas, la duplicación de esfuerzos o inconsistencias en los registros (Single Source of Truth, s. f.).
 
-### 2.2.1 La Plataforma Abierta de Innovación (PLAi)
-PLAi representa una de las apuestas de política pública más relevantes del Gobierno del Estado de Jalisco en materia de innovación y tecnología. Diseñada como un nodo articulador entre los ecosistemas de talento de las universidades y las demandas del sector tecnológico en Ciudad Creativa Digital y el corredor tecnológico de Guadalajara, PLAi ofrece un entorno donde la teoría académica se encuentra con el hardware de vanguardia.
+Para erradicar la fragmentación operativa en PLAi, la plataforma digital se fundamenta en el principio de **Single Source of Truth (SSOT)** o Fuente Única de la Verdad. Una SSOT se define como una biblioteca centralizada de datos que almacena la información más actualizada, completa y precisa de una organización, agregando datos provenientes de distintos sistemas y aplicaciones (Single Source of Truth, s. f.).
 
-### 2.2.2 El Laboratorio de Innovación, Robótica y Tecnologías Inmersivas
-El laboratorio no es un almacén pasivo de equipos, sino un centro de experimentación activa donde convergen investigadores, docentes, desarrolladores independientes y estudiantes. Esta dinámica abierta exige que sus procesos de control tecnológico no sean burocráticos ni lentos, sino ágiles, transparentes y digitales, proyectando la misma innovación que promueven sus propios talleres.
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    FUENTES REGISTRALES PREVIAS                  │
+│   Hoja de Cálculo A       Hoja de Cálculo B     Bitácora Física │
+└─────────────────┬──────────────────┬──────────────────┬─────────┘
+                  │                  │                  │
+                  ▼                  ▼                  ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     SILOS DE DATOS Y DUPLICIDAD                 │
+│        (Registros inconsistentes, colisión de horarios)         │
+└─────────────────────────────────┬───────────────────────────────┘
+                                  │
+                                  ▼  [Implementación de SSOT]
+┌─────────────────────────────────────────────────────────────────┐
+│              SINGLE SOURCE OF TRUTH (PLATAFORMA PLAi)            │
+│      Catálogo Único · Fichas Técnicas · Reservaciones en Vivo    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+La adopción del modelo SSOT aporta ventajas estratégicas fundamentales:
+1. **Reducción de costes:** Hace más sencilla la gestión de datos dentro de una empresa y reduce los recursos destinados a infraestructura y personal (Single Source of Truth, s. f.).
+2. **Eliminación de la duplicación de datos:** Optimiza el espacio de almacenamiento e integra los datos para evitar que entren en contradicción (Single Source of Truth, s. f.).
+3. **Aceleración en la recuperación de datos:** Simplifica la detección e identificación de información alterada o requerida (Single Source of Truth, s. f.).
+4. **Aumento de la transparencia:** Promueve la cultura de la transparencia al garantizar que todos los miembros del equipo tengan acceso a la misma fuente de datos sin diferencias (Single Source of Truth, s. f.).
+
+---
+
+## 2.2 Paradigmas Web y Selección del Stack Tecnológico (Análisis Comparativo)
+
+### 2.2.1 Lenguajes de Programación y Entornos de Ejecución: JavaScript / Node.js vs. PHP
+**JavaScript (JS)** es un lenguaje de programación ligero, interpretado o compilado justo-a-tiempo (*JIT*), dinámico y basado en prototipos, utilizado ampliamente en el desarrollo web (MDN, s. f.). Creado por Ryan Dahl en 2009, **Node.js** nació como respuesta a la necesidad de ejecutar código JavaScript del lado del servidor (*server-side*), fuera del navegador web (Alura Cursos Online, 2025).
+
+Node.js es un entorno de ejecución (*runtime*) que utiliza el motor **V8 de Google** (desarrollado en C++) para interpretar y traducir el código en un bytecode optimizado para la máquina (Alura Cursos Online, 2025). A diferencia de los entornos de servidor tradicionales basados en **PHP** (PHP Documentation, s. f.), Node.js destaca por ser un sistema asíncrono, *single-threaded* (de un solo hilo) y orientado a eventos (Alura Cursos Online, 2025). Al ser un sistema de un solo hilo, Node.js no necesita administrar múltiples hilos en paralelo, lo que optimiza el proceso y el consumo de memoria de la aplicación al manejar operaciones no bloqueantes (Alura Cursos Online, 2025).
+
+##### Tabla 2.1: Comparativa Técnica entre Node.js (JavaScript) y PHP Tradicional
+
+| Criterio / Modelo | Node.js (JavaScript Runtime) | PHP (Servidor Web Tradicional) | Impacto en el Proyecto PLAi |
+| :--- | :--- | :--- | :--- |
+| **Modelo de Concurrencia** | Asíncrono, *Non-Blocking I/O*, basado en bucle de eventos (Alura Cursos Online, 2025). | Síncrono por petición en servidor web (PHP Documentation, s. f.). | Permite atender múltiples solicitudes de reservación simultáneas sin bloquear el servidor. |
+| **Consumo de Memoria** | Ligero; optimiza el consumo al no administrar hilos paralelos (Alura Cursos Online, 2025). | Mayor sobrecarga por proceso e hilo instanciado. | Optimiza la infraestructura de contenedores en el despliegue institucional. |
+| **Ecosistema y Lenguaje** | Lenguaje unificado en *Frontend* y *Backend* mediante JS (Alura Cursos Online, 2025). | Lenguaje exclusivo del lado del servidor (PHP Documentation, s. f.). | Reduce la curva de desarrollo utilizando JavaScript y TypeScript en toda la pila. |
+| **Gestión de Paquetes** | pnpm / NPM (*Node Package Manager*) (Alura Cursos Online, 2025). | Composer (*PHP Dependency Manager*) (Laravel, s. f.). | Facilita la integración de librerías modernas de interfaz y validación estricta. |
+
+---
+
+### 2.2.2 Frameworks y Arquitecturas Web: Next.js (React) vs. Laravel (PHP)
+
+#### **React y el Paradigma de Componentes**
+**React** es una biblioteca de JavaScript diseñada para construir interfaces de usuario interactivas mediante piezas individuales y reutilizables llamadas componentes (React, s. f.). Los desarrolladores combinan estos elementos utilizando la sintaxis de marcado **JSX**, una extensión de JavaScript que facilita la creación y mantenimiento de componentes (React, s. f.). Aunque React permite agrupar componentes, no prescribe cómo hacer el enrutamiento o la obtención de datos, recomendando el uso de un framework *full-stack* (React, s. f.).
+
+#### **Next.js y el Renderizado Híbrido Full-Stack**
+**Next.js** es un framework de React diseñado para construir aplicaciones web *full-stack* que configura automáticamente herramientas subyacentes como compiladores y empaquetadores (Next.js Docs, s. f.). A través de su arquitectura **App Router**, Next.js soporta capacidades modernas de React como los **React Server Components (RSC)**, permitiendo ejecutar componentes y obtener datos directamente en el servidor sin exponer credenciales ni tokens sensibles en el cliente (Next.js Docs, s. f.).
+
+#### **Laravel y la Arquitectura Monolítica MVC Tradicional**
+Por su parte, **Laravel** es un framework de aplicaciones web en PHP con sintaxis expresiva y elegante, diseñado para construir aplicaciones monolíticas (mediante plantillas Blade) o arquitecturas API backend (Laravel, s. f.).
+
+##### Tabla 2.2: Comparativa de Arquitectura: Next.js (App Router / RSC) vs. Laravel (MVC / Blade)
+
+| Característica | Next.js (App Router + RSC) | Laravel (MVC + Blade Monolítico) | Sustento para la Elección en PLAi |
+| :--- | :--- | :--- | :--- |
+| **Arquitectura Principal** | Híbrida: *Server Components* (RSC) y componentes de cliente (Next.js Docs, s. f.). | Monolítica MVC con motor de plantillas en servidor (*Blade*) (Laravel, s. f.). | **Next.js:** Permite procesar datos pesados en servidor entregando una interfaz ágil. |
+| **Navegación e Interactividad** | Reactiva y fluida; basada en componentes reactivos (React, s. f.). | Renderización de vistas completas en servidor por petición (Laravel, s. f.). | Mejora la experiencia de usuario (UX) al consultar disponibilidad en tiempo real. |
+| **Obtención de Datos** | *Data fetching* integrado en componentes asíncronos de servidor (React, s. f.). | Consultas integradas en controladores y capa Eloquent (Laravel, s. f.). | Next.js simplifica el flujo de datos directo a la interfaz del inventario. |
+
+---
+
+## 2.3 Diseño de Interfaz, Estilos y Experiencia de Usuario (UI/UX)
+
+### 2.3.1 Hoja de Estilos en Cascada (CSS) y los Desafíos de Escalabilidad
+**CSS (Hojas de Estilo en Cascada)** es el lenguaje de estilos utilizado para describir la presentación visual y maquetación de documentos estructurados en HTML o XML (MDN, s. f.). A medida que las aplicaciones web crecen, el manejo de CSS tradicional puede presentar problemas de especificidad global y mantenimiento en las hojas de estilo.
+
+---
+
+### 2.3.2 Enfoque Utility-First con Tailwind CSS y daisyUI
+**Tailwind CSS** opera mediante un enfoque *zero-runtime* que escanea los archivos HTML y componentes JavaScript del proyecto para detectar clases de utilidad, generando únicamente los estilos correspondientes en un archivo CSS estático (Tailwind CSS, s. f.). La integración de Tailwind CSS v4 mediante `@tailwindcss/postcss` y el motor de compilación Turbopack de Next.js ofrece un flujo de compilación ágil y optimizado para proyectos web modernos sin sobrecarga de estilos en tiempo de ejecución (Tailwind CSS, s. f.). Asimismo, la biblioteca de componentes semánticos **daisyUI** aporta elementos accesibles (*modales, tarjetas, badges semánticos*) que respetan la paleta institucional de PLAi.
+
+##### Tabla 2.3: Comparativa Técnica: CSS Tradicional vs. Utility-First CSS (Tailwind CSS)
+
+| Criterio | CSS Tradicional / Metodología BEM | Utility-First CSS (Tailwind CSS) | Impacto e Integración en PLAi |
+| :--- | :--- | :--- | :--- |
+| **Generación de Estilos** | Hojas de estilo globales escritas manualmente (MDN, s. f.). | Escaneo de clases y generación estática *zero-runtime* (Tailwind CSS, s. f.). | Elimina código no utilizado y optimiza el tamaño del archivo CSS. |
+| **Mantenibilidad** | Riesgo de colisiones globales por la cascada. | Clases de utilidad aplicadas directamente en el marcado (Tailwind CSS, s. f.). | Garantiza modularidad en los componentes JSX del catálogo. |
+| **Velocidad de Desarrollo** | Cambio de contexto constante entre HTML y CSS. | Estilizado ágil e inmediato sobre los componentes de React (Tailwind CSS, s. f.). | Acelera la construcción del panel de reservaciones y tablas. |
+
+---
+
+## 2.4 Gestión de Persistencia y Bases de Datos
+
+### 2.4.1 Paradigma Relacional (RDBMS) vs. Paradigma Orientado a Documentos (NoSQL)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      EVALUACIÓN DE PARADIGMAS DE BD                      │
+├────────────────────────────────────┬────────────────────────────────────┤
+│     MODELO RELACIONAL (RDBMS)      │    MODELO DOCUMENTAL (NOSQL)      │
+│  (PostgreSQL / MySQL)              │          (MongoDB)                 │
+├────────────────────────────────────┼────────────────────────────────────┤
+│ • Esquema estricto con Tablas/FKs  │ • Colecciones de documentos JSON   │
+│ • Transacciones ACID nativas       │ • Esquema flexible sin esquemas    │
+│ • Validaciones de integridad       │ • Inserción rápida no estructurada │
+└─────────────────┬──────────────────┴────────────────────────────────────┘
+                  │
+                  ▼  [Requerimiento Crítico en PLAi]
+┌─────────────────────────────────────────────────────────────────────────┐
+│               EXIGENCIA OPERATIVA: CONTROL DE RESERVACIONES              │
+│       Prevención de colisiones dobles + Integridad referencial estricta  │
+└─────────────────┬───────────────────────────────────────────────────────┘
+                  │
+                  ▼  [Selección Justificada]
+┌─────────────────────────────────────────────────────────────────────────┐
+│               SISTEMA DE GESTIÓN DE BASE DE DATOS RELACIONAL            │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### **Bases de Datos Documentales (NoSQL: MongoDB)**
+**MongoDB** es una base de datos operativa orientada a documentos diseñada como alternativa a las bases de datos relacionales, permitiendo almacenar documentos enriquecidos tipo JSON (MongoDB Docs, s. f.). Aunque MongoDB ofrece soporte para **transacciones ACID estrictas** y escalado horizontal (MongoDB Docs, s. f.), el modelado de datos sin esquemas relacionales estrictos dificulta el control de reglas relacionales complejas entre usuarios y recursos.
+
+#### **Bases de Datos Relacionales (RDBMS: PostgreSQL / MySQL)**
+Por otro lado, los motores relacionales como **MySQL** (MySQL Documentation, s. f.) o **PostgreSQL** (PostgreSQL Documentation, s. f.) organizan la información mediante esquemas basados en tablas y relaciones explícitas, garantizando la integridad referencial a nivel de motor.
+
+---
+
+### 2.4.2 Análisis de Consistencia (ACID) y Manejo de Reservaciones
+Para evitar la asignación duplicada de aulas o visores VR, las propiedades **ACID** (Atomicidad, Consistencia, Aislamiento y Durabilidad) garantizan que las operaciones compuestas en la base de datos se ejecuten sin errores ni interferencias concurrentes (MongoDB Docs, s. f.).
+
+##### Tabla 2.4: Comparativa de Motores de Base de Datos: Relacionales vs. Documental (MongoDB)
+
+| Característica | Relacional (PostgreSQL / MySQL) | Documental NoSQL (MongoDB) | Justificación para el Proyecto PLAi |
+| :--- | :--- | :--- | :--- |
+| **Estructura de Datos** | Tablas estructuradas con tipos estrictos y claves foráneas (MySQL Documentation, s. f.). | Documentos JSON flexibles mapeados a objetos (MongoDB Docs, s. f.). | **Relacional:** Atributos fijos y conocidos para el inventario tecnológico. |
+| **Integridad Referencial** | Restricciones nativas entre tablas a nivel de base de datos (PostgreSQL Documentation, s. f.). | Manejo manual de referencias interdocumentales. | **Relacional:** Garantiza la consistencia entre solicitudes, usuarios y equipos. |
+| **Concurrencia y ACID** | Bloqueo estricto de transacciones relacionales y claves únicas. | Soporte para transacciones ACID estrictas (MongoDB Docs, s. f.). | **Relacional:** Previene la sobreposición de horarios en reservaciones simultáneas. |
+
+---
+
+### 2.4.3 Paradigma Headless CMS (Directus 11 sobre PostgreSQL)
+Conforme a las directrices normativas del *Estándar Tecnológico para Proyectos de Software de PLAi v1.0*, los catálogos y contenidos administrables deben operar bajo el paradigma de **Headless CMS** mediante **Directus 11** conectado a la base de datos PostgreSQL. Esta arquitectura desacopla el almacenamiento y modelado de datos respecto a la capa de presentación visual. Los administradores gestionan los activos, categorías y fichas técnicas a través de la interfaz autogenerada de Directus, mientras que la aplicación Next.js consume los datos de manera segura mediante `@directus/sdk` del lado del servidor (*Server-Side*), eliminando la exposición de credenciales y centralizando la gobernanza del inventario.
+
+---
+
+## 2.5 Gobernanza de Datos, Seguridad y Control de Acceso
+
+### 2.5.1 Principios de Seguridad Web y el Estándar OWASP Top 10:2025
+El **Proyecto Abierto de Seguridad de Aplicaciones Web (OWASP)** es una organización internacional sin fines de lucro enfocada en mejorar la seguridad del software web mediante recursos de libre acceso (Cloudflare, s. f.). Su publicación insignia, el **OWASP Top 10**, es un informe actualizado periódicamente que representa el consenso global sobre los riesgos de seguridad más críticos para aplicaciones web (OWASP Top 10:2025, s. f.).
+
+En la versión **OWASP Top 10:2025**, la vulnerabilidad **A01:2025 – Broken Access Control (Pérdida o Fallo en el Control de Acceso)** encabeza la lista de riesgos prioritarios (OWASP Top 10:2025, s. f.). El control de acceso rige los mecanismos que conceden o restringen permisos sobre la información y funcionalidades; sus fallos permiten a un atacante eludir la autorización y actuar como un usuario privilegiado (Cloudflare, s. f.).
+
+---
+
+### 2.5.2 Control de Acceso Basado en Roles (RBAC), Rate Limiting y Protección LFPDPPP
+Los controles de acceso se aseguran garantizando que la aplicación utilice **tokens de autorización** y establezca restricciones estrictas sobre los mismos (Cloudflare, s. f.). La adopción del modelo de **Control de Acceso Basado en Roles (RBAC)** asigna permisos específicos a roles del sistema (Administrador, Colaborador, Usuario General), asegurando que cada perfil interactúe exclusivamente con los módulos autorizados (Cloudflare, s. f.).
+
+##### Tabla 2.5: Comparativa de Modelos de Control de Acceso en Software
+
+| Modelo | Definición y Funcionamiento | Aplicabilidad en el Proyecto PLAi |
+| :--- | :--- | :--- |
+| **DAC** *(Discretionary Access Control)* | El propietario asigna accesos a su discreción. | **Inadecuado:** Generaría falta de control centralizado sobre el patrimonio institucional. |
+| **RBAC** *(Role-Based Access Control)* | Permisos asignados a roles definidos por la organización (Cloudflare, s. f.). | **Seleccionado:** Mitiga el riesgo *OWASP A01:2025* al restringir módulos según el rol (OWASP Top 10:2025, s. f.). |
+| **ABAC** *(Attribute-Based Access Control)* | Evaluación dinámica por atributos y contexto. | **Innecesario:** Añade complejidad técnica innecesaria para el alcance actual. |
+
+Asimismo, en cumplimiento con el estándar de seguridad de PLAi y la **Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP)**, la plataforma resguarda las identificaciones oficiales (INE) y cartas responsivas requeridas para los préstamos con estricto control de confidencialidad y sanitización de registros. Adicionalmente, se implementa una política activa de **Rate Limiting** (limitación de tasa de solicitudes) con algoritmo de ventana deslizante en memoria, mitigando eficazmente intentos de fuerza bruta en los endpoints de autenticación y previniendo la saturación maliciosa en los formularios públicos de reservación.
+
+---
+
+## 2.6 Metodología de Desarrollo y Despliegue en la Nube
+
+### 2.6.1 Marco de Trabajo Ágil Scrum (Guía de Scrum 2020)
+**Scrum** es un marco de trabajo liviano desarrollado por Ken Schwaber y Jeff Sutherland que ayuda a personas, equipos y organizaciones a generar valor mediante soluciones adaptativas para problemas complejos (Schwaber y Sutherland, 2020). Se fundamenta en el **empirismo** (el conocimiento proviene de la experiencia) y el **pensamiento Lean** (reducción de desperdicios), sosteniéndose sobre tres pilares: **Transparencia, Inspección y Adaptación** (Schwaber y Sutherland, 2020).
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          CICLO DE SPRINT EN SCRUM                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   ┌──────────────┐     ┌──────────────────┐     ┌──────────────────┐    │
+│   │ Product      │ ──► │ Sprint Planning  │ ──► │ Daily Scrum      │    │
+│   │ Backlog      │     │ (3 Temas)        │     │ (15 min diarios) │    │
+│   └──────────────┘     └────────┬─────────┘     └────────┬─────────┘    │
+│                                 │                        │              │
+│                                 ▼                        ▼              │
+│                        ┌──────────────────┐     ┌──────────────────┐    │
+│                        │ Incremento de    │ ◄── │ Trabajo de       │    │
+│                        │ Valor (Done)     │     │ Desarrollo       │    │
+│                        └────────┬─────────┘     └──────────────────┘    │
+│                                 │                                       │
+│                                 ▼                                       │
+│                        ┌──────────────────┐     ┌──────────────────┐    │
+│                        │ Sprint Review    │ ──► │ Retrospectiva    │    │
+│                        └──────────────────┘     └──────────────────┘    │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### **Estructura del Equipo y Responsabilidades**
+La unidad fundamental es el **Scrum Team**, un pequeño equipo constituido por un **Product Owner**, un **Scrum Master** y los **Developers**, sin jerarquías ni subequipos (Schwaber y Sutherland, 2020):
+* **Product Owner:** Responsable de maximizar el valor del producto resultante y gestionar el *Product Backlog* (Schwaber y Sutherland, 2020).
+* **Developers:** Se comprometen a crear un *Increment* utilizable y de calidad que cumpla con la *Definición de Terminado* en cada Sprint (Schwaber y Sutherland, 2020).
+* **Scrum Master:** Responsable de lograr la efectividad del equipo guiándolo en la teoría y práctica de Scrum (Schwaber y Sutherland, 2020).
+
+#### **Eventos de Scrum**
+El desarrollo se realiza en iteraciones fijas denominadas **Sprints**, que integran eventos como *Sprint Planning*, *Daily Scrum*, *Sprint Review* y *Sprint Retrospective* (Schwaber y Sutherland, 2020).
+
+---
+
+### 2.6.2 Contenedorización y Orquestación con Docker y Docker Swarm
+Para garantizar la ejecutabilidad homogénea de la aplicación entre entornos, se utiliza la tecnología de **contenedorización** de Docker (Docker Docs, s. f.). Para la orquestación en producción se utiliza **Docker Swarm**, el orquestador nativo que permite gestionar, escalar y asegurar clústeres de contenedores mediante comandos CLI (Docker Docs, s. f.).
+
+##### Tabla 2.6: Beneficios Técnicos de la Orquestación con Docker Swarm en el Proyecto
+
+| Capacidad de Swarm | Descripción Técnica | Impacto en la Plataforma PLAi |
+| :--- | :--- | :--- |
+| **Gestión de Clúster** | Comandos para inicializar e integrar nodos en un clúster (`docker swarm init / join`) (Docker Docs, s. f.). | Facilita la administración centralizada de los servidores de producción. |
+| **Alta Disponibilidad** | Tolerancia a fallos distribuyendo réplicas de los contenedores (Docker Docs, s. f.). | Mantiene el servicio activo ante caídas imprevistas de un servidor físico. |
+| **Despliegues Progresivos** | Permite realizar actualizaciones sin interrumpir la operación (*Rolling Updates*) (Docker Docs, s. f.). | Permite publicar mejoras en la plataforma sin suspender la atención en almacén. |
 
 ---
 
@@ -270,10 +468,26 @@ Las interfaces fueron maquetadas siguiendo una jerarquía visual estructurada y 
 # 7. Bibliografía
 *(En formato APA 7ma Edición)*
 
-1. Bass, L., Clements, P., & Kazman, R. (2021). *Software Architecture in Practice* (4th ed.). Addison-Wesley Professional.
-2. Gamma, E., Helm, R., Johnson, R., & Vlissides, J. (1994). *Design Patterns: Elements of Reusable Object-Oriented Software*. Addison-Wesley.
-3. Open Web Application Security Project. (2021). *OWASP Top 10:2021 - The Ten Most Critical Web Application Security Risks*. https://owasp.org/Top10/
-4. Plataforma Abierta de Innovación. (2026). *Estándar Tecnológico para Proyectos de Software (Versión 1.0)*. Dirección de Tecnología e Infraestructura, PLAi.
-5. Pressman, R. S., & Maxim, B. R. (2020). *Software Engineering: A Practitioner's Approach* (9th ed.). McGraw-Hill Education.
-6. React Core Team. (2024). *React Documentation: Server Components and Architecture*. Meta Open Source. https://react.dev
-7. Vercel Inc. (2026). *Next.js Documentation: App Router and Standalone Deployment*. https://nextjs.org/docs
+1. Alura Cursos Online. (2025, 29 de julio). *Node.JS: qué es, cómo funciona este entorno de ejecución de JavaScript y una guía para empezar*. https://www.aluracursos.com/blog/node-js-que-es-como-funciona-este-entorno-de-ejecucion-de-javascript-y-una-guia-para-empezar
+2. Bass, L., Clements, P., & Kazman, R. (2021). *Software Architecture in Practice* (4th ed.). Addison-Wesley Professional.
+3. Cloudflare. (s. f.). *¿Qué es el OWASP? ¿Qué es el OWASP Top 10?* Cloudflare Learning Center. Recuperado el 20 de octubre de 2026, de https://www.cloudflare.com/es-es/learning/security/threats/owasp-top-10/
+4. Directus. (s. f.). *Directus documentation: The open source data platform*. Recuperado el 20 de octubre de 2026, de https://docs.directus.io/
+5. Docker Docs. (s. f.). *Docker documentation: Swarm mode overview*. Recuperado el 20 de octubre de 2026, de https://docs.docker.com/engine/swarm/
+6. Gamma, E., Helm, R., Johnson, R., & Vlissides, J. (1994). *Design Patterns: Elements of Reusable Object-Oriented Software*. Addison-Wesley.
+7. Guía R-ADC-08-07. (s. f.). *Guía de redacción del reporte de estadía profesional (R-ADC-08-07)*. Universidad Tecnológica.
+8. Laravel. (s. f.). *Laravel documentation: The clean stack for Artisans and agents*. Recuperado el 20 de octubre de 2026, de https://laravel.com/framework/docs/
+9. MDN Web Docs. (s. f.). *CSS: Cascading Style Sheets*. Mozilla Developer Network. Recuperado el 20 de octubre de 2026, de https://developer.mozilla.org/es/docs/Web/CSS
+10. MDN Web Docs. (s. f.). *JavaScript*. Mozilla Developer Network. Recuperado el 20 de octubre de 2026, de https://developer.mozilla.org/es/docs/Web/JavaScript
+11. MongoDB Docs. (s. f.). *Bienvenido a la documentación de MongoDB*. Recuperado el 20 de octubre de 2026, de https://www.mongodb.com/es/docs/
+12. MySQL Documentation. (s. f.). *MySQL reference manuals*. Oracle Corporation. Recuperado el 20 de octubre de 2026, de https://dev.mysql.com/doc/
+13. OWASP Foundation. (2025). *OWASP Top 10:2025 release*. Recuperado el 20 de octubre de 2026, de https://top10.owasp.org/2025/
+14. PHP Documentation. (s. f.). *PHP manual*. PHP Group. Recuperado el 20 de octubre de 2026, de https://www.php.net/manual/es/
+15. Plataforma Abierta de Innovación. (2026). *Estándar Tecnológico para Proyectos de Software (Versión 1.0)*. Dirección de Tecnología e Infraestructura, PLAi.
+16. Plataforma Abierta de Innovación. (s. f.). *Plataforma Abierta de Innovación y Desarrollo de Jalisco*. Gobierno del Estado de Jalisco. Recuperado el 20 de octubre de 2026, de https://plai.mx/
+17. PostgreSQL Global Development Group. (s. f.). *PostgreSQL 16 manual*. Recuperado el 20 de octubre de 2026, de https://www.postgresql.org/docs/
+18. Pressman, R. S., & Maxim, B. R. (2020). *Software Engineering: A Practitioner's Approach* (9th ed.). McGraw-Hill Education.
+19. React Core Team. (s. f.). *React: La biblioteca para interfaces de usuario web y nativas*. Meta Platforms, Inc. Recuperado el 20 de octubre de 2026, de https://es.react.dev/
+20. Schwaber, K., & Sutherland, J. (2020). *La Guía de Scrum: Las reglas del juego*. Scrum.org. https://scrumguides.org/docs/scrumguide/v2020/2020-Scrum-Guide-Spanish-Latin-South-American.pdf
+21. Single Source of Truth. (s. f.). *Single Source of Truth: qué es, ejemplos y cómo implementarla*. Cyberclick. Recuperado el 20 de octubre de 2026, de https://www.cyberclick.es/numerical-blog/single-source-of-truth-que-es-ejemplos-y-como-implementarla
+22. Tailwind Labs Inc. (s. f.). *Tailwind CSS v4 documentation*. Recuperado el 20 de octubre de 2026, de https://tailwindcss.com/docs
+23. Vercel Inc. (2026). *Next.js Documentation: App Router and Standalone Deployment*. https://nextjs.org/docs
