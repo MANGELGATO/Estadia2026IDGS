@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  experimental: {
+    agentUpgrade: "security",
+  } as Record<string, unknown>,
 };
 
 export default nextConfig;
