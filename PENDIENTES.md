@@ -17,9 +17,9 @@ Esta tabla resume el estado actual contra la **Lista de Verificación de Aceptac
 | **Salud** | `[OBLIGATORIO]` | **CUMPLE** | Endpoint `/api/health` (`force-dynamic`) responde 200 en milisegundos sin autenticación. |
 | **Configuración** | `[OBLIGATORIO]` | **CUMPLE** | `.env.example` documentado con valores ficticios; principios 12-factor; ninguna URL ni credencial quemada en el código. |
 | **Secretos** | `[OBLIGATORIO]` | **CUMPLE** | Lector `lib/env.ts` implementa patrón `VARIABLE_FILE` y lectura directa desde `/run/secrets/`. Sin secretos en Git ni en la imagen. |
-| **Seguridad** | `[OBLIGATORIO]` | **PENDIENTE (P3)** | P1 (NextAuth.js + Proxy RBAC) y P2 (Validación Zod en servidor) completados. Falta rate limiting (P3) y escaneo Trivy. |
+| **Seguridad** | `[OBLIGATORIO]` | **CUMPLE (Código)** | P1 (NextAuth.js + Proxy RBAC), P2 (Validación Zod en servidor) y P3 (Rate Limiting en endpoints sensibles) completados. Falta escaneo Trivy en servidor/CI. |
 | **Autenticación** | `[OBLIGATORIO]` | **CUMPLE** | NextAuth.js 4.24.15 con sesiones JWT en servidor, proxy de seguridad `proxy.ts` (Next.js 16) protegiendo `/admin` y `/usuario` con RBAC, e interfaz `/login` con cuentas de evaluación. |
-| **Calidad** | `[OBLIGATORIO]` | **CUMPLE** | ESLint 9 pasa con 0 errores y 0 advertencias; Vitest con 60 pruebas unitarias automatizadas (`pnpm test`). |
+| **Calidad** | `[OBLIGATORIO]` | **CUMPLE** | ESLint 9 pasa con 0 errores y 0 advertencias; Vitest con 74 pruebas unitarias automatizadas (`pnpm test`). |
 | **Datos** | `[OBLIGATORIO]` | **PENDIENTE (P4, P5)** | Datos aún provienen de `lib/mockData.ts`. Requiere integración con Directus 11 (`@directus/sdk`) y PostgreSQL con migraciones versionadas. |
 | **Logs** | `[OBLIGATORIO]` | **CUMPLE** | Salida a stdout/stderr sin escribir en archivos locales; sin datos sensibles. |
 | **Documentación** | `[OBLIGATORIO]` | **CUMPLE** | `README.md` completo en español con arquitectura, Swarm, Docker, variables y checklist. |
@@ -44,8 +44,13 @@ Estos puntos son **condición obligatoria** para que el área de Tecnología e I
   - Creados Route Handlers [`app/api/reservas/route.ts`](file:///c:/Users/MANGE/Estadia2026IDGS/app/api/reservas/route.ts) y [`app/api/solicitudes-espacios/route.ts`](file:///c:/Users/MANGE/Estadia2026IDGS/app/api/solicitudes-espacios/route.ts) con respuesta 201/400 tipada y formateada.
   - Conectado [ReservationForm.tsx](file:///c:/Users/MANGE/Estadia2026IDGS/app/components/ReservationForm.tsx) al backend mediante `fetch('/api/reservas')` con manejo de estados de carga (`isSubmitting`) y despliegue de errores de validación.
   - 10 pruebas unitarias añadidas en `lib/validations/schemas.test.ts` y `app/api/reservas/route.test.ts`.
-- [ ] **P3. Rate Limiting en Endpoints Sensibles (Sección 7.3).**
-  - Proteger los endpoints de login y de envío de solicitudes públicas contra ataques de fuerza bruta o saturación (mediante middleware en Next.js o integración con el proxy Nginx institucional).
+- [x] **P3. Rate Limiting en Endpoints Sensibles (Sección 7.3).** *(COMPLETADO)*
+  - Diseñado e implementado [`lib/rateLimit.ts`](file:///c:/Users/MANGE/Estadia2026IDGS/lib/rateLimit.ts) con algoritmo de ventana deslizante en memoria (*Sliding Window Log*) y limpieza periódica para evitar fugas de memoria.
+  - Detección precisa de IP cliente compatible con Traefik v3 y Nginx (`x-forwarded-for`, `x-real-ip`, `cf-connecting-ip`).
+  - Integrado en [`proxy.ts`](file:///c:/Users/MANGE/Estadia2026IDGS/proxy.ts) para proteger en el perímetro: `/api/auth/*` (máx. 5 intentos/min contra fuerza bruta), `/api/reservas` y `/api/solicitudes-espacios` (máx. 10 peticiones POST/min contra saturación) y la vista `/login` (máx. 30 peticiones/min).
+  - Defensa en profundidad agregada en los Route Handlers [`app/api/reservas/route.ts`](file:///c:/Users/MANGE/Estadia2026IDGS/app/api/reservas/route.ts) y [`app/api/solicitudes-espacios/route.ts`](file:///c:/Users/MANGE/Estadia2026IDGS/app/api/solicitudes-espacios/route.ts).
+  - Respuestas HTTP 429 con cabeceras estándar (`Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`) y mensaje claro.
+  - 14 pruebas unitarias nuevas en `lib/rateLimit.test.ts`, `proxy.test.ts` y `app/api/reservas/route.test.ts` (suite total: 74 pruebas en verde).
 
 ### 🔴 Datos, Persistencia e Integración con Directus
 - [ ] **P4. Conexión de Catálogos y Contenidos a Directus 11 (Secciones 4.4 y 10).**
@@ -130,4 +135,6 @@ Aspectos que mejoran la observabilidad, accesibilidad y robustez de la plataform
 | **Widget de Accesibilidad (P13)** | Botón flotante interactivo global con ajuste tipográfico (100%-130%), alto contraste, monocromía y resaltado de enlaces con persistencia. | 4 pruebas unitarias en `AccessibilityButton.test.tsx`. |
 | **Aviso de Privacidad y Carta (P14)** | Modal accesible con Aviso de Privacidad Integral LFPDPPP y generación de plantilla PDF descargable para Carta Responsiva. | 4 pruebas en `PrivacyPolicyModal.test.tsx`. |
 | **Validación Zod en Servidor (P2)** | Instalación de Zod, esquemas estrictos de reservaciones y cursos con límite de 2 hrs, Route Handlers `/api/reservas` y `/api/solicitudes-espacios` y conexión a `ReservationForm`. | 10 pruebas unitarias en `schemas.test.ts` y `route.test.ts`. |
-| **Logger Estructurado JSON (P11)** | Módulo `lib/logger.ts` para emisión JSON a stdout/stderr con sanitización de tokens y datos personales para Promtail/Loki. | 3 pruebas unitarias en `lib/logger.test.ts` (total suite: 60 pruebas en verde). |
+| **Logger Estructurado JSON (P11)** | Módulo `lib/logger.ts` para emisión JSON a stdout/stderr con sanitización de tokens y datos personales para Promtail/Loki. | 3 pruebas unitarias en `lib/logger.test.ts`. |
+| **Rate Limiting en Endpoints Sensibles (P3)** | Módulo [`lib/rateLimit.ts`](file:///c:/Users/MANGE/Estadia2026IDGS/lib/rateLimit.ts) (Sliding Window Log en memoria), protección en [`proxy.ts`](file:///c:/Users/MANGE/Estadia2026IDGS/proxy.ts) para `/api/auth`, `/api/reservas`, `/api/solicitudes-espacios` y `/login`, y defensa en profundidad en Route Handlers con HTTP 429 y cabeceras estándar. | 14 pruebas unitarias nuevas en `rateLimit.test.ts`, `proxy.test.ts` y `route.test.ts` (total suite: 74 pruebas en verde). |
+

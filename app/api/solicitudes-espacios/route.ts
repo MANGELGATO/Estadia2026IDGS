@@ -1,11 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { spaceRequestSchema } from '../../../lib/validations/schemas';
 import { logger } from '../../../lib/logger';
+import {
+  checkRateLimit,
+  getClientIp,
+  createRateLimitResponse,
+  RATE_LIMIT_MUTATION,
+} from '../../../lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   const reqId = req.headers.get('x-request-id') || `req-${Date.now()}`;
+  const ip = getClientIp(req);
+
+  // Rate Limiting en servidor (Sección 7.3 Estándar PLAi)
+  const rate = checkRateLimit(`espacio_route:${ip}`, RATE_LIMIT_MUTATION);
+  if (!rate.success) {
+    logger.warn('Rate limit excedido en POST /api/solicitudes-espacios', {
+      reqId,
+      path: '/api/solicitudes-espacios',
+      ip,
+      status: 429,
+    });
+    return createRateLimitResponse(rate);
+  }
 
   try {
     const body = await req.json();

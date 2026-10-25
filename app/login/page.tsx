@@ -33,6 +33,12 @@ function LoginFormContent() {
         redirect: false,
       });
 
+      if (res?.status === 429) {
+        setError('Has alcanzado el límite máximo de intentos permitidos por seguridad. Por favor, espera un minuto antes de reintentar.');
+        setLoading(false);
+        return;
+      }
+
       if (res?.error) {
         setError('Credenciales no válidas. Verifica tu correo o contraseña.');
         setLoading(false);
