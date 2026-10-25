@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import SessionProviderWrapper from "./components/SessionProviderWrapper";
+import AccessibilityButton from "./components/AccessibilityButton";
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -34,6 +35,7 @@ export default function RootLayout({
           <Navbar />
           <main>{children}</main>
           <Footer />
+          <AccessibilityButton />
         </SessionProviderWrapper>
       </body>
     </html>

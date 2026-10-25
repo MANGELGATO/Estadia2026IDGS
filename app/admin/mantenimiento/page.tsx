@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import DataTable, { Column } from '../../components/admin/DataTable';
 import StatCard from '../../components/admin/StatCard';
+import ConfirmDialog from '../../components/admin/ConfirmDialog';
 import { RiToolsLine, RiAlertLine, RiCheckLine, RiTimeLine } from 'react-icons/ri';
 
 type MaintenanceStatus = 'Abierta' | 'En proceso' | 'Resuelta' | 'Cerrada';
@@ -46,6 +47,7 @@ export default function MantenimientoPage() {
   const [data, setData] = useState<MaintenanceRecord[]>(initialData);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MaintenanceRecord | null>(null);
+  const [closingRecord, setClosingRecord] = useState<MaintenanceRecord | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('Todas');
 
   const abiertas = data.filter(r => r.status === 'Abierta').length;
@@ -58,9 +60,7 @@ export default function MantenimientoPage() {
   const handleAdd = () => { setEditingItem(null); setIsModalOpen(true); };
   const handleEdit = (item: MaintenanceRecord) => { setEditingItem(item); setIsModalOpen(true); };
   const handleDelete = (item: MaintenanceRecord) => {
-    if (confirm(`¿Cerrar el registro de mantenimiento de "${item.equipo}"?`)) {
-      setData(data.map(r => r.id === item.id ? { ...r, status: 'Cerrada' } : r));
-    }
+    setClosingRecord(item);
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -249,6 +249,20 @@ export default function MantenimientoPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!closingRecord}
+        title="¿Cerrar registro de mantenimiento?"
+        description={`El reporte para "${closingRecord?.equipo}" se marcará como cerrado y pasará al historial resuelto.`}
+        confirmText="Cerrar Incidencia"
+        isDestructive={false}
+        onConfirm={() => {
+          if (closingRecord) {
+            setData(data.map(r => r.id === closingRecord.id ? { ...r, status: 'Cerrada' } : r));
+          }
+        }}
+        onClose={() => setClosingRecord(null)}
+      />
     </div>
   );
 }

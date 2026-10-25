@@ -89,3 +89,13 @@
   button { cursor: pointer; border: none; background: none; }
   input, select, textarea { font-family: var(--font-body); }
 }
+
+/* Modo accesibilidad: Resaltado visual estricto de hipervínculos */
+html.a11y-highlight-links a {
+  text-decoration: underline !important;
+  text-decoration-thickness: 2px !important;
+  text-underline-offset: 3px !important;
+  font-weight: 700 !important;
+  outline: 2px dashed #a81e71 !important;
+}
+

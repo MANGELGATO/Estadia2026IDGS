@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import DataTable, { Column } from '../../components/admin/DataTable';
 import StatCard from '../../components/admin/StatCard';
+import ConfirmDialog from '../../components/admin/ConfirmDialog';
 import { RiAppsLine, RiGamepadLine, RiEyeLine, RiComputerLine, RiAddLine, RiCloseLine } from 'react-icons/ri';
 
 type Platform = 'Meta Quest' | 'PC' | 'Meta Quest + PC';
@@ -249,6 +250,7 @@ export default function AplicacionesPage() {
   const [editingItem, setEditingItem] = useState<Application | null>(null);
   const [detailItem, setDetailItem] = useState<Application | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [deletingApp, setDeletingApp] = useState<Application | null>(null);
 
   const [filterPlatform, setFilterPlatform] = useState<string>('Todas');
   const [filterCategory, setFilterCategory] = useState<string>('Todas');
@@ -280,9 +282,7 @@ export default function AplicacionesPage() {
   };
 
   const handleDelete = (item: Application) => {
-    if (confirm(`¿Quitar "${item.name}" del catálogo?`)) {
-      setData(data.filter(d => d.id !== item.id));
-    }
+    setDeletingApp(item);
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -595,6 +595,19 @@ export default function AplicacionesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!deletingApp}
+        title="¿Quitar aplicación del catálogo?"
+        description={`Se retirará "${deletingApp?.name}" de la lista pública de aplicaciones disponibles en PLAi.`}
+        confirmText="Quitar del catálogo"
+        onConfirm={() => {
+          if (deletingApp) {
+            setData(data.filter(d => d.id !== deletingApp.id));
+          }
+        }}
+        onClose={() => setDeletingApp(null)}
+      />
     </div>
   );
 }

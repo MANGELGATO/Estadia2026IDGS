@@ -5,7 +5,6 @@ import CategoryCarousel from './components/CategoryCarousel';
 import EquipmentFilterGrid from './components/EquipmentFilterGrid';
 import AppCarousel from './components/AppCarousel';
 import CourseCallout from './components/CourseCallout';
-import AccessibilityButton from './components/AccessibilityButton';
 
 export default function Home() {
 
@@ -33,9 +32,6 @@ export default function Home() {
       <div id="cursos">
         <CourseCallout />
       </div>
-
-      {/* Botón flotante de accesibilidad */}
-      <AccessibilityButton />
     </>
   );
 }

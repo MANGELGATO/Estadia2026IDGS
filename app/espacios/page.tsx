@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Users, Calendar, Building, ShieldCheck, CheckCircle2, Clock } from 'lucide-react';
+import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
 
 const espaciosMock = [
   {
@@ -40,6 +41,7 @@ const espaciosMock = [
 export default function EspaciosPage() {
   const [selectedEspacio, setSelectedEspacio] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,7 +166,15 @@ export default function EspaciosPage() {
                   <div className="flex items-center gap-2 rounded-xl bg-[#F4F6F9] p-3">
                     <input type="checkbox" className="size-4 cursor-pointer accent-plai" required id="aviso" />
                     <label htmlFor="aviso" className="flex cursor-pointer items-center text-[0.85rem] text-navy">
-                      <ShieldCheck size={14} className="mr-1 text-plai" /> Acepto el <a href="#" style={{ color: activeEspacio.color, marginLeft: '0.2rem' }}>Aviso de Privacidad</a>
+                      <ShieldCheck size={14} className="mr-1 text-plai" /> Acepto el{' '}
+                      <button
+                        type="button"
+                        onClick={() => setIsPrivacyOpen(true)}
+                        className="cursor-pointer font-semibold underline hover:opacity-80 transition-opacity"
+                        style={{ color: activeEspacio.color, marginLeft: '0.2rem' }}
+                      >
+                        Aviso de Privacidad
+                      </button>
                     </label>
                   </div>
 
@@ -177,6 +187,8 @@ export default function EspaciosPage() {
           </div>
         </div>
       )}
+      {/* Modal de Aviso de Privacidad */}
+      <PrivacyPolicyModal isOpen={isPrivacyOpen} onClose={() => setIsPrivacyOpen(false)} />
     </div>
   );
 }

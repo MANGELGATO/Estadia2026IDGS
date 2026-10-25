@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import DataTable, { Column } from '../../components/admin/DataTable';
+import ConfirmDialog from '../../components/admin/ConfirmDialog';
 
 type Equipment = {
   id: number;
@@ -23,6 +24,7 @@ export default function InventarioPage() {
   const [data, setData] = useState<Equipment[]>(initialData);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Equipment | null>(null);
+  const [deletingEquipment, setDeletingEquipment] = useState<Equipment | null>(null);
 
   const columns: Column[] = [
     { key: 'name', label: 'Nombre' },
@@ -72,9 +74,7 @@ export default function InventarioPage() {
   };
 
   const handleDelete = (item: Equipment) => {
-    if (confirm(`¿Estás seguro de querer dar de baja el equipo "${item.name}"?`)) {
-      setData(data.filter(d => d.id !== item.id));
-    }
+    setDeletingEquipment(item);
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -162,6 +162,19 @@ export default function InventarioPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!deletingEquipment}
+        title="¿Dar de baja equipo?"
+        description={`El equipo "${deletingEquipment?.name}" será retirado del inventario activo de PLAi.`}
+        confirmText="Dar de baja"
+        onConfirm={() => {
+          if (deletingEquipment) {
+            setData(data.filter(d => d.id !== deletingEquipment.id));
+          }
+        }}
+        onClose={() => setDeletingEquipment(null)}
+      />
     </div>
   );
 }

@@ -3,7 +3,9 @@
 import React, { useState } from 'react';
 import DataTable, { Column } from '../../components/admin/DataTable';
 import StatCard from '../../components/admin/StatCard';
+import ConfirmDialog from '../../components/admin/ConfirmDialog';
 import { RiUserLine, RiUserSettingsLine, RiShieldUserLine } from 'react-icons/ri';
+import { AlertTriangle } from 'lucide-react';
 
 type UserRole = 'Administrador' | 'Colaborador' | 'Usuario Final';
 type UserStatus = 'Activo' | 'Inactivo';
@@ -69,6 +71,8 @@ export default function UsuariosPage() {
   const [data, setData] = useState<User[]>(initialData);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<User | null>(null);
+  const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const admins = data.filter(u => u.role === 'Administrador').length;
   const colaboradores = data.filter(u => u.role === 'Colaborador').length;
@@ -78,12 +82,11 @@ export default function UsuariosPage() {
   const handleEdit = (item: User) => { setEditingItem(item); setIsModalOpen(true); };
   const handleDelete = (item: User) => {
     if (item.role === 'Administrador') {
-      alert('No puedes eliminar una cuenta de Administrador.');
+      setActionNotice('No puedes desactivar ni eliminar una cuenta con rol de Administrador.');
       return;
     }
-    if (confirm(`¿Desactivar la cuenta de "${item.name}"?`)) {
-      setData(data.map(u => u.id === item.id ? { ...u, status: 'Inactivo' } : u));
-    }
+    setActionNotice(null);
+    setDeletingUser(item);
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -150,6 +153,21 @@ export default function UsuariosPage() {
         <StatCard title="Colaboradores" value={colaboradores} icon={<RiUserSettingsLine />} variant="primary" />
       </div>
 
+      {actionNotice && (
+        <div role="alert" className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800 animate-pop-in">
+          <div className="flex items-center gap-3">
+            <AlertTriangle size={20} className="shrink-0 text-amber-600" />
+            <span className="text-sm font-semibold">{actionNotice}</span>
+          </div>
+          <button
+            onClick={() => setActionNotice(null)}
+            className="rounded-lg px-2 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
+
       <DataTable
         title="Usuarios Registrados"
         columns={columns}
@@ -208,6 +226,19 @@ export default function UsuariosPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!deletingUser}
+        title="¿Desactivar cuenta de usuario?"
+        description={`La cuenta de "${deletingUser?.name}" pasará a estado Inactivo y se restringirá su acceso al sistema.`}
+        confirmText="Desactivar"
+        onConfirm={() => {
+          if (deletingUser) {
+            setData(data.map(u => u.id === deletingUser.id ? { ...u, status: 'Inactivo' } : u));
+          }
+        }}
+        onClose={() => setDeletingUser(null)}
+      />
     </div>
   );
 }

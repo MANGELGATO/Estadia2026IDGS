@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import DataTable, { Column } from '../../components/admin/DataTable';
 import { RiCalendarCheckLine, RiCheckLine, RiCloseLine, RiTimeLine, RiEyeLine } from 'react-icons/ri';
 import StatCard from '../../components/admin/StatCard';
+import ConfirmDialog from '../../components/admin/ConfirmDialog';
 
 type ReservationStatus = 'Pendiente' | 'Aprobada' | 'Rechazada' | 'En uso' | 'Completada';
 
@@ -58,6 +59,7 @@ export default function ReservacionesPage() {
   const [selectedItem, setSelectedItem] = useState<Reservation | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [cancelingReservation, setCancelingReservation] = useState<Reservation | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('Todas');
 
   const pendientes = data.filter(r => r.status === 'Pendiente').length;
@@ -72,9 +74,7 @@ export default function ReservacionesPage() {
   };
 
   const handleDelete = (item: Reservation) => {
-    if (confirm(`¿Cancelar la reservación de "${item.usuario}" para "${item.recurso}"?`)) {
-      setData(data.filter(r => r.id !== item.id));
-    }
+    setCancelingReservation(item);
   };
 
   const handleAdd = () => {
@@ -284,6 +284,19 @@ export default function ReservacionesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!cancelingReservation}
+        title="¿Cancelar reservación?"
+        description={`Se cancelará la solicitud de "${cancelingReservation?.usuario}" para "${cancelingReservation?.recurso}".`}
+        confirmText="Cancelar Reservación"
+        onConfirm={() => {
+          if (cancelingReservation) {
+            setData(data.filter(r => r.id !== cancelingReservation.id));
+          }
+        }}
+        onClose={() => setCancelingReservation(null)}
+      />
     </div>
   );
 }

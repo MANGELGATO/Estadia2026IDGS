@@ -18,21 +18,22 @@ describe('ReservationForm', () => {
     expect(document.getElementById('res-end')).toBeEnabled();
   });
 
-  it('rechaza un préstamo mayor a 2 horas y limpia la hora de fin', () => {
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+  it('rechaza un préstamo mayor a 2 horas, muestra alerta accesible y limpia la hora de fin', () => {
     render(<ReservationForm device={device} onClose={() => {}} />);
     fireEvent.change(document.getElementById('res-start')!, { target: { value: '10:00' } });
     fireEvent.change(document.getElementById('res-end')!, { target: { value: '13:00' } });
-    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('2 horas'));
+    
+    const alertBanner = screen.getByRole('alert');
+    expect(alertBanner).toBeInTheDocument();
+    expect(alertBanner).toHaveTextContent(/2 horas/i);
     expect(document.getElementById('res-end')).toHaveValue('');
   });
 
-  it('acepta un rango válido', () => {
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+  it('acepta un rango válido sin mostrar alerta', () => {
     render(<ReservationForm device={device} onClose={() => {}} />);
     fireEvent.change(document.getElementById('res-start')!, { target: { value: '10:00' } });
     fireEvent.change(document.getElementById('res-end')!, { target: { value: '11:30' } });
-    expect(alertSpy).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(document.getElementById('res-end')).toHaveValue('11:30');
   });
 

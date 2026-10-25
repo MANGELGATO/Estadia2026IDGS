@@ -17,9 +17,9 @@ Esta tabla resume el estado actual contra la **Lista de Verificación de Aceptac
 | **Salud** | `[OBLIGATORIO]` | **CUMPLE** | Endpoint `/api/health` (`force-dynamic`) responde 200 en milisegundos sin autenticación. |
 | **Configuración** | `[OBLIGATORIO]` | **CUMPLE** | `.env.example` documentado con valores ficticios; principios 12-factor; ninguna URL ni credencial quemada en el código. |
 | **Secretos** | `[OBLIGATORIO]` | **CUMPLE** | Lector `lib/env.ts` implementa patrón `VARIABLE_FILE` y lectura directa desde `/run/secrets/`. Sin secretos en Git ni en la imagen. |
-| **Seguridad** | `[OBLIGATORIO]` | **PENDIENTE (P2, P3)** | P1 completado (NextAuth.js + Proxy RBAC). Falta validación Zod en servidor, rate limiting y escaneo de vulnerabilidades Trivy. |
+| **Seguridad** | `[OBLIGATORIO]` | **PENDIENTE (P3)** | P1 (NextAuth.js + Proxy RBAC) y P2 (Validación Zod en servidor) completados. Falta rate limiting (P3) y escaneo Trivy. |
 | **Autenticación** | `[OBLIGATORIO]` | **CUMPLE** | NextAuth.js 4.24.15 con sesiones JWT en servidor, proxy de seguridad `proxy.ts` (Next.js 16) protegiendo `/admin` y `/usuario` con RBAC, e interfaz `/login` con cuentas de evaluación. |
-| **Calidad** | `[OBLIGATORIO]` | **CUMPLE** | ESLint 9 pasa con 0 errores y 0 advertencias; Vitest con 30 pruebas unitarias automatizadas (`pnpm test`). |
+| **Calidad** | `[OBLIGATORIO]` | **CUMPLE** | ESLint 9 pasa con 0 errores y 0 advertencias; Vitest con 60 pruebas unitarias automatizadas (`pnpm test`). |
 | **Datos** | `[OBLIGATORIO]` | **PENDIENTE (P4, P5)** | Datos aún provienen de `lib/mockData.ts`. Requiere integración con Directus 11 (`@directus/sdk`) y PostgreSQL con migraciones versionadas. |
 | **Logs** | `[OBLIGATORIO]` | **CUMPLE** | Salida a stdout/stderr sin escribir en archivos locales; sin datos sensibles. |
 | **Documentación** | `[OBLIGATORIO]` | **CUMPLE** | `README.md` completo en español con arquitectura, Swarm, Docker, variables y checklist. |
@@ -38,9 +38,12 @@ Estos puntos son **condición obligatoria** para que el área de Tecnología e I
   - Modernizada la interfaz de `/login` con soporte para credenciales institucionales y botones de acceso rápido para evaluadores.
   - Indicador de sesión activa y botón de cierre de sesión en `Navbar.tsx`, `AdminSidebar.tsx` y `UserSidebar.tsx`.
   - Cobertura con 13 pruebas unitarias nuevas en `lib/auth.test.ts` y `proxy.test.ts` (suite total: 30 pruebas en verde).
-- [ ] **P2. Validación en el Servidor con Zod (Sección 7.2).**
-  - Actualmente los 8 formularios del sistema (reserva de equipos, solicitudes de cursos, gestión de inventario, mantenimientos, etc.) solo validan en el cliente mediante atributos HTML5 o `useState`.
-  - **Acción:** Instalar `zod` y crear esquemas de validación estrictos en route handlers (`/api/...`) o Server Actions para sanitizar y validar todas las entradas antes de procesarlas.
+- [x] **P2. Validación en el Servidor con Zod (Sección 7.2).** *(COMPLETADO)*
+  - Instalado `zod 4.x` y construidos esquemas de validación estrictos en [`lib/validations/schemas.ts`](file:///c:/Users/MANGE/Estadia2026IDGS/lib/validations/schemas.ts) para reservaciones de equipo, cursos y espacios.
+  - Implementado control de regla de negocio en servidor con `.superRefine`: préstamo máximo de 2 horas y coherencia temporal.
+  - Creados Route Handlers [`app/api/reservas/route.ts`](file:///c:/Users/MANGE/Estadia2026IDGS/app/api/reservas/route.ts) y [`app/api/solicitudes-espacios/route.ts`](file:///c:/Users/MANGE/Estadia2026IDGS/app/api/solicitudes-espacios/route.ts) con respuesta 201/400 tipada y formateada.
+  - Conectado [ReservationForm.tsx](file:///c:/Users/MANGE/Estadia2026IDGS/app/components/ReservationForm.tsx) al backend mediante `fetch('/api/reservas')` con manejo de estados de carga (`isSubmitting`) y despliegue de errores de validación.
+  - 10 pruebas unitarias añadidas en `lib/validations/schemas.test.ts` y `app/api/reservas/route.test.ts`.
 - [ ] **P3. Rate Limiting en Endpoints Sensibles (Sección 7.3).**
   - Proteger los endpoints de login y de envío de solicitudes públicas contra ataques de fuerza bruta o saturación (mediante middleware en Next.js o integración con el proxy Nginx institucional).
 
@@ -75,16 +78,29 @@ Estos puntos son **condición obligatoria** para que el área de Tecnología e I
 
 Aspectos que mejoran la observabilidad, accesibilidad y robustez de la plataforma según el estándar:
 
-- [ ] **P10. Páginas Personalizadas de Error y 404 (Sección 7.4).**
-  - Crear `app/not-found.tsx` y `app/error.tsx` con diseño institucional PLAi para asegurar que errores inesperados no revelen trazas de código, versiones de dependencias ni consultas internas al usuario final.
-- [ ] **P11. Logger Estructurado en JSON (Sección 8).**
-  - Implementar un logger ligero que serialice logs en formato JSON hacia `stdout`/`stderr` con campos `timestamp`, `level`, `message`, `path` y `reqId`, facilitando su ingesta en Grafana Loki y Promtail.
-- [ ] **P12. Reemplazar Diálogos Nativos `alert()` y `confirm()` (Sección 7 y UX).**
-  - Reemplazar las alertas nativas del navegador en [ReservationForm.tsx](file:///c:/Users/MANGE/Estadia2026IDGS/app/components/ReservationForm.tsx) y vistas de administración por toasts o componentes visuales daisyUI (`alert`/`modal`) con `role="alert"` para accesibilidad.
-- [ ] **P13. Accesibilidad e Integración del Botón Flotante (Sección 3).**
-  - Asociar `AccessibilityButton.tsx` a controles de accesibilidad reales (alto contraste, incremento de tipografía) y verificar que todos los `<label>` de modales cuenten con `htmlFor` apuntando al `id` del input.
-- [ ] **P14. Publicación de Documentos Oficiales en Enlaces `href="#"`.**
-  - Enlazar la plantilla oficial de la Carta Responsiva y el Aviso de Privacidad oficial de PLAi en los enlaces correspondientes de `ReservationForm.tsx`.
+- [x] **P10. Páginas Personalizadas de Error y 404 (Sección 7.4).** *(COMPLETADO)*
+  - Implementada [`app/not-found.tsx`](file:///c:/Users/MANGE/Estadia2026IDGS/app/not-found.tsx) con diseño institucional PLAi, badge 404, y enlaces directos de navegación segura.
+  - Implementada [`app/error.tsx`](file:///c:/Users/MANGE/Estadia2026IDGS/app/error.tsx) (boundary `'use client'`) sanitizada para no exponer stack traces ni consultas internas en pantalla, con soporte de código digest para soporte técnico y botón de reintento.
+  - Verificado con 5 pruebas unitarias en `app/not-found.test.tsx` y `app/error.test.tsx`.
+- [x] **P11. Logger Estructurado en JSON (Sección 8).** *(COMPLETADO)*
+  - Creado [`lib/logger.ts`](file:///c:/Users/MANGE/Estadia2026IDGS/lib/logger.ts) con métodos `info`, `warn`, `error` y `debug`.
+  - Serialización directa a `stdout`/`stderr` en formato JSON (`timestamp`, `level`, `service`, `message`, `reqId`, `path`, `status`).
+  - Función de sanitización recursiva `sanitizeLogData` que enmascara automáticamente contraseñas, tokens y copias de INE con `[REDACTED]` conforme a la LFPDPPP.
+  - 3 pruebas unitarias añadidas en `lib/logger.test.ts`.
+- [x] **P12. Reemplazar Diálogos Nativos `alert()` y `confirm()` (Sección 7 y UX).** *(COMPLETADO)*
+  - Eliminados el 100% de `alert()` y `confirm()` nativos y bloqueantes en `ReservationForm.tsx`, `app/categoria/[slug]/client.tsx` y las 5 vistas administrativas.
+  - Creado [`ConfirmDialog.tsx`](file:///c:/Users/MANGE/Estadia2026IDGS/app/components/admin/ConfirmDialog.tsx) con soporte completo de accesibilidad (`role="alertdialog"`, `aria-modal="true"`, tecla Escape y foco).
+  - Integrados avisos accesibles con `role="alert"` en formularios para usuarios y cotizaciones.
+  - Verificado con pruebas unitarias en `ConfirmDialog.test.tsx` y `ReservationForm.test.tsx`.
+- [x] **P13. Accesibilidad e Integración del Botón Flotante (Sección 3).** *(COMPLETADO)*
+  - Transformado [`AccessibilityButton.tsx`](file:///c:/Users/MANGE/Estadia2026IDGS/app/components/AccessibilityButton.tsx) en un widget interactivo flotante montado globalmente en [`app/layout.tsx`](file:///c:/Users/MANGE/Estadia2026IDGS/app/layout.tsx).
+  - Incluye zoom tipográfico dinámico (100%, 115%, 130%), alternador de Alto Contraste, Escala de Grises y Resaltado estricto de hipervínculos con persistencia en `localStorage`.
+  - Verificado con 4 pruebas unitarias en `AccessibilityButton.test.tsx`.
+- [x] **P14. Publicación de Documentos Oficiales en Enlaces `href="#"`.** *(COMPLETADO)*
+  - Creado componente [`PrivacyPolicyModal.tsx`](file:///c:/Users/MANGE/Estadia2026IDGS/app/components/PrivacyPolicyModal.tsx) con el texto institucional completo del Aviso de Privacidad Integral de PLAi conforme a la LFPDPPP y derechos ARCO.
+  - Conectado a todos los enlaces de consentimiento en `ReservationForm.tsx`, `espacios/page.tsx` y `Footer.tsx`.
+  - Generada plantilla oficial descargable en PDF de la Carta Responsiva en [`public/documentos/PLAi_Carta_Responsiva_Equipos.pdf`](file:///c:/Users/MANGE/Estadia2026IDGS/public/documentos/PLAi_Carta_Responsiva_Equipos.pdf).
+  - Verificado con 4 pruebas unitarias en `PrivacyPolicyModal.test.tsx`.
 - [ ] **P15. Pipeline CI/CD Automatizado (Sección 9).**
   - Crear workflow de GitHub Actions o GitLab CI (`.gitlab-ci.yml`) que ejecute en cada Pull Request: `pnpm lint`, `pnpm test`, `pnpm build` y escaneo Trivy.
 - [ ] **P16. Ampliar Cobertura de Pruebas Unitarias (Sección 9).**
@@ -109,3 +125,9 @@ Aspectos que mejoran la observabilidad, accesibilidad y robustez de la plataform
 | **Lector de Secretos (P5)** | Creación de `lib/env.ts` para soportar `VARIABLE_FILE` y `/run/secrets/` de Docker Swarm. | 6 pruebas unitarias específicas en `lib/env.test.ts`. |
 | **Genéricos en DataTable (P2)** | Tipado de [DataTable.tsx](file:///c:/Users/MANGE/Estadia2026IDGS/app/components/admin/DataTable.tsx) mediante genéricos `<T extends Record<string, any>>`. | Compilación exitosa en `pnpm build`. |
 | **Autenticación NextAuth.js (P1)** | Integración de `next-auth@4.24.15`, sesiones JWT del lado del servidor, roles institucionales (`admin`, `usuario`), protección con `proxy.ts` (Next.js 16) y formulario interactivo `/login` con cuentas de demostración. | 13 pruebas unitarias nuevas (30/30 en verde en `pnpm test`), compilación limpia `output: 'standalone'` y linter en 0. |
+| **Páginas 404 / Error (P10)** | Creación de `app/not-found.tsx` y boundary `app/error.tsx` con diseño institucional y sanitización estricta sin fugas de stack traces ni BD. | 5 pruebas unitarias en `not-found.test.tsx` y `error.test.tsx`. |
+| **Eliminación de alert/confirm (P12)** | Creación de `ConfirmDialog.tsx` (`role="alertdialog"`) y sustitución del 100% de diálogos nativos por banners y modales accesibles daisyUI. | 4 pruebas en `ConfirmDialog.test.tsx` y actualización de `ReservationForm.test.tsx`. |
+| **Widget de Accesibilidad (P13)** | Botón flotante interactivo global con ajuste tipográfico (100%-130%), alto contraste, monocromía y resaltado de enlaces con persistencia. | 4 pruebas unitarias en `AccessibilityButton.test.tsx`. |
+| **Aviso de Privacidad y Carta (P14)** | Modal accesible con Aviso de Privacidad Integral LFPDPPP y generación de plantilla PDF descargable para Carta Responsiva. | 4 pruebas en `PrivacyPolicyModal.test.tsx`. |
+| **Validación Zod en Servidor (P2)** | Instalación de Zod, esquemas estrictos de reservaciones y cursos con límite de 2 hrs, Route Handlers `/api/reservas` y `/api/solicitudes-espacios` y conexión a `ReservationForm`. | 10 pruebas unitarias en `schemas.test.ts` y `route.test.ts`. |
+| **Logger Estructurado JSON (P11)** | Módulo `lib/logger.ts` para emisión JSON a stdout/stderr con sanitización de tokens y datos personales para Promtail/Loki. | 3 pruebas unitarias en `lib/logger.test.ts` (total suite: 60 pruebas en verde). |

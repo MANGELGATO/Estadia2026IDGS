@@ -83,6 +83,7 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
   const [selectedReserveId, setSelectedReserveId]  = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string>('https://www.youtube.com/embed/dQw4w9WgXcQ');
   const [isLoaded, setIsLoaded] = useState(false);
+  const [quoteSubmitted, setQuoteSubmitted] = useState(false);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -275,28 +276,38 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
                 </div>
                 <div className="mt-4 flex flex-col gap-6">
                   <p className="text-base text-plai-gray">¿Tienes un diseño listo pero no necesitas solicitar el equipo completo? Podemos imprimirlo por ti.</p>
-                  <form className="flex flex-col gap-5 rounded-xl bg-[#F4F6F9] p-6" onSubmit={(e) => { e.preventDefault(); alert('Solicitud de cotización enviada.'); }}>
-                    <div className="flex flex-col gap-2">
-                      <label className="font-heading text-[0.9rem] font-bold text-navy">Archivo 3D (.stl, .obj)</label>
-                      <input type="file" accept=".stl,.obj,.3mf" className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] file:mr-4 file:rounded-full file:border-0 file:bg-plai/10 file:px-4 file:py-2 file:font-heading file:font-semibold file:text-plai" required />
+                  {quoteSubmitted ? (
+                    <div role="alert" className="flex items-center gap-4 rounded-xl border border-emerald-200 bg-emerald-50 p-6 text-emerald-800 animate-pop-in">
+                      <CheckCircle2 size={32} className="shrink-0 text-emerald-600" />
+                      <div>
+                        <h3 className="font-heading font-bold text-emerald-900">¡Solicitud de cotización enviada con éxito!</h3>
+                        <p className="mt-1 text-sm text-emerald-700">El equipo técnico de manufactura aditiva de PLAi revisará tu modelo y responderá a la brevedad.</p>
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="font-heading text-[0.9rem] font-bold text-navy">Material deseado</label>
-                      <select className="w-full cursor-pointer rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] text-navy outline-none focus:border-plai">
-                        <option>PLA</option>
-                        <option>PETG</option>
-                        <option>TPU (Flexible)</option>
-                        <option>ABS</option>
-                      </select>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="font-heading text-[0.9rem] font-bold text-navy">Detalles adicionales</label>
-                      <textarea className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] outline-none focus:border-plai" placeholder="Ej. Relleno al 20%, color preferido..." rows={2}></textarea>
-                    </div>
-                    <button type="submit" className="mt-2 cursor-pointer self-start rounded-xl px-6 py-3 font-heading text-base font-bold text-white transition-all hover:-translate-y-0.5 hover:opacity-90" style={{ backgroundColor: meta.color }}>
-                      Solicitar Cotización
-                    </button>
-                  </form>
+                  ) : (
+                    <form className="flex flex-col gap-5 rounded-xl bg-[#F4F6F9] p-6" onSubmit={(e) => { e.preventDefault(); setQuoteSubmitted(true); }}>
+                      <div className="flex flex-col gap-2">
+                        <label className="font-heading text-[0.9rem] font-bold text-navy">Archivo 3D (.stl, .obj)</label>
+                        <input type="file" accept=".stl,.obj,.3mf" className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] file:mr-4 file:rounded-full file:border-0 file:bg-plai/10 file:px-4 file:py-2 file:font-heading file:font-semibold file:text-plai" required />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="font-heading text-[0.9rem] font-bold text-navy">Material deseado</label>
+                        <select className="w-full cursor-pointer rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] text-navy outline-none focus:border-plai">
+                          <option>PLA</option>
+                          <option>PETG</option>
+                          <option>TPU (Flexible)</option>
+                          <option>ABS</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="font-heading text-[0.9rem] font-bold text-navy">Detalles adicionales</label>
+                        <textarea className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] outline-none focus:border-plai" placeholder="Ej. Relleno al 20%, color preferido..." rows={2}></textarea>
+                      </div>
+                      <button type="submit" className="mt-2 cursor-pointer self-start rounded-xl px-6 py-3 font-heading text-base font-bold text-white transition-all hover:-translate-y-0.5 hover:opacity-90" style={{ backgroundColor: meta.color }}>
+                        Solicitar Cotización
+                      </button>
+                    </form>
+                  )}
                 </div>
               </div>
 
