@@ -17,7 +17,7 @@ Esta guía contiene la estructura oficial del formato **R-ADC-08-07** y los **pr
 | | 1.5 Justificación | ✅ | Redactado (fuente única, valor operativo, norma PLAi) |
 | | 1.6 Alcance del Proyecto | ✅ | Alcance Principal y Alcance Complementario definidos |
 | **2. Marco Teórico y de Referencia** | 2. Marco Teórico y Contextual | ✅ | Redactado (Next.js RSC, Tailwind, ITAM, RBAC, Swarm) |
-| **3. Desarrollo: Métodos y Técnicas** | 3. Metodología y Arquitectura | 🟡 En progreso | Metodología Scrum, RF, RNF, diagrama y modelo de datos |
+| **3. Desarrollo: Métodos y Técnicas** | 3. Metodología y Arquitectura | ✅ | Redactado (Scrum, Sprints, RF/RNF, RSC, MER 3FN, Zod, RBAC, Swarm) |
 | **4. Análisis de Resultados** | 4. Resultados e Indicadores | ⏳ Pendiente | Métricas de cumplimiento, cobertura de inventario y tests |
 | **5. Conclusiones y Recomendaciones**| 5. Cierre y Trabajo Futuro | ⏳ Pendiente | Logros, trabajo futuro (QR, firmas, notificaciones) |
 | **6. Preliminares y Finales** | Resumen Ejecutivo | ⏳ Pendiente | Máximo 1 cuartilla (problema, objetivo, solución, resultados) |
