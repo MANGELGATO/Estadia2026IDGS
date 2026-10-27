@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { 
   RiDashboardLine, 
@@ -35,9 +36,17 @@ export default function UserSidebar() {
 
   return (
     <aside className="sticky top-[70px] flex h-auto w-full flex-col overflow-y-auto border-r border-white/5 bg-gradient-to-b from-[#162E50] to-[#1B365D] p-4 text-white shadow-[4px_0_20px_rgba(0,0,0,0.15)] [scrollbar-color:rgba(255,255,255,0.2)_transparent] [scrollbar-width:thin] md:h-[calc(100vh-70px)] md:w-[260px] md:p-6">
-      <div className="mb-4 flex items-center gap-3 border-b border-white/[0.08] px-4 pb-6 pt-3">
-        <span className="text-2xl">🎓</span>
-        <span className="font-heading text-[1.1rem] font-extrabold tracking-[0.02em] text-white">PLAi Usuario</span>
+      <div className="mb-4 flex items-center justify-between border-b border-white/[0.08] px-3 pb-5 pt-2">
+        <div className="rounded-lg bg-white/95 px-2 py-1 shadow-sm">
+          <Image
+            src="/logotipo.png"
+            alt="PLAi"
+            width={120}
+            height={36}
+            className="h-7 w-auto object-contain"
+          />
+        </div>
+        <span className="rounded bg-[#E91E8C]/20 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#E91E8C]">Usuario</span>
       </div>
       <nav className="flex flex-1 flex-col gap-1">
         {navSections.map((section) => (

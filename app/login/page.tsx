@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, Suspense } from 'react';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { ShieldCheck, User, Lock, Mail, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
@@ -92,6 +93,14 @@ function LoginFormContent() {
           {/* Columna Izquierda: Formulario Directo */}
           <div className="p-8 md:col-span-7 md:p-12">
             <div className="mb-6">
+              <Image
+                src="/logotipo.png"
+                alt="PLAi - Plataforma Abierta de Innovación"
+                width={160}
+                height={48}
+                priority
+                className="mb-4 h-10 w-auto object-contain"
+              />
               <span className="inline-block rounded-full bg-[#1B365D]/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[#1B365D]">
                 Estándar PLAi v1.0 • NextAuth.js
               </span>

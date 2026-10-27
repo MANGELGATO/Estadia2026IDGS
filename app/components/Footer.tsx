@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { MapPin, Mail } from 'lucide-react';
 import PrivacyPolicyModal from './PrivacyPolicyModal';
 
@@ -19,18 +20,14 @@ export default function Footer() {
         <div className={`${container} grid grid-cols-1 gap-8 md:grid-cols-[1.6fr_1fr_1.4fr] md:gap-12`}>
           {/* Brand col */}
           <div>
-            <div className="mb-4 flex items-center gap-3">
-              <svg width="40" height="30" viewBox="0 0 80 62" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="18" cy="32" r="14" fill="#E91E8C" fillOpacity="0.8"/>
-                <circle cx="18" cy="32" r="8" fill="#1B365D"/>
-                <circle cx="38" cy="20" r="12" fill="#F59E0B" fillOpacity="0.9"/>
-                <circle cx="38" cy="20" r="6" fill="#1B365D"/>
-                <circle cx="58" cy="32" r="14" fill="#00C48C" fillOpacity="0.8"/>
-                <circle cx="58" cy="32" r="8" fill="#1B365D"/>
-                <circle cx="38" cy="44" r="12" fill="#7C3AED" fillOpacity="0.85"/>
-                <circle cx="38" cy="44" r="6" fill="#1B365D"/>
-              </svg>
-              <span className="font-heading text-[1.4rem] font-black tracking-[-0.03em] text-white">PLAi</span>
+            <div className="mb-4 flex items-center">
+              <Image
+                src="/logotipo.png"
+                alt="PLAi - Plataforma Abierta de Innovación"
+                width={160}
+                height={48}
+                className="h-11 w-auto rounded-lg bg-white/95 px-2 py-1 object-contain shadow-sm"
+              />
             </div>
             <p className="mb-6 max-w-[340px] text-[0.87rem] leading-[1.65] text-white/65">
               Plataforma Abierta de Innovación. Impulsamos la innovación y el desarrollo tecnológico para toda la comunidad.

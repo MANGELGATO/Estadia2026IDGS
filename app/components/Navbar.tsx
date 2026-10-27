@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import NavAuthStatus from './NavAuthStatus';
 
 const navLinkClass =
@@ -10,21 +11,16 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 border-b border-black/[0.08] bg-white shadow-[0_1px_0_rgba(0,0,0,0.06)]">
       <div className="mx-auto flex h-[68px] max-w-[1200px] items-center justify-between gap-8 px-6">
-        {/* Logo - exactly as in aprender.plai.mx */}
-        <Link href="/" className="flex shrink-0 items-center gap-[0.6rem]">
-          {/* PLAi colored logo circles icon */}
-          <svg width="48" height="38" viewBox="0 0 80 62" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="18" cy="32" r="14" fill="#E91E8C"/>
-            <circle cx="18" cy="32" r="8" fill="#F4F6F9"/>
-            <circle cx="38" cy="20" r="12" fill="#F59E0B"/>
-            <circle cx="56" cy="32" r="14" fill="#22C55E"/>
-            <circle cx="56" cy="32" r="8" fill="#F4F6F9"/>
-          </svg>
-          <div className="flex flex-col leading-[1.15]">
-            <span className="text-[0.78rem] font-extrabold text-navy">Plataforma</span>
-            <span className="text-[0.72rem] font-medium leading-[1.2] text-plai-gray">Abierta de</span>
-            <span className="text-[0.72rem] font-medium leading-[1.2] text-plai-gray">Innovación</span>
-          </div>
+        {/* Logo oficial de PLAi */}
+        <Link href="/" className="flex shrink-0 items-center">
+          <Image
+            src="/logotipo.png"
+            alt="PLAi - Plataforma Abierta de Innovación"
+            width={160}
+            height={48}
+            priority
+            className="h-10 w-auto object-contain"
+          />
         </Link>
 
         <nav className="hidden gap-10 md:flex">
