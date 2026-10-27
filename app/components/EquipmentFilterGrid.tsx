@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import { mockDevices } from '../../lib/mockData';
+import { useState, useEffect } from 'react';
+import { DeviceItem, mockDevices } from '../../lib/mockData';
 import EquipmentCard from './EquipmentCard';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -14,18 +14,35 @@ const FILTER_TABS = ['Todos', 'Realidad Virtual', 'Robótica', 'Cómputo', 'Dron
 
 export default function EquipmentFilterGrid({ activeFilter, onFilterChange }: Props) {
   const router = useRouter();
+  const [devices, setDevices] = useState<DeviceItem[]>(mockDevices);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos los estados');
+
+  useEffect(() => {
+    fetch('/api/equipos')
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          setDevices(json.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const filter = activeFilter ?? 'Todos';
 
   const statuses = ['Todos los estados', 'Disponible', 'Reservado', 'En uso', 'En mantenimiento', 'No disponible'];
 
-  const filtered = mockDevices.filter(d => {
+  const filtered = devices.filter(d => {
     const matchCat = filter === 'Todos' || d.category === filter;
     const matchStatus = statusFilter === 'Todos los estados' || d.status === statusFilter;
-    const matchSearch = !search || d.name.toLowerCase().includes(search.toLowerCase())
-      || d.brand.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase().trim();
+    const matchSearch = !q 
+      || d.name.toLowerCase().includes(q)
+      || d.brand.toLowerCase().includes(q)
+      || d.inventoryNumber.toLowerCase().includes(q)
+      || (d.serialNumber && d.serialNumber.toLowerCase().includes(q))
+      || (d.storage && d.storage.toLowerCase().includes(q));
     return matchCat && matchStatus && matchSearch;
   });
 

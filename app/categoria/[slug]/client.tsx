@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
-import { mockDevices } from '../../../lib/mockData';
+import { mockDevices, DeviceItem } from '../../../lib/mockData';
 import { ArrowLeft, Lightbulb, Target, CheckCircle2, Box, Layers, Coins } from 'lucide-react';
 import EquipmentCard from '../../components/EquipmentCard';
 import EquipmentDetailModal from '../../components/EquipmentDetailModal';
@@ -77,7 +77,20 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
   const resolvedParams = use(params);
   const meta = categoryMeta[resolvedParams.slug];
   const deviceCategory = categoryToDeviceCategory[resolvedParams.slug];
-  const devices = mockDevices.filter(d => d.category === deviceCategory);
+  const [allDevices, setAllDevices] = useState<DeviceItem[]>(mockDevices);
+
+  useEffect(() => {
+    fetch('/api/equipos')
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          setAllDevices(json.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const devices = allDevices.filter(d => d.category === deviceCategory);
 
   const [selectedDetailsId, setSelectedDetailsId] = useState<string | null>(null);
   const [selectedReserveId, setSelectedReserveId]  = useState<string | null>(null);
@@ -96,8 +109,8 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
     return () => cancelAnimationFrame(frame);
   }, [resolvedParams.slug]);
 
-  const deviceForDetails = mockDevices.find(d => d.id === selectedDetailsId);
-  const deviceForReserve = mockDevices.find(d => d.id === selectedReserveId);
+  const deviceForDetails = allDevices.find(d => d.id === selectedDetailsId);
+  const deviceForReserve = allDevices.find(d => d.id === selectedReserveId);
 
   if (!meta) {
     return (
@@ -111,7 +124,7 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
   }
 
   return (
-    <div className={isLoaded ? 'translate-y-0 opacity-100 transition-all duration-700 ease-out' : 'translate-y-2 opacity-0'}>
+    <div className={isLoaded ? 'opacity-100 transition-opacity duration-500 ease-out' : 'opacity-0'}>
       {/* Dynamic Hero Section */}
       <div
         className="relative overflow-hidden py-16 text-white after:absolute after:-bottom-px after:inset-x-0 after:h-16 after:bg-[#F4F6F9] after:[clip-path:polygon(0_100%,100%_100%,100%_40%,0%_100%)] bg-[linear-gradient(135deg,var(--primary)_0%,color-mix(in_srgb,var(--cat-color)_60%,var(--primary))_100%)]"

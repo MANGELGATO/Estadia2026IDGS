@@ -68,4 +68,20 @@ export const env = {
   get nextAuthSecret(): string {
     return getEnvSecret('NEXTAUTH_SECRET');
   },
+  get dbHost(): string {
+    return process.env.DB_HOST || '127.0.0.1';
+  },
+  get dbPort(): number {
+    const p = parseInt(process.env.DB_PORT || '3306', 10);
+    return Number.isNaN(p) ? 3306 : p;
+  },
+  get dbUser(): string {
+    return process.env.DB_USER || 'root';
+  },
+  get dbPassword(): string {
+    return getEnvSecret('DB_PASSWORD', 'root');
+  },
+  get dbName(): string {
+    return process.env.DB_NAME || 'plai_recursos';
+  },
 };

@@ -79,6 +79,7 @@ CREATE TABLE `equipos` (
   `nombre` VARCHAR(120) NOT NULL,
   `marca` VARCHAR(80) NOT NULL,
   `modelo` VARCHAR(80) NOT NULL,
+  `almacenamiento` VARCHAR(80) NULL,
   `numero_serie` VARCHAR(80) NOT NULL,
   `codigo_plai` VARCHAR(60) NOT NULL COMMENT 'Código de resguardo patrimonial del Estado de Jalisco',
   `estado` ENUM('Disponible', 'Reservado', 'En uso', 'En mantenimiento', 'Fuera de servicio', 'No disponible') NOT NULL DEFAULT 'Disponible',

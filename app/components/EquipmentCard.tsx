@@ -1,5 +1,5 @@
 import { DeviceItem } from '../../lib/mockData';
-import { Calendar, Info } from 'lucide-react';
+import { Calendar, Info, Tag, HardDrive } from 'lucide-react';
 
 interface Props {
   device: DeviceItem;
@@ -21,6 +21,8 @@ const statusClasses: Record<string, string> = {
   'Reservado': 'bg-[#fef9c3] text-[#a16207]',
   'En uso': 'bg-[#ffedd5] text-[#c2410c]',
   'En mantenimiento': 'bg-[#f1f5f9] text-[#475569]',
+  'Fuera de servicio': 'bg-[#fee2e2] text-[#b91c1c]',
+  'No disponible': 'bg-[#fee2e2] text-[#b91c1c]',
 };
 const statusFallback = 'bg-[#fee2e2] text-[#b91c1c]';
 
@@ -49,11 +51,32 @@ export default function EquipmentCard({ device, onViewDetails, onReserve }: Prop
       </div>
 
       {/* Body */}
-      <div className="flex flex-1 flex-col gap-[0.2rem] px-5 pb-5 pt-[1.1rem]">
-        <p className="mb-[0.1rem] font-heading text-[0.68rem] font-extrabold uppercase tracking-[0.06em] text-plai">{device.category}</p>
+      <div className="flex flex-1 flex-col gap-[0.3rem] px-5 pb-5 pt-[1.1rem]">
+        <div className="flex items-center justify-between">
+          <p className="font-heading text-[0.68rem] font-extrabold uppercase tracking-[0.06em] text-plai">{device.category}</p>
+        </div>
+        
         <h3 className="font-heading text-base font-extrabold leading-[1.25] text-navy">{device.name}</h3>
         <p className="text-[0.78rem] font-normal text-plai-gray">{device.brand} · {device.model}</p>
-        <p className="mb-2 text-[0.72rem] text-plai-muted">ID: {device.inventoryNumber}</p>
+        
+        {/* Identificadores clave: Código PLAi, Almacenamiento, Serie */}
+        <div className="my-1.5 flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 rounded bg-plai/10 px-2 py-0.5 text-[0.7rem] font-semibold text-plai" title="Código de Resguardo Patrimonial PLAi">
+            <Tag size={11} />
+            {device.inventoryNumber}
+          </span>
+          {device.storage && device.storage !== 'N/A' && (
+            <span className="inline-flex items-center gap-1 rounded bg-sky-50 px-2 py-0.5 text-[0.7rem] font-semibold text-sky-700" title="Almacenamiento">
+              <HardDrive size={11} />
+              {device.storage}
+            </span>
+          )}
+          {device.serialNumber && (
+            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[0.68rem] text-plai-muted" title="Número de Serie">
+              S/N: {device.serialNumber}
+            </span>
+          )}
+        </div>
 
         {/* Mini specs preview */}
         <ul className="my-1 flex list-none flex-col gap-[0.2rem]">
@@ -68,12 +91,12 @@ export default function EquipmentCard({ device, onViewDetails, onReserve }: Prop
         </ul>
 
         {/* Location */}
-        <p className="mb-3 mt-[0.35rem] text-[0.72rem] text-plai-muted">📍 {device.location}</p>
+        <p className="mb-3 mt-[0.2rem] text-[0.72rem] text-plai-muted">📍 {device.location}</p>
 
         {/* Actions */}
         <div className="mt-auto flex flex-col gap-2">
           <button
-            className={`${btnBase} border-[1.5px] border-black/[0.08] bg-white font-semibold text-navy hover:border-plai hover:text-plai`}
+            className={`${btnBase} cursor-pointer border-[1.5px] border-black/[0.08] bg-white font-semibold text-navy hover:border-plai hover:text-plai`}
             onClick={() => onViewDetails(device.id)}
             id={`details-${device.id}`}
           >
@@ -84,7 +107,7 @@ export default function EquipmentCard({ device, onViewDetails, onReserve }: Prop
             <button
               className={`${btnBase} font-bold text-white ${
                 isAvailable
-                  ? 'bg-plai hover:bg-navy'
+                  ? 'cursor-pointer bg-plai hover:bg-navy'
                   : 'cursor-not-allowed bg-[#94a3b8] opacity-60'
               }`}
               onClick={() => isAvailable && onReserve(device.id)}
