@@ -38,7 +38,7 @@ export async function proxy(request: NextRequest) {
   // B) Formularios públicos de reservación y solicitudes (POST)
   if (
     request.method === 'POST' &&
-    (pathname === '/api/reservas' || pathname === '/api/solicitudes-espacios')
+    (pathname === '/api/reservas' || pathname === '/api/solicitudes-espacios' || pathname === '/api/cotizaciones')
   ) {
     const rate = checkRateLimit(`mutations:${ip}`, RATE_LIMIT_MUTATION);
     if (!rate.success) {
@@ -101,5 +101,6 @@ export const config = {
     '/api/auth/:path*',
     '/api/reservas',
     '/api/solicitudes-espacios',
+    '/api/cotizaciones',
   ],
 };

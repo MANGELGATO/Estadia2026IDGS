@@ -97,6 +97,51 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
   const [videoUrl, setVideoUrl] = useState<string>('https://www.youtube.com/embed/dQw4w9WgXcQ');
   const [isLoaded, setIsLoaded] = useState(false);
   const [quoteSubmitted, setQuoteSubmitted] = useState(false);
+  const [createdQuoteId, setCreatedQuoteId] = useState('');
+  const [quoteName, setQuoteName] = useState('');
+  const [quoteEmail, setQuoteEmail] = useState('');
+  const [quotePhone, setQuotePhone] = useState('');
+  const [quoteMaterial, setQuoteMaterial] = useState('PLA');
+  const [quoteInfill, setQuoteInfill] = useState('20%');
+  const [quoteDetails, setQuoteDetails] = useState('');
+  const [quoteFilename, setQuoteFilename] = useState('');
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+
+  const handleQuoteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setQuoteLoading(true);
+    setQuoteError(null);
+
+    try {
+      const res = await fetch('/api/cotizaciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre_solicitante: quoteName,
+          email_solicitante: quoteEmail,
+          telefono: quotePhone,
+          archivo_nombre: quoteFilename || 'modelo_3d.stl',
+          material: quoteMaterial,
+          relleno: quoteInfill,
+          detalles: quoteDetails,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success && json.data) {
+        setCreatedQuoteId(json.data.id);
+        setQuoteSubmitted(true);
+      } else {
+        setQuoteError(json.message || 'No fue posible registrar la cotización.');
+      }
+    } catch {
+      setQuoteError('Error de conexión con el servidor de manufactura de PLAi.');
+    } finally {
+      setQuoteLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -288,36 +333,137 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
                   <h2 className="font-heading text-2xl font-extrabold tracking-[-0.02em] text-navy sm:text-[1.8rem]">Cotización de Impresión 3D</h2>
                 </div>
                 <div className="mt-4 flex flex-col gap-6">
-                  <p className="text-base text-plai-gray">¿Tienes un diseño listo pero no necesitas solicitar el equipo completo? Podemos imprimirlo por ti.</p>
+                  <p className="text-base text-plai-gray">¿Tienes un diseño listo pero no necesitas solicitar el equipo completo? Podemos imprimirlo por ti en nuestras impresoras 3D industriales Bambu Lab y Ender.</p>
                   {quoteSubmitted ? (
                     <div role="alert" className="flex items-center gap-4 rounded-xl border border-emerald-200 bg-emerald-50 p-6 text-emerald-800 animate-pop-in">
-                      <CheckCircle2 size={32} className="shrink-0 text-emerald-600" />
+                      <CheckCircle2 size={36} className="shrink-0 text-emerald-600" />
                       <div>
-                        <h3 className="font-heading font-bold text-emerald-900">¡Solicitud de cotización enviada con éxito!</h3>
-                        <p className="mt-1 text-sm text-emerald-700">El equipo técnico de manufactura aditiva de PLAi revisará tu modelo y responderá a la brevedad.</p>
+                        <h3 className="font-heading font-bold text-emerald-900">
+                          ¡Solicitud de cotización enviada con éxito!
+                        </h3>
+                        <p className="mt-1 text-sm text-emerald-700">
+                          Folio de seguimiento: <strong className="font-mono font-bold text-emerald-900">{createdQuoteId || 'COT-104'}</strong>. El equipo técnico de manufactura aditiva de PLAi revisará la geometría de tu archivo y responderá a tu correo.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => { setQuoteSubmitted(false); setCreatedQuoteId(''); }}
+                          className="mt-3 text-xs font-bold text-emerald-800 underline hover:text-emerald-950"
+                        >
+                          Enviar otra solicitud
+                        </button>
                       </div>
                     </div>
                   ) : (
-                    <form className="flex flex-col gap-5 rounded-xl bg-[#F4F6F9] p-6" onSubmit={(e) => { e.preventDefault(); setQuoteSubmitted(true); }}>
-                      <div className="flex flex-col gap-2">
-                        <label className="font-heading text-[0.9rem] font-bold text-navy">Archivo 3D (.stl, .obj)</label>
-                        <input type="file" accept=".stl,.obj,.3mf" className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] file:mr-4 file:rounded-full file:border-0 file:bg-plai/10 file:px-4 file:py-2 file:font-heading file:font-semibold file:text-plai" required />
+                    <form className="flex flex-col gap-5 rounded-xl bg-[#F4F6F9] p-6" onSubmit={handleQuoteSubmit}>
+                      {quoteError && (
+                        <div className="rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-700">
+                          {quoteError}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="font-heading text-[0.85rem] font-bold text-navy">Nombre del solicitante *</label>
+                          <input
+                            type="text"
+                            required
+                            value={quoteName}
+                            onChange={(e) => setQuoteName(e.target.value)}
+                            placeholder="Ej. Ing. Carlos Mendoza"
+                            className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-2.5 font-body text-[0.9rem] text-navy outline-none focus:border-plai"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="font-heading text-[0.85rem] font-bold text-navy">Correo institucional *</label>
+                          <input
+                            type="email"
+                            required
+                            value={quoteEmail}
+                            onChange={(e) => setQuoteEmail(e.target.value)}
+                            placeholder="usuario@plai.edu.mx"
+                            className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-2.5 font-body text-[0.9rem] text-navy outline-none focus:border-plai"
+                          />
+                        </div>
                       </div>
-                      <div className="flex flex-col gap-2">
-                        <label className="font-heading text-[0.9rem] font-bold text-navy">Material deseado</label>
-                        <select className="w-full cursor-pointer rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] text-navy outline-none focus:border-plai">
-                          <option>PLA</option>
-                          <option>PETG</option>
-                          <option>TPU (Flexible)</option>
-                          <option>ABS</option>
-                        </select>
+
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="font-heading text-[0.85rem] font-bold text-navy">Teléfono / WhatsApp</label>
+                          <input
+                            type="tel"
+                            value={quotePhone}
+                            onChange={(e) => setQuotePhone(e.target.value)}
+                            placeholder="33-1234-5678"
+                            className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-2.5 font-body text-[0.9rem] text-navy outline-none focus:border-plai"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="font-heading text-[0.85rem] font-bold text-navy">Material deseado</label>
+                          <select
+                            value={quoteMaterial}
+                            onChange={(e) => setQuoteMaterial(e.target.value)}
+                            className="w-full cursor-pointer rounded-xl border border-black/[0.08] bg-white px-4 py-2.5 font-body text-[0.9rem] text-navy outline-none focus:border-plai"
+                          >
+                            <option value="PLA">PLA (Estándar prototipos)</option>
+                            <option value="PETG">PETG (Resistencia química/mecánica)</option>
+                            <option value="TPU (Flexible)">TPU (Flexible / Elastomérico)</option>
+                            <option value="ABS">ABS (Térmico de ingeniería)</option>
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="font-heading text-[0.85rem] font-bold text-navy">Relleno (Infill)</label>
+                          <select
+                            value={quoteInfill}
+                            onChange={(e) => setQuoteInfill(e.target.value)}
+                            className="w-full cursor-pointer rounded-xl border border-black/[0.08] bg-white px-4 py-2.5 font-body text-[0.9rem] text-navy outline-none focus:border-plai"
+                          >
+                            <option value="15%">15% (Visual decorativo)</option>
+                            <option value="20%">20% (Estándar recomendado)</option>
+                            <option value="40%">40% (Carga media / funcional)</option>
+                            <option value="80%">80% (Alta resistencia mecánica)</option>
+                            <option value="100%">100% (Sólido macizo)</option>
+                          </select>
+                        </div>
                       </div>
-                      <div className="flex flex-col gap-2">
-                        <label className="font-heading text-[0.9rem] font-bold text-navy">Detalles adicionales</label>
-                        <textarea className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] outline-none focus:border-plai" placeholder="Ej. Relleno al 20%, color preferido..." rows={2}></textarea>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="font-heading text-[0.85rem] font-bold text-navy">Archivo 3D (.stl, .obj, .3mf)</label>
+                        <input
+                          type="file"
+                          accept=".stl,.obj,.3mf"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) setQuoteFilename(f.name);
+                          }}
+                          className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-2.5 font-body text-[0.9rem] file:mr-4 file:rounded-full file:border-0 file:bg-plai/10 file:px-4 file:py-1.5 file:font-heading file:font-semibold file:text-plai"
+                        />
+                        <span className="text-xs text-plai-muted">
+                          {quoteFilename ? (
+                            <strong className="text-plai">Archivo cargado: {quoteFilename}</strong>
+                          ) : (
+                            'Puedes adjuntar tu archivo CAD/STL o especificar dimensiones en el campo de detalles.'
+                          )}
+                        </span>
                       </div>
-                      <button type="submit" className="mt-2 cursor-pointer self-start rounded-xl px-6 py-3 font-heading text-base font-bold text-white transition-all hover:-translate-y-0.5 hover:opacity-90" style={{ backgroundColor: meta.color }}>
-                        Solicitar Cotización
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="font-heading text-[0.85rem] font-bold text-navy">Detalles adicionales o requerimientos</label>
+                        <textarea
+                          value={quoteDetails}
+                          onChange={(e) => setQuoteDetails(e.target.value)}
+                          className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-2.5 font-body text-[0.9rem] text-navy outline-none focus:border-plai"
+                          placeholder="Ej. Color negro de preferencia, altura de capa de 0.16mm para mayor detalle superficial..."
+                          rows={2}
+                        ></textarea>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={quoteLoading}
+                        className="mt-2 cursor-pointer self-start rounded-xl px-7 py-3 font-heading text-base font-bold text-white transition-all hover:-translate-y-0.5 hover:opacity-90 disabled:opacity-50"
+                        style={{ backgroundColor: meta.color }}
+                      >
+                        {quoteLoading ? 'Enviando solicitud...' : 'Solicitar Cotización de Impresión'}
                       </button>
                     </form>
                   )}

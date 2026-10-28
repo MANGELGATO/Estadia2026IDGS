@@ -18,6 +18,48 @@ export const DEMO_USERS = [
     password: 'UserPlai2026!',
     role: 'usuario' as const,
   },
+  {
+    id: 'usr-01',
+    name: 'Juan Pérez',
+    email: 'juan.perez@plai.edu.mx',
+    password: 'AdminPlai2026!',
+    role: 'admin' as const,
+  },
+  {
+    id: 'usr-02',
+    name: 'Ana García',
+    email: 'ana.garcia@plai.edu.mx',
+    password: 'AdminPlai2026!',
+    role: 'admin' as const,
+  },
+  {
+    id: 'usr-03',
+    name: 'Carlos López',
+    email: 'carlos.lopez@plai.edu.mx',
+    password: 'AdminPlai2026!',
+    role: 'admin' as const,
+  },
+  {
+    id: 'usr-04',
+    name: 'María Torres',
+    email: 'maria.torres@plai.edu.mx',
+    password: 'AdminPlai2026!',
+    role: 'admin' as const,
+  },
+  {
+    id: 'usr-05',
+    name: 'Pedro Sánchez',
+    email: 'pedro.sanchez@plai.edu.mx',
+    password: 'UserPlai2026!',
+    role: 'usuario' as const,
+  },
+  {
+    id: 'usr-06',
+    name: 'Lucía Ramírez',
+    email: 'lucia.ramirez@plai.edu.mx',
+    password: 'UserPlai2026!',
+    role: 'usuario' as const,
+  },
 ];
 
 export const authOptions: NextAuthOptions = {
@@ -50,11 +92,12 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        // Valida contra contraseña oficial o atajo 'admin123' / 'user123'
+        // Valida contra contraseña oficial o atajos comunes de desarrollo/demostración
         const isValid =
           credentials.password === found.password ||
-          (found.role === 'admin' && credentials.password === 'admin123') ||
-          (found.role === 'usuario' && credentials.password === 'user123');
+          credentials.password === 'password123' ||
+          (found.role === 'admin' && (credentials.password === 'admin123' || credentials.password === 'admin')) ||
+          (found.role === 'usuario' && (credentials.password === 'user123' || credentials.password === 'usuario'));
 
         if (!isValid) {
           return null;

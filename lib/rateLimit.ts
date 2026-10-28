@@ -26,17 +26,17 @@ export interface RateLimitResult {
 
 // Presets recomendados según la criticidad del endpoint
 export const RATE_LIMIT_LOGIN: RateLimitOptions = {
-  limit: 5, // Máximo 5 intentos por minuto para prevenir fuerza bruta
+  limit: process.env.NODE_ENV === 'development' ? 60 : 5,
   windowMs: 60 * 1000,
 };
 
 export const RATE_LIMIT_LOGIN_PAGE: RateLimitOptions = {
-  limit: 30, // Máximo 30 peticiones por minuto para la vista /login
+  limit: process.env.NODE_ENV === 'development' ? 120 : 30,
   windowMs: 60 * 1000,
 };
 
 export const RATE_LIMIT_MUTATION: RateLimitOptions = {
-  limit: 10, // Máximo 10 solicitudes de reservación o espacios por minuto por IP
+  limit: process.env.NODE_ENV === 'development' ? 60 : 10,
   windowMs: 60 * 1000,
 };
 

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { usePathname } from 'next/navigation';
 import { MapPin, Mail } from 'lucide-react';
 import PrivacyPolicyModal from './PrivacyPolicyModal';
 
@@ -12,7 +13,12 @@ const colLink = 'text-white/65 transition-colors duration-200 hover:text-white';
 const contactValue = 'text-[0.87rem] leading-[1.7] text-white/65';
 
 export default function Footer() {
+  const pathname = usePathname();
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
+
+  if (pathname?.startsWith('/admin')) {
+    return null;
+  }
 
   return (
     <footer className="bg-navy text-[0.9rem] text-white/75">

@@ -13,6 +13,7 @@ import {
   RiToolsLine,
   RiBarChartLine,
   RiLogoutBoxRLine,
+  RiPrinterLine,
 } from "react-icons/ri";
 import { useSession, signOut } from "next-auth/react";
 
@@ -28,6 +29,7 @@ const navSections = [
     items: [
       { name: "Categorías", href: "/admin/categorias", icon: <RiAppsLine /> },
       { name: "Inventario", href: "/admin/inventario", icon: <RiComputerLine /> },
+      { name: "Cotizaciones 3D", href: "/admin/cotizaciones", icon: <RiPrinterLine /> },
       { name: "Aplicaciones", href: "/admin/aplicaciones", icon: <RiAppsLine /> },
       { name: "Mantenimiento", href: "/admin/mantenimiento", icon: <RiToolsLine /> },
     ],
@@ -56,7 +58,7 @@ export default function AdminSidebar() {
   const userInitial = userName.charAt(0).toUpperCase();
 
   return (
-    <aside className="sticky top-[70px] flex h-auto w-full flex-col overflow-y-auto border-r border-white/5 bg-gradient-to-b from-[#162E50] to-[#1B365D] p-4 text-white shadow-[4px_0_20px_rgba(0,0,0,0.15)] [scrollbar-color:rgba(255,255,255,0.2)_transparent] [scrollbar-width:thin] md:h-[calc(100vh-70px)] md:w-[260px] md:p-6">
+    <aside className="sticky top-0 flex h-auto w-full flex-col overflow-y-auto border-r border-white/5 bg-gradient-to-b from-[#162E50] to-[#1B365D] p-4 text-white shadow-[4px_0_20px_rgba(0,0,0,0.15)] [scrollbar-color:rgba(255,255,255,0.2)_transparent] [scrollbar-width:thin] md:h-screen md:w-[260px] md:p-6">
       <div className="mb-4 flex items-center justify-between border-b border-white/[0.08] px-3 pb-5 pt-2">
         <div className="rounded-lg bg-white/95 px-2 py-1 shadow-sm">
           <Image

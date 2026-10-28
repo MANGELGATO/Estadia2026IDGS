@@ -22,6 +22,7 @@ USE `plai_recursos`;
 -- -----------------------------------------------------------------------------
 -- 2. ELIMINACIÓN PREVIA DE TABLAS (PARA IMPORTACIÓN LIMPIA)
 -- -----------------------------------------------------------------------------
+DROP TABLE IF EXISTS `cotizaciones_3d`;
 DROP TABLE IF EXISTS `solicitudes_cursos`;
 DROP TABLE IF EXISTS `solicitudes_espacios`;
 DROP TABLE IF EXISTS `mantenimientos`;
@@ -252,6 +253,30 @@ CREATE TABLE `solicitudes_cursos` (
   KEY `idx_sc_estado` (`estado`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- -----------------------------------------------------------------------------
+-- 13. TABLA: cotizaciones_3d
+-- Solicitudes de cotización para servicio de impresión 3D
+-- -----------------------------------------------------------------------------
+CREATE TABLE `cotizaciones_3d` (
+  `id` VARCHAR(64) NOT NULL COMMENT 'Folio institucional tipo COT-XXX',
+  `nombre_solicitante` VARCHAR(120) NOT NULL,
+  `email_solicitante` VARCHAR(120) NOT NULL,
+  `telefono` VARCHAR(30) NULL,
+  `archivo_nombre` VARCHAR(255) NOT NULL,
+  `material` VARCHAR(50) NOT NULL DEFAULT 'PLA',
+  `color_preferido` VARCHAR(50) NULL DEFAULT 'Cualquiera',
+  `relleno` VARCHAR(30) NULL DEFAULT '20%',
+  `detalles` TEXT NULL,
+  `estado` ENUM('Pendiente', 'Cotizada', 'Aprobada', 'En impresión', 'Completada', 'Rechazada') NOT NULL DEFAULT 'Pendiente',
+  `precio_estimado` DECIMAL(10,2) NULL,
+  `tiempo_estimado_horas` DECIMAL(5,1) NULL,
+  `notas_tecnicas` TEXT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_cot_estado` (`estado`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- =============================================================================
 -- INSERCIÓN DE DATOS INICIALES (SEEDS / CATÁLOGOS BASE)
 -- =============================================================================
@@ -458,6 +483,12 @@ INSERT INTO `solicitudes_espacios` (`id`, `espacio_id`, `nombre_solicitante`, `e
 INSERT INTO `solicitudes_cursos` (`id`, `tipo_curso`, `institucion`, `contacto_nombre`, `contacto_email`, `contacto_telefono`, `participantes`, `fecha_preferida`, `notas`, `estado`) VALUES
 ('CUR-3001', 'academica', 'Universidad Tecnológica de Jalisco (UTJ)', 'Prof. Héctor Rivera', 'hrivera@utj.edu.mx', '33-1234-5678', 35, '2026-11-05', 'Visita guiada para estudiantes de 8vo cuatrimestre de software con taller de realidad virtual', 'Confirmada'),
 ('CUR-3002', 'privada', 'Tech Innovations Hub', 'Ing. Sofía Morales', 'smorales@techhub.com', '33-9876-5432', 15, '2026-11-12', 'Capacitación ejecutiva en modelado e impresión 3D industrial', 'Pendiente');
+
+-- --- 11. COTIZACIONES 3D ---
+INSERT INTO `cotizaciones_3d` (`id`, `nombre_solicitante`, `email_solicitante`, `telefono`, `archivo_nombre`, `material`, `color_preferido`, `relleno`, `detalles`, `estado`, `precio_estimado`, `tiempo_estimado_horas`, `notas_tecnicas`) VALUES
+('COT-101', 'Valeria Mendoza', 'valeria.mendoza@alumnos.udg.mx', '33-2211-4455', 'engrane_robotica_v2.stl', 'PLA', 'Blanco', '20%', 'Prototipo para brazo robótico, se requiere buena resistencia dimensional en los dientes del engrane.', 'Pendiente', NULL, NULL, NULL),
+('COT-102', 'Héctor Cárdenas', 'hector.cardenas@innovacion.org', '33-9988-7766', 'soporte_camara_dron.stl', 'PETG', 'Negro', '40%', 'Soporte rígido para cámara de dron institucional con absorción de vibración.', 'Cotizada', 280.00, 5.0, 'Material PETG confirmado en stock.'),
+('COT-103', 'Carla Villanueva', 'cvillanueva@gmail.com', '33-4455-6677', 'figura_arquitectura_maqueta.obj', 'PLA', 'Gris', '15%', 'Maqueta a escala 1:100 para entrega de proyecto final de arquitectura.', 'En impresión', 145.00, 3.5, 'Revisado con slicer Cura; 45g de PLA gris.');
 
 -- -----------------------------------------------------------------------------
 -- REACTIVACIÓN DE RESTRICCIONES DE INTEGRIDAD REFERENCIAL
