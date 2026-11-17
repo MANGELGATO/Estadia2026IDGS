@@ -48,9 +48,10 @@ export async function PUT(req: NextRequest) {
       const reserva = allReservas.find(r => r.id === id);
       if (reserva) {
         const allEquipos = await getEquiposFromDB();
+        const catNorm = (reserva.categoriaId || '').toLowerCase().replace(/-/g, ' ');
         const disponible = allEquipos.find(e => 
           e.status === 'Disponible' && 
-          (e.category.toLowerCase().includes(reserva.categoriaId.replace('-', ' ')) || reserva.categoriaId.includes(e.category.toLowerCase()))
+          (e.category.toLowerCase().includes(catNorm) || (catNorm !== '' && catNorm.includes(e.category.toLowerCase())))
         );
         if (disponible) {
           resolvedEquipoId = disponible.id;

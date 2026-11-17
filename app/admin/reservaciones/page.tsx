@@ -78,7 +78,8 @@ export default function ReservacionesPage() {
   const filteredData = filterStatus === 'Todas' ? data : data.filter(r => r.estado === filterStatus);
 
   // Get available devices matching the category of the reservation
-  const getAvailableDevicesForCategory = (categoriaId: string) => {
+  const getAvailableDevicesForCategory = (categoriaId?: string) => {
+    if (!categoriaId) return [];
     const normCat = categoriaId.toLowerCase().replace(/-/g, ' ');
     return equipos.filter(eq => {
       const isSameCategory = eq.category.toLowerCase().includes(normCat) || normCat.includes(eq.category.toLowerCase());
@@ -205,39 +206,42 @@ export default function ReservacionesPage() {
       label: 'Folio / Solicitante',
       render: (_, item: ReservacionItem) => (
         <div>
-          <span className="font-mono text-xs font-bold text-plai">{item.folio}</span>
-          <div className="text-sm font-semibold text-navy">{item.usuarioNombre}</div>
-          <div className="text-xs text-plai-muted">{item.usuarioEmail}</div>
+          <span className="font-mono text-xs font-bold text-plai">{item.folio || item.id}</span>
+          <div className="text-sm font-semibold text-navy">{item.usuarioNombre || 'Usuario PLAi'}</div>
+          <div className="text-xs text-plai-muted">{item.usuarioEmail || ''}</div>
         </div>
       ),
     },
     {
       key: 'categoriaId',
       label: 'Categoría / Equipo Asignado',
-      render: (v: string, item: ReservacionItem) => (
-        <div>
-          <div className="text-xs font-semibold capitalize text-navy">
-            {v.replace('-', ' ')}
+      render: (v: string, item: ReservacionItem) => {
+        const catName = (v || item.categoriaId || 'General').replace(/-/g, ' ');
+        return (
+          <div>
+            <div className="text-xs font-semibold capitalize text-navy">
+              {catName}
+            </div>
+            {item.codigoPlaiAsignado ? (
+              <div className="mt-0.5 inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-[11px] font-mono font-bold text-blue-700">
+                Cód: {item.codigoPlaiAsignado}
+              </div>
+            ) : (
+              <div className="mt-0.5 text-[11px] italic text-amber-600">
+                Sin dispositivo asignado
+              </div>
+            )}
           </div>
-          {item.codigoPlaiAsignado ? (
-            <div className="mt-0.5 inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-[11px] font-mono font-bold text-blue-700">
-              Cód: {item.codigoPlaiAsignado}
-            </div>
-          ) : (
-            <div className="mt-0.5 text-[11px] italic text-amber-600">
-              Sin dispositivo asignado
-            </div>
-          )}
-        </div>
-      ),
+        );
+      },
     },
     {
       key: 'fechaUso',
       label: 'Fecha y Horario',
       render: (v: string, item: ReservacionItem) => (
         <div>
-          <div className="font-mono text-xs font-semibold text-navy">{v}</div>
-          <div className="text-xs text-plai-muted">{item.horaInicio} – {item.horaFin}</div>
+          <div className="font-mono text-xs font-semibold text-navy">{v || item.fechaUso || ''}</div>
+          <div className="text-xs text-plai-muted">{item.horaInicio || '10:00'} – {item.horaFin || '12:00'}</div>
         </div>
       ),
     },
@@ -353,7 +357,7 @@ export default function ReservacionesPage() {
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-navy uppercase tracking-wider">Categoría solicitada:</span>
                   <span className="rounded bg-blue-600 px-2 py-0.5 font-bold uppercase text-white">
-                    {selectedItem.categoriaId.replace('-', ' ')}
+                    {(selectedItem?.categoriaId || 'General').replace(/-/g, ' ')}
                   </span>
                 </div>
                 <div className="mt-2 text-xs text-gray-600">
@@ -634,7 +638,7 @@ export default function ReservacionesPage() {
               </div>
               <div>
                 <span className="font-bold text-plai-muted uppercase">Categoría:</span>
-                <p className="font-semibold text-navy capitalize">{selectedItem.categoriaId.replace('-', ' ')}</p>
+                <p className="font-semibold text-navy capitalize">{(selectedItem?.categoriaId || 'General').replace(/-/g, ' ')}</p>
               </div>
               <div>
                 <span className="font-bold text-plai-muted uppercase">Código PLAi Asignado:</span>

@@ -659,26 +659,34 @@ const initialReservaciones: ReservacionItem[] = [
 export async function getReservacionesFromDB(): Promise<ReservacionItem[]> {
   try {
     const pool = getPool();
-    const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM reservaciones ORDER BY created_at DESC');
+    const [rows] = await pool.query<RowDataPacket[]>(`
+      SELECT r.*, 
+             e.categoria_id AS equipo_categoria_id,
+             e.nombre AS equipo_nombre,
+             e.codigo_plai AS equipo_codigo_plai
+      FROM reservaciones r
+      LEFT JOIN equipos e ON (r.recurso_id = e.id)
+      ORDER BY r.created_at DESC
+    `);
     if (rows && rows.length > 0) {
       return rows.map(r => ({
         id: String(r.id),
-        folio: r.folio,
-        categoriaId: r.categoria_id,
-        equipoId: r.equipo_id || undefined,
-        codigoPlaiAsignado: r.codigo_plai_asignado || undefined,
-        usuarioNombre: r.usuario_nombre,
-        usuarioEmail: r.usuario_email,
+        folio: r.folio || String(r.id),
+        categoriaId: r.categoria_id || r.equipo_categoria_id || 'realidad-virtual',
+        equipoId: r.equipo_id || r.recurso_id || undefined,
+        codigoPlaiAsignado: r.codigo_plai_asignado || r.equipo_codigo_plai || undefined,
+        usuarioNombre: r.usuario_nombre || r.nombre_solicitante || 'Usuario PLAi',
+        usuarioEmail: r.usuario_email || r.email_solicitante || '',
         usuarioTelefono: r.usuario_telefono || undefined,
         usuarioInstitucion: r.usuario_institucion || undefined,
-        fechaUso: String(r.fecha_uso).split('T')[0],
-        horaInicio: String(r.hora_inicio).substring(0, 5),
-        horaFin: String(r.hora_fin).substring(0, 5),
-        actividad: r.actividad,
-        estado: r.estado,
+        fechaUso: String(r.fecha_uso || r.fecha || new Date().toISOString().split('T')[0]).split('T')[0],
+        horaInicio: String(r.hora_inicio || '10:00:00').substring(0, 5),
+        horaFin: String(r.hora_fin || '12:00:00').substring(0, 5),
+        actividad: r.actividad || 'Uso de laboratorio',
+        estado: r.estado || 'Pendiente',
         accesoriosIncluidos: r.accesorios_incluidos || undefined,
         condicionSalida: r.condicion_salida || undefined,
-        observacionesAdmin: r.observaciones_admin || undefined,
+        observacionesAdmin: r.observaciones_admin || r.notas || undefined,
         aprobadoPor: r.aprobado_por || undefined,
       }));
     }
@@ -686,7 +694,15 @@ export async function getReservacionesFromDB(): Promise<ReservacionItem[]> {
     logger.warn('MySQL no disponible para reservaciones, usando respaldo local', { error: String(error) });
   }
 
-  return ensureDataFile<ReservacionItem[]>('reservaciones.json', initialReservaciones);
+  const localReservations = ensureDataFile<ReservacionItem[]>('reservaciones.json', initialReservaciones);
+  return localReservations.map(r => ({
+    ...r,
+    categoriaId: r.categoriaId || 'realidad-virtual',
+    folio: r.folio || r.id,
+    fechaUso: r.fechaUso || new Date().toISOString().split('T')[0],
+    horaInicio: r.horaInicio || '10:00',
+    horaFin: r.horaFin || '12:00',
+  }));
 }
 
 export async function updateReservacionInDB(

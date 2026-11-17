@@ -309,12 +309,12 @@ export default function BitacoraPage() {
                     </td>
 
                     <td className="px-5 py-4 whitespace-nowrap text-xs text-gray-700">
-                      <div>{log.fechaEntrega.replace('T', ' ').slice(0, 16)}</div>
+                      <div>{log.fechaEntrega ? log.fechaEntrega.replace('T', ' ').slice(0, 16) : ''}</div>
                       <span className="text-[10px] text-gray-400">Entrega: {log.adminEntrega}</span>
                     </td>
 
                     <td className="px-5 py-4 whitespace-nowrap text-xs">
-                      <div className="text-gray-500">Est: {log.fechaDevolucionEstimada.replace('T', ' ').slice(0, 16)}</div>
+                      <div className="text-gray-500">Est: {log.fechaDevolucionEstimada ? log.fechaDevolucionEstimada.replace('T', ' ').slice(0, 16) : ''}</div>
                       {log.fechaDevolucionReal ? (
                         <div className="font-bold text-emerald-700">Real: {log.fechaDevolucionReal.replace('T', ' ').slice(0, 16)}</div>
                       ) : (
