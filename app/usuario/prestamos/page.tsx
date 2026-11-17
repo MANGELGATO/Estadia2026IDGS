@@ -35,7 +35,7 @@ export default function PrestamosPage() {
           <h1 className="mb-1 font-heading text-2xl font-extrabold text-[#162E50] md:text-3xl">Mis Préstamos</h1>
           <p className="text-sm text-gray-500 md:text-base">Historial y estado de tus solicitudes de equipo.</p>
         </div>
-        <button className="btn rounded-lg border-none bg-[#E91E8C] px-6 font-semibold text-white shadow-[0_4px_10px_rgba(233,30,140,0.2)] transition-all hover:bg-[#c41876] hover:-translate-y-0.5">
+        <button className="btn rounded-lg border-none bg-plai px-6 font-semibold text-white shadow-plai-sm transition-all hover:bg-navy hover:-translate-y-0.5">
           + Nueva Solicitud
         </button>
       </div>

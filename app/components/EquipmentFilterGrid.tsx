@@ -17,6 +17,7 @@ export default function EquipmentFilterGrid({ activeFilter, onFilterChange }: Pr
   const [devices, setDevices] = useState<DeviceItem[]>(mockDevices);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos los estados');
+  const [internalFilter, setInternalFilter] = useState('Todos');
 
   useEffect(() => {
     fetch('/api/equipos')
@@ -29,7 +30,11 @@ export default function EquipmentFilterGrid({ activeFilter, onFilterChange }: Pr
       .catch(() => {});
   }, []);
 
-  const filter = activeFilter ?? 'Todos';
+  const filter = activeFilter ?? internalFilter;
+  const handleFilterClick = (tab: string) => {
+    if (onFilterChange) onFilterChange(tab);
+    else setInternalFilter(tab);
+  };
 
   const statuses = ['Todos los estados', 'Disponible', 'Reservado', 'En uso', 'En mantenimiento', 'No disponible'];
 
@@ -105,7 +110,7 @@ export default function EquipmentFilterGrid({ activeFilter, onFilterChange }: Pr
                   ? 'border-plai bg-plai text-white'
                   : 'border-black/[0.08] bg-white text-plai-gray hover:border-plai hover:text-plai'
               }`}
-              onClick={() => onFilterChange?.(tab)}
+              onClick={() => handleFilterClick(tab)}
               id={`filter-${tab.replace(/\s+/g, '-').toLowerCase()}`}
             >
               {tab}

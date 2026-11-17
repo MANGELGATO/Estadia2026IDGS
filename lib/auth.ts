@@ -6,14 +6,29 @@ import { env } from './env';
 export const DEMO_USERS = [
   {
     id: 'usr-admin-01',
-    name: 'Administrador de Laboratorio',
-    email: 'admin@plai.mx',
-    password: 'AdminPlai2026!',
+    name: 'Administrador de Laboratorio PLAi',
+    email: 'admin@plai.edu.mx',
+    password: '123admin',
     role: 'admin' as const,
   },
   {
     id: 'usr-standard-01',
     name: 'Investigador / Alumno PLAi',
+    email: 'user@plai.edu.mx',
+    password: '123user',
+    role: 'usuario' as const,
+  },
+  // Alias de compatibilidad institucional
+  {
+    id: 'usr-admin-alias',
+    name: 'Administrador PLAi',
+    email: 'admin@plai.mx',
+    password: 'AdminPlai2026!',
+    role: 'admin' as const,
+  },
+  {
+    id: 'usr-user-alias',
+    name: 'Usuario PLAi',
     email: 'usuario@plai.mx',
     password: 'UserPlai2026!',
     role: 'usuario' as const,

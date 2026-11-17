@@ -66,7 +66,7 @@ export const env = {
     return process.env.NEXTAUTH_URL || 'http://localhost:3000';
   },
   get nextAuthSecret(): string {
-    return getEnvSecret('NEXTAUTH_SECRET');
+    return getEnvSecret('NEXTAUTH_SECRET', 'plai-dev-secret-key-32chars-min-2026');
   },
   get dbHost(): string {
     return process.env.DB_HOST || '127.0.0.1';

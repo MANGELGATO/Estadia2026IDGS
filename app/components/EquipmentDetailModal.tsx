@@ -19,11 +19,11 @@ interface Props {
 }
 
 const categoryColors: Record<string, string> = {
-  'Realidad Virtual': '#7c3aed',
+  'Realidad Virtual': '#1e5ca7',
   'Robótica': '#0ea5e9',
-  'Fabricación digital': '#f59e0b',
+  'Fabricación digital': '#ed8d1b',
   'Drones': '#10b981',
-  'Cómputo': '#a81e71',
+  'Cómputo': '#0086ff',
 };
 
 const statusClasses: Record<string, string> = {
@@ -38,7 +38,7 @@ const statusFallback = 'bg-[#fee2e2] text-[#b91c1c]';
 
 export default function EquipmentDetailModal({ device, onClose, onReserve }: Props) {
   const mounted = useIsMounted();
-  const catColor = categoryColors[device.category] ?? '#a81e71';
+  const catColor = categoryColors[device.category] ?? '#0086ff';
   const isAvailable = device.status === 'Disponible';
 
   useEffect(() => {
@@ -70,7 +70,15 @@ export default function EquipmentDetailModal({ device, onClose, onReserve }: Pro
           style={{ '--cat-color': catColor } as React.CSSProperties}
         >
           <div className="flex items-center gap-4">
-            <span className="text-4xl sm:text-5xl leading-none drop-shadow-sm">{device.imageEmoji}</span>
+            {device.imageUrl ? (
+              <img
+                src={device.imageUrl}
+                alt={device.name}
+                className="h-16 w-auto max-w-[90px] object-contain drop-shadow-md rounded-lg bg-white/60 p-1 border border-black/5"
+              />
+            ) : (
+              <span className="text-4xl sm:text-5xl leading-none drop-shadow-sm">{device.imageEmoji}</span>
+            )}
             <div>
               <p className="mb-1 font-heading text-[0.7rem] font-extrabold uppercase tracking-[0.06em] text-plai">
                 {device.category}

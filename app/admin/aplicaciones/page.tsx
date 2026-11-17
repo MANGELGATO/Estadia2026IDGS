@@ -1,10 +1,19 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DataTable, { Column } from '../../components/admin/DataTable';
 import StatCard from '../../components/admin/StatCard';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
-import { RiAppsLine, RiGamepadLine, RiEyeLine, RiComputerLine, RiAddLine, RiCloseLine } from 'react-icons/ri';
+import { 
+  RiAppsLine, 
+  RiGamepadLine, 
+  RiEyeLine, 
+  RiComputerLine, 
+  RiAddLine, 
+  RiCloseLine, 
+  RiImageLine,
+  RiUploadCloud2Line 
+} from 'react-icons/ri';
 
 type Platform = 'Meta Quest' | 'PC' | 'Meta Quest + PC';
 type AgeRating = 'Todas las edades' | '3+' | '6+' | '10+' | '12+';
@@ -19,8 +28,8 @@ type AppCategory =
 
 type AppStatus = 'Activa' | 'Inactiva';
 
-type Application = {
-  id: number;
+export type Application = {
+  id: string | number;
   name: string;
   developer: string;
   version: string;
@@ -30,205 +39,24 @@ type Application = {
   description: string;
   devicesInstalled: number;
   status: AppStatus;
+  imageUrl?: string;
+  iconUrl?: string;
 };
 
-const initialData: Application[] = [
-  {
-    id: 1,
-    name: 'Tilt Brush',
-    developer: 'Google',
-    version: '22.0',
-    category: 'Arte y Creatividad',
-    platform: 'Meta Quest',
-    ageRating: 'Todas las edades',
-    description: 'Pinta en realidad virtual en 3D con pinceles y materiales mágicos. Ideal para talleres de arte inmersivo con niños.',
-    devicesInstalled: 10,
-    status: 'Activa',
-  },
-  {
-    id: 2,
-    name: 'Rec Room',
-    developer: 'Against Gravity',
-    version: '20240901',
-    category: 'Juego Interactivo',
-    platform: 'Meta Quest + PC',
-    ageRating: 'Todas las edades',
-    description: 'Mundo social con minijuegos cooperativos: paintball, dodgeball, escape rooms. Excelente para grupos de niños.',
-    devicesInstalled: 15,
-    status: 'Activa',
-  },
-  {
-    id: 3,
-    name: 'Ocean Rift',
-    developer: 'Llyr ap Cenydd',
-    version: '4.1',
-    category: 'Ciencia y Naturaleza',
-    platform: 'Meta Quest',
-    ageRating: 'Todas las edades',
-    description: 'Parque acuático virtual con tiburones, ballenas, delfines y tortugas. Experiencia educativa sobre el océano.',
-    devicesInstalled: 15,
-    status: 'Activa',
-  },
-  {
-    id: 4,
-    name: 'Beat Saber',
-    developer: 'Beat Games',
-    version: '1.37.0',
-    category: 'Juego Interactivo',
-    platform: 'Meta Quest',
-    ageRating: '6+',
-    description: 'Juego rítmico con sables de luz. Coordinar movimientos con la música. Muy popular en demostraciones para niños.',
-    devicesInstalled: 15,
-    status: 'Activa',
-  },
-  {
-    id: 5,
-    name: 'Job Simulator',
-    developer: 'Owlchemy Labs',
-    version: '1.4.0',
-    category: 'Simulación',
-    platform: 'Meta Quest',
-    ageRating: 'Todas las edades',
-    description: 'Simula trabajos cotidianos (chef, mecánico, oficinista) en un mundo futurista donde los robots hacen todo. Divertido y educativo.',
-    devicesInstalled: 15,
-    status: 'Activa',
-  },
-  {
-    id: 6,
-    name: 'Vacation Simulator',
-    developer: 'Owlchemy Labs',
-    version: '1.2.0',
-    category: 'Simulación',
-    platform: 'Meta Quest',
-    ageRating: 'Todas las edades',
-    description: 'Secuela de Job Simulator en una isla de vacaciones virtual. Actividades al aire libre, juegos y diversión interactiva.',
-    devicesInstalled: 12,
-    status: 'Activa',
-  },
-  {
-    id: 7,
-    name: 'Apollo 11 VR HD',
-    developer: 'Immersive VR Education',
-    version: '2.0',
-    category: 'Ciencia y Naturaleza',
-    platform: 'Meta Quest + PC',
-    ageRating: 'Todas las edades',
-    description: 'Reconstrucción histórica del alunizaje del Apolo 11 en 1969 usando audio y datos reales de la NASA. Alta relevancia educativa.',
-    devicesInstalled: 10,
-    status: 'Activa',
-  },
-  {
-    id: 8,
-    name: 'National Geographic Explore VR',
-    developer: 'Force Field VR',
-    version: '1.3',
-    category: 'Ciencia y Naturaleza',
-    platform: 'Meta Quest',
-    ageRating: 'Todas las edades',
-    description: 'Expediciones a la Antártida y Machu Picchu como fotógrafo de National Geographic. Escalada, kayak y naturaleza.',
-    devicesInstalled: 10,
-    status: 'Activa',
-  },
-  {
-    id: 9,
-    name: 'First Steps & First Contact',
-    developer: 'Oculus',
-    version: '1.0',
-    category: 'Experiencia VR',
-    platform: 'Meta Quest',
-    ageRating: 'Todas las edades',
-    description: 'La experiencia de bienvenida perfecta para niños y personas que usan realidad virtual por primera vez. Robot amigable e interacción táctil.',
-    devicesInstalled: 15,
-    status: 'Activa',
-  },
-  {
-    id: 10,
-    name: 'Epic Roller Coasters',
-    developer: 'B4T Games',
-    version: '3.5',
-    category: 'Experiencia VR',
-    platform: 'Meta Quest',
-    ageRating: 'Todas las edades',
-    description: 'Montañas rusas en lugares fantásticos: dinosaurios, castillos medievales, el espacio. Muy emocionante para primeras experiencias.',
-    devicesInstalled: 12,
-    status: 'Activa',
-  },
-  {
-    id: 11,
-    name: 'Walkabout Mini Golf',
-    developer: 'Mighty Coconut',
-    version: '4.2',
-    category: 'Deportes VR',
-    platform: 'Meta Quest + PC',
-    ageRating: 'Todas las edades',
-    description: 'Minigolf relajante y divertido con física ultra-precisa y escenarios mágicos. Ideal para dinámicas en grupos pequeños.',
-    devicesInstalled: 8,
-    status: 'Activa',
-  },
-  {
-    id: 12,
-    name: 'ShapesXR',
-    developer: 'ShapesXR',
-    version: '2.1',
-    category: 'Arte y Creatividad',
-    platform: 'Meta Quest',
-    ageRating: 'Todas las edades',
-    description: 'Herramienta de diseño espacial en 3D para prototipar experiencias, interfaces y entornos virtuales en equipo.',
-    devicesInstalled: 6,
-    status: 'Activa',
-  },
-  {
-    id: 13,
-    name: 'Mission: ISS',
-    developer: 'Magnopus / NASA',
-    version: '1.2',
-    category: 'Ciencia y Naturaleza',
-    platform: 'Meta Quest + PC',
-    ageRating: 'Todas las edades',
-    description: 'Explora la Estación Espacial Internacional en gravedad cero con astronautas reales guiando el recorrido.',
-    devicesInstalled: 10,
-    status: 'Activa',
-  },
-  {
-    id: 14,
-    name: 'Gadgeteer',
-    developer: 'Metanaut',
-    version: '1.5.2',
-    category: 'Juego Educativo',
-    platform: 'Meta Quest',
-    ageRating: 'Todas las edades',
-    description: 'Construye máquinas de reacción en cadena (estilo Rube Goldberg) usando física real. Enseña pensamiento lógico e ingeniería.',
-    devicesInstalled: 8,
-    status: 'Activa',
-  },
-  {
-    id: 15,
-    name: 'Elixir',
-    developer: 'Magnopus',
-    version: '1.1',
-    category: 'Experiencia VR',
-    platform: 'Meta Quest',
-    ageRating: 'Todas las edades',
-    description: 'Experiencia con seguimiento de manos (sin controles). Conviértete en aprendiz de brujo e interactúa con pociones y criaturas usando solo las manos.',
-    devicesInstalled: 15,
-    status: 'Activa',
-  },
-];
-
 const categoryColors: Record<AppCategory, { bg: string; color: string; emoji: string }> = {
-  'Juego Educativo':    { bg: 'rgba(59,130,246,0.12)',  color: '#2563EB', emoji: '🧩' },
-  'Experiencia VR':     { bg: 'rgba(168,30,113,0.12)',  color: '#a81e71', emoji: '✨' },
-  'Simulación':         { bg: 'rgba(245,158,11,0.12)',  color: '#D97706', emoji: '🏗️' },
-  'Juego Interactivo':  { bg: 'rgba(139,92,246,0.12)',  color: '#7C3AED', emoji: '🎯' },
-  'Arte y Creatividad': { bg: 'rgba(236,72,153,0.12)',  color: '#DB2777', emoji: '🎨' },
+  'Juego Educativo':     { bg: 'rgba(59,130,246,0.12)',  color: '#2563EB', emoji: '🧩' },
+  'Experiencia VR':      { bg: 'rgba(30,92,167,0.12)',   color: '#1e5ca7', emoji: '✨' },
+  'Simulación':          { bg: 'rgba(245,158,11,0.12)',  color: '#D97706', emoji: '🏗️' },
+  'Juego Interactivo':   { bg: 'rgba(0,134,255,0.12)',   color: '#0086ff', emoji: '🎯' },
+  'Arte y Creatividad':  { bg: 'rgba(237,141,27,0.12)',  color: '#ed8d1b', emoji: '🎨' },
   'Ciencia y Naturaleza':{ bg: 'rgba(16,185,129,0.12)', color: '#059669', emoji: '🌿' },
-  'Deportes VR':        { bg: 'rgba(249,115,22,0.12)',  color: '#EA580C', emoji: '⛳' },
+  'Deportes VR':         { bg: 'rgba(249,115,22,0.12)',  color: '#EA580C', emoji: '⛳' },
 };
 
 const platformConfig: Record<Platform, { bg: string; color: string; icon: string }> = {
-  'Meta Quest':      { bg: 'rgba(168,30,113,0.1)', color: '#a81e71', icon: '🥽' },
+  'Meta Quest':      { bg: 'rgba(0,134,255,0.1)',  color: '#0086ff', icon: '🥽' },
   'PC':              { bg: 'rgba(30,41,59,0.1)',   color: '#1E293B', icon: '💻' },
-  'Meta Quest + PC': { bg: 'rgba(79,70,229,0.1)',  color: '#4F46E5', icon: '🎮' },
+  'Meta Quest + PC': { bg: 'rgba(30,92,167,0.1)',  color: '#1e5ca7', icon: '🎮' },
 };
 
 const ALL_CATEGORIES: AppCategory[] = [
@@ -245,18 +73,41 @@ const ALL_PLATFORMS: Platform[] = ['Meta Quest', 'PC', 'Meta Quest + PC'];
 const ALL_AGE_RATINGS: AgeRating[] = ['Todas las edades', '3+', '6+', '10+', '12+'];
 
 export default function AplicacionesPage() {
-  const [data, setData] = useState<Application[]>(initialData);
+  const [data, setData] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Application | null>(null);
   const [detailItem, setDetailItem] = useState<Application | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [deletingApp, setDeletingApp] = useState<Application | null>(null);
 
+  const [imagePreview, setImagePreview] = useState<string>('');
   const [filterPlatform, setFilterPlatform] = useState<string>('Todas');
   const [filterCategory, setFilterCategory] = useState<string>('Todas');
 
-  const totalVR = data.filter(a => a.platform.includes('Meta Quest')).length;
-  const totalPC = data.filter(a => a.platform.includes('PC')).length;
+  // Load from API
+  const fetchApps = async () => {
+    try {
+      const res = await fetch('/api/aplicaciones');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data && Array.isArray(json.data)) {
+          setData(json.data);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching aplicaciones:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApps();
+  }, []);
+
+  const totalVR = data.filter(a => String(a.platform).includes('Meta Quest')).length;
+  const totalPC = data.filter(a => String(a.platform).includes('PC')).length;
   const totalActivas = data.filter(a => a.status === 'Activa').length;
   const educativas = data.filter(a => a.category === 'Juego Educativo' || a.category === 'Ciencia y Naturaleza').length;
 
@@ -268,11 +119,13 @@ export default function AplicacionesPage() {
 
   const handleAdd = () => {
     setEditingItem(null);
+    setImagePreview('');
     setIsModalOpen(true);
   };
 
   const handleEdit = (item: Application) => {
     setEditingItem(item);
+    setImagePreview(item.imageUrl || item.iconUrl || '');
     setIsModalOpen(true);
   };
 
@@ -285,27 +138,74 @@ export default function AplicacionesPage() {
     setDeletingApp(item);
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const confirmDelete = async () => {
+    if (!deletingApp) return;
+    try {
+      await fetch(`/api/aplicaciones?id=${deletingApp.id}`, { method: 'DELETE' });
+      setData(prev => prev.filter(d => d.id !== deletingApp.id));
+    } catch (err) {
+      console.error('Error eliminando app:', err);
+    } finally {
+      setDeletingApp(null);
+    }
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const item: Application = {
-      id: editingItem ? editingItem.id : Date.now(),
-      name: fd.get('name') as string,
-      developer: fd.get('developer') as string,
-      version: fd.get('version') as string,
+      id: editingItem ? editingItem.id : `app-${Date.now()}`,
+      name: (fd.get('name') as string).trim(),
+      developer: (fd.get('developer') as string).trim(),
+      version: (fd.get('version') as string).trim() || '1.0',
       category: fd.get('category') as AppCategory,
       platform: fd.get('platform') as Platform,
       ageRating: fd.get('ageRating') as AgeRating,
-      description: fd.get('description') as string,
-      devicesInstalled: parseInt(fd.get('devicesInstalled') as string, 10) || 0,
-      status: (fd.get('status') as AppStatus) || 'Activa',
+      description: (fd.get('description') as string).trim(),
+      devicesInstalled: parseInt(fd.get('devicesInstalled') as string, 10) || 1,
+      status: ((fd.get('status') as AppStatus) || 'Activa'),
+      imageUrl: imagePreview || (fd.get('imageUrl') as string)?.trim() || '/images/apps/default.png',
+      iconUrl: imagePreview || (fd.get('imageUrl') as string)?.trim() || '/images/apps/default.png',
     };
-    if (editingItem) {
-      setData(data.map(d => d.id === editingItem.id ? item : d));
-    } else {
-      setData([item, ...data]);
+
+    try {
+      const res = await fetch('/api/aplicaciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item),
+      });
+
+      if (res.ok) {
+        if (editingItem) {
+          setData(prev => prev.map(d => d.id === editingItem.id ? item : d));
+        } else {
+          setData(prev => [item, ...prev]);
+        }
+        setIsModalOpen(false);
+      } else {
+        alert('Error al guardar la aplicación');
+      }
+    } catch (err) {
+      console.error('Error al persistir app:', err);
+      // Fallback local
+      if (editingItem) {
+        setData(prev => prev.map(d => d.id === editingItem.id ? item : d));
+      } else {
+        setData(prev => [item, ...prev]);
+      }
+      setIsModalOpen(false);
     }
-    setIsModalOpen(false);
   };
 
   // ── Columns ──
@@ -314,11 +214,16 @@ export default function AplicacionesPage() {
       key: 'name',
       label: 'Aplicación',
       render: (value, item: Application) => {
-        const cfg = categoryColors[item.category];
+        const cfg = categoryColors[item.category] || { bg: '#eef2ff', color: '#1e5ca7', emoji: '🎮' };
+        const img = item.imageUrl || item.iconUrl;
         return (
           <div className="flex items-center gap-3">
-            <div className="flex size-[38px] shrink-0 items-center justify-center rounded-lg bg-gray-100 text-xl">
-              {cfg.emoji}
+            <div className="flex size-[42px] shrink-0 items-center justify-center rounded-xl bg-gray-100 overflow-hidden border border-black/[0.06]">
+              {img && img.startsWith('http') || img && img.startsWith('/') || img && img.startsWith('data:image') ? (
+                <img src={img} alt={String(value)} className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-xl">{cfg.emoji}</span>
+              )}
             </div>
             <div>
               <div className="text-sm font-semibold text-navy">{value}</div>
@@ -332,7 +237,7 @@ export default function AplicacionesPage() {
       key: 'category',
       label: 'Categoría',
       render: (value: AppCategory) => {
-        const cfg = categoryColors[value];
+        const cfg = categoryColors[value] || { bg: '#eef2ff', color: '#1e5ca7', emoji: '🎮' };
         return (
           <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap" style={{ background: cfg.bg, color: cfg.color }}>
             {cfg.emoji} {value}
@@ -344,7 +249,7 @@ export default function AplicacionesPage() {
       key: 'platform',
       label: 'Plataforma',
       render: (value: Platform) => {
-        const cfg = platformConfig[value];
+        const cfg = platformConfig[value] || { bg: 'rgba(30,92,167,0.1)', color: '#1e5ca7', icon: '🎮' };
         return (
           <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap" style={{ background: cfg.bg, color: cfg.color }}>
             {cfg.icon} {value}
@@ -364,7 +269,7 @@ export default function AplicacionesPage() {
       label: 'Dispositivos',
       render: (value: number) => (
         <span className="font-semibold text-navy">
-          {value} <span className="text-xs font-normal text-plai-muted">equipos</span>
+          {value || 1} <span className="text-xs font-normal text-plai-muted">equipos</span>
         </span>
       ),
     },
@@ -375,7 +280,7 @@ export default function AplicacionesPage() {
         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${
           value === 'Activa' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
         }`}>
-          {value}
+          {value || 'Activa'}
         </span>
       ),
     },
@@ -385,7 +290,7 @@ export default function AplicacionesPage() {
       render: (_, item) => (
         <button
           onClick={() => handleDetail(item)}
-          className="flex items-center gap-1 rounded-md bg-[rgba(168,30,113,0.1)] px-3 py-1.5 text-xs font-semibold text-plai transition-colors hover:bg-plai hover:text-white"
+          className="flex items-center gap-1 rounded-md bg-plai/10 px-3 py-1.5 text-xs font-semibold text-plai transition-colors hover:bg-plai hover:text-white"
         >
           <RiEyeLine /> Ver
         </button>
@@ -398,7 +303,7 @@ export default function AplicacionesPage() {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <h1 className="mb-1 font-heading text-3xl font-extrabold text-navy">Catálogo de Aplicaciones</h1>
-          <p className="text-sm text-plai-muted md:text-base">Juegos y experiencias VR y PC disponibles en PLAi</p>
+          <p className="text-sm text-plai-muted md:text-base">Juegos y experiencias VR y PC gestionados en la base de datos de PLAi</p>
         </div>
       </div>
 
@@ -440,7 +345,7 @@ export default function AplicacionesPage() {
               }`}
               onClick={() => setFilterCategory(c)}
             >
-              {c !== 'Todas' ? categoryColors[c as AppCategory].emoji + ' ' : ''}{c}
+              {c !== 'Todas' ? (categoryColors[c as AppCategory]?.emoji || '🎮') + ' ' : ''}{c}
             </button>
           ))}
         </div>
@@ -461,8 +366,12 @@ export default function AplicacionesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-pop-in" onClick={() => setIsDetailOpen(false)}>
           <div className="max-h-[90vh] w-full max-w-[560px] overflow-y-auto rounded-2xl border border-black/[0.08] bg-white p-6 shadow-2xl md:p-8" onClick={e => e.stopPropagation()}>
             <div className="mb-5 flex items-start gap-4">
-              <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gray-100 text-3xl">
-                {categoryColors[detailItem.category].emoji}
+              <div className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-gray-100 text-3xl overflow-hidden border border-black/[0.08]">
+                {detailItem.imageUrl || detailItem.iconUrl ? (
+                  <img src={detailItem.imageUrl || detailItem.iconUrl} alt={detailItem.name} className="h-full w-full object-cover" />
+                ) : (
+                  categoryColors[detailItem.category]?.emoji || '🎮'
+                )}
               </div>
               <div className="flex-1">
                 <h2 className="font-heading text-xl font-bold text-navy md:text-2xl">{detailItem.name}</h2>
@@ -474,11 +383,11 @@ export default function AplicacionesPage() {
             <p className="mb-5 text-sm leading-relaxed text-gray-700">{detailItem.description}</p>
 
             <div className="mb-6 flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap" style={{ background: categoryColors[detailItem.category].bg, color: categoryColors[detailItem.category].color }}>
-                {categoryColors[detailItem.category].emoji} {detailItem.category}
+              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap" style={{ background: categoryColors[detailItem.category]?.bg, color: categoryColors[detailItem.category]?.color }}>
+                {categoryColors[detailItem.category]?.emoji} {detailItem.category}
               </span>
-              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap" style={{ background: platformConfig[detailItem.platform].bg, color: platformConfig[detailItem.platform].color }}>
-                {platformConfig[detailItem.platform].icon} {detailItem.platform}
+              <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap" style={{ background: platformConfig[detailItem.platform]?.bg, color: platformConfig[detailItem.platform]?.color }}>
+                {platformConfig[detailItem.platform]?.icon} {detailItem.platform}
               </span>
               <span className="inline-block rounded-md border border-gray-200 bg-gray-100 px-2 py-0.5 text-xs font-bold text-navy">{detailItem.ageRating}</span>
               <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${
@@ -523,7 +432,7 @@ export default function AplicacionesPage() {
           <div className="max-h-[90vh] w-full max-w-[640px] overflow-y-auto rounded-2xl border border-black/[0.08] bg-white p-6 shadow-2xl md:p-8" onClick={e => e.stopPropagation()}>
             <div className="mb-6 flex items-center justify-between">
               <h2 className="font-heading text-xl font-bold text-navy md:text-2xl">
-                {editingItem ? 'Editar Aplicación' : 'Agregar Aplicación'}
+                {editingItem ? 'Editar Aplicación' : 'Agregar Aplicación al Catálogo'}
               </h2>
               <button className="flex size-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900" onClick={() => setIsModalOpen(false)}><RiCloseLine className="text-xl" /></button>
             </div>
@@ -533,6 +442,40 @@ export default function AplicacionesPage() {
                   <label className="text-xs font-bold uppercase tracking-wider text-navy">Nombre de la Aplicación / Juego</label>
                   <input type="text" name="name" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem?.name} required placeholder="Ej. Beat Saber" />
                 </div>
+                
+                {/* Image Upload / URL */}
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Imagen / Icono de la Aplicación</label>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <input 
+                      type="text" 
+                      name="imageUrl" 
+                      className="w-full flex-1 rounded-lg border border-gray-300 px-3.5 py-2 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none" 
+                      value={imagePreview} 
+                      onChange={e => setImagePreview(e.target.value)} 
+                      placeholder="URL de imagen (ej. /images/apps/beat-saber.png o https://...)" 
+                    />
+                    <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-plai/30 bg-plai/10 px-4 py-2 text-xs font-bold text-plai transition-all hover:bg-plai hover:text-white">
+                      <RiUploadCloud2Line className="text-base" /> Subir archivo
+                      <input type="file" accept="image/*" onChange={handleImageFileChange} className="hidden" />
+                    </label>
+                  </div>
+
+                  {imagePreview && (
+                    <div className="mt-1 flex items-center gap-3 rounded-lg border border-black/[0.06] bg-gray-50 p-2">
+                      <img src={imagePreview} alt="Preview" className="size-12 rounded-lg object-cover border border-gray-200" />
+                      <span className="text-xs text-plai-muted">Vista previa de imagen cargada</span>
+                      <button 
+                        type="button" 
+                        onClick={() => setImagePreview('')} 
+                        className="ml-auto text-xs text-rose-500 hover:underline"
+                      >
+                        Quitar imagen
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-navy">Desarrollador</label>
                   <input type="text" name="developer" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem?.developer} required placeholder="Ej. Beat Games" />
@@ -545,7 +488,7 @@ export default function AplicacionesPage() {
                   <label className="text-xs font-bold uppercase tracking-wider text-navy">Categoría</label>
                   <select name="category" className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem?.category || 'Juego Interactivo'}>
                     {ALL_CATEGORIES.map(c => (
-                      <option key={c} value={c}>{categoryColors[c].emoji} {c}</option>
+                      <option key={c} value={c}>{categoryColors[c]?.emoji} {c}</option>
                     ))}
                   </select>
                 </div>
@@ -563,7 +506,7 @@ export default function AplicacionesPage() {
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-navy">Dispositivos instalados</label>
-                  <input type="number" name="devicesInstalled" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem?.devicesInstalled ?? 0} min="0" required />
+                  <input type="number" name="devicesInstalled" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem?.devicesInstalled ?? 1} min="1" required />
                 </div>
                 {editingItem && (
                   <div className="flex flex-col gap-1.5 sm:col-span-2">
@@ -581,7 +524,7 @@ export default function AplicacionesPage() {
                     className="w-full resize-y rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20"
                     defaultValue={editingItem?.description}
                     rows={3}
-                    placeholder="Describe brevemente la aplicación y su uso en PLAI..."
+                    placeholder="Describe la experiencia, si requiere internet, controles o seguimiento de manos..."
                   />
                 </div>
               </div>
@@ -599,13 +542,9 @@ export default function AplicacionesPage() {
       <ConfirmDialog
         isOpen={!!deletingApp}
         title="¿Quitar aplicación del catálogo?"
-        description={`Se retirará "${deletingApp?.name}" de la lista pública de aplicaciones disponibles en PLAi.`}
+        description={`Se retirará "${deletingApp?.name}" de la base de datos y de la lista pública de aplicaciones disponibles en PLAi.`}
         confirmText="Quitar del catálogo"
-        onConfirm={() => {
-          if (deletingApp) {
-            setData(data.filter(d => d.id !== deletingApp.id));
-          }
-        }}
+        onConfirm={confirmDelete}
         onClose={() => setDeletingApp(null)}
       />
     </div>

@@ -58,6 +58,27 @@ export default function PrivacyPolicyModal({ isOpen, onClose }: PrivacyPolicyMod
           </button>
         </div>
 
+        {/* Acceso a documentos oficiales oficiales descargables */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-[#F8FAFC] px-6 py-2.5 text-xs">
+          <span className="font-semibold text-navy">Documentos Oficiales 2025:</span>
+          <a
+            href="/documentos/Aviso de Privacidad Integral 2025.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 font-medium text-plai hover:border-plai hover:bg-plai/5 transition-colors shadow-2xs"
+          >
+            <FileText size={13} /> Aviso Integral (PDF)
+          </a>
+          <a
+            href="/documentos/Aviso de Privacidad Simplificado PLAi 2025.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 font-medium text-plai hover:border-plai hover:bg-plai/5 transition-colors shadow-2xs"
+          >
+            <FileText size={13} /> Aviso Simplificado (PDF)
+          </a>
+        </div>
+
         {/* Contenido desplazable con lineamientos normativos */}
         <div className="flex-1 overflow-y-auto px-6 py-5 font-body text-sm leading-relaxed text-plai-gray">
           <div className="flex flex-col gap-4">
@@ -134,7 +155,7 @@ export default function PrivacyPolicyModal({ isOpen, onClose }: PrivacyPolicyMod
         <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-6 py-4">
           <div className="flex items-center gap-1.5 text-xs text-plai-muted">
             <FileText size={14} className="text-plai" />
-            <span>Versión 1.0 &bull; Octubre 2026</span>
+            <span>Versión Oficial 2025 &bull; Plataforma Abierta de Innovación (PLAi)</span>
           </div>
           <button
             type="button"

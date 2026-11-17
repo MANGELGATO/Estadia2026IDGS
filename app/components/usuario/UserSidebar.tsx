@@ -46,7 +46,7 @@ export default function UserSidebar() {
             className="h-7 w-auto object-contain"
           />
         </div>
-        <span className="rounded bg-[#E91E8C]/20 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#E91E8C]">Usuario</span>
+        <span className="rounded bg-plai/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-plai">Usuario</span>
       </div>
       <nav className="flex flex-1 flex-col gap-1">
         {navSections.map((section) => (
@@ -64,7 +64,7 @@ export default function UserSidebar() {
                   href={item.href}
                   className={`relative flex items-center gap-3 overflow-hidden rounded-xl px-4 py-[0.7rem] font-heading text-[0.875rem] font-medium transition-all duration-200 ${
                     isActive
-                      ? "bg-gradient-to-br from-[#E91E8C] to-[#c42585] text-white shadow-[0_4px_15px_rgba(233,30,140,0.35)]"
+                      ? "bg-gradient-to-br from-plai to-[#1e5ca7] text-white shadow-[0_4px_15px_rgba(0,134,255,0.35)]"
                       : "text-white/65 hover:bg-white/[0.08] hover:text-white"
                   }`}
                 >
@@ -78,7 +78,7 @@ export default function UserSidebar() {
       </nav>
       <div className="mt-4 flex items-center justify-between gap-2 rounded-xl border-t border-white/[0.08] p-3 md:p-4">
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#E91E8C] to-[#c42585] font-heading text-base font-bold text-white shadow-sm">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-plai to-[#1e5ca7] font-heading text-base font-bold text-white shadow-sm">
             {userInitial}
           </div>
           <div className="flex min-w-0 flex-col">

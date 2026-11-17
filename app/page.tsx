@@ -2,7 +2,7 @@
 import SubHeader from './components/SubHeader';
 import HeroSection from './components/HeroSection';
 import CategoryCarousel from './components/CategoryCarousel';
-import EquipmentFilterGrid from './components/EquipmentFilterGrid';
+import EquipmentCarousel from './components/EquipmentCarousel';
 import AppCarousel from './components/AppCarousel';
 import CourseCallout from './components/CourseCallout';
 
@@ -18,9 +18,9 @@ export default function Home() {
         <CategoryCarousel />
       </div>
 
-      {/* Grid de dispositivos (solo vista de catálogo) */}
+      {/* Carrusel de vista previa de equipos destacados */}
       <div id="equipos">
-        <EquipmentFilterGrid />
+        <EquipmentCarousel />
       </div>
 
       {/* Carrusel de Aplicaciones */}

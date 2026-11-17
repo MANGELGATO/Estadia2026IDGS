@@ -8,7 +8,7 @@ type StatCardProps = {
 };
 
 const iconVariants: Record<NonNullable<StatCardProps['variant']>, string> = {
-  primary: 'bg-[rgba(168,30,113,0.1)] text-plai',
+  primary: 'bg-plai/10 text-plai',
   success: 'bg-[rgba(16,185,129,0.1)] text-[#10B981]',
   warning: 'bg-[rgba(245,158,11,0.1)] text-[#F59E0B]',
   danger: 'bg-[rgba(239,68,68,0.1)] text-[#EF4444]',

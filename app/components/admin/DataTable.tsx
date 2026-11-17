@@ -17,6 +17,7 @@ export type DataTableProps<T extends Record<string, any> = any> = {
   onAdd?: () => void;
   onEdit?: (item: T) => void;
   onDelete?: (item: T) => void;
+  customActions?: (item: T) => React.ReactNode;
   addActionLabel?: string;
 };
 
@@ -28,6 +29,7 @@ export default function DataTable<T extends Record<string, any> = any>({
   onAdd, 
   onEdit, 
   onDelete,
+  customActions,
   addActionLabel = 'Agregar'
 }: DataTableProps<T>) {
   return (
@@ -55,8 +57,8 @@ export default function DataTable<T extends Record<string, any> = any>({
                   {col.label}
                 </th>
               ))}
-              {(onEdit || onDelete) && (
-                <th className="w-[100px] border-b border-black/[0.08] bg-[#F4F6F9] px-6 py-4 text-center font-heading text-xs font-semibold uppercase tracking-[0.05em] text-plai-muted">
+              {(onEdit || onDelete || customActions) && (
+                <th className="w-[120px] border-b border-black/[0.08] bg-[#F4F6F9] px-6 py-4 text-center font-heading text-xs font-semibold uppercase tracking-[0.05em] text-plai-muted">
                   Acciones
                 </th>
               )}
@@ -78,9 +80,10 @@ export default function DataTable<T extends Record<string, any> = any>({
                       </td>
                     );
                   })}
-                  {(onEdit || onDelete) && (
+                  {(onEdit || onDelete || customActions) && (
                     <td className="border-b border-black/[0.08] px-6 py-4 text-center">
-                      <div className="flex justify-center gap-2">
+                      <div className="flex justify-center items-center gap-2">
+                        {customActions && customActions(item)}
                         {onEdit && (
                           <button 
                             className="cursor-pointer rounded p-1 text-xl text-plai-muted transition-colors duration-[250ms] hover:bg-plai/10 hover:text-plai" 
@@ -108,7 +111,7 @@ export default function DataTable<T extends Record<string, any> = any>({
             {data.length === 0 && (
               <tr>
                 <td
-                  colSpan={columns.length + (onEdit || onDelete ? 1 : 0)}
+                  colSpan={columns.length + (onEdit || onDelete || customActions ? 1 : 0)}
                   className="p-8 text-center text-sm text-plai-muted"
                 >
                   No hay datos disponibles.

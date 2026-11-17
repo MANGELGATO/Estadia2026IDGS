@@ -13,9 +13,26 @@ export interface DeviceItem {
   apps?: string[];
   accessories: string[];
   imageEmoji: string; // visual placeholder
+  imageUrl?: string;  // imagen oficial del activo
   responsible?: string;
   observations?: string;
   dateAdded?: string;
+}
+
+export interface UsageHistoryItem {
+  id: string;
+  deviceId: string;
+  deviceName?: string;
+  user: string;
+  institution?: string;
+  activity: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  hoursUsed: number;
+  status: 'Completado' | 'En curso' | 'Cancelado';
+  conditionReturned: 'Excelente' | 'Bueno' | 'Observación' | 'En revisión';
+  notes?: string;
 }
 
 export const mockDevices: DeviceItem[] = [
@@ -37,6 +54,7 @@ export const mockDevices: DeviceItem[] = [
     apps: ['Beat Saber', 'Job Simulator', 'Ocean Rift', 'Spatial', 'Tilt Brush'],
     accessories: ['2 Controladores Touch Plus', 'Correa estándar', 'Cable USB-C y adaptador de corriente'],
     imageEmoji: '🥽',
+    imageUrl: '/images/equipos/meta-quest-3.png',
   },
   {
     id: 'vr-02',
@@ -55,6 +73,7 @@ export const mockDevices: DeviceItem[] = [
     apps: ['Rec Room', 'Superhot VR', 'The Room VR'],
     accessories: ['2 Controladores Touch Plus', 'Cable de carga'],
     imageEmoji: '🥽',
+    imageUrl: '/images/equipos/meta-quest-3.png',
   },
   {
     id: 'vr-03',
@@ -73,6 +92,7 @@ export const mockDevices: DeviceItem[] = [
     apps: ['Ocean Rift', 'Tilt Brush', 'National Geographic Explore VR'],
     accessories: ['2 Controladores Oculus Touch', 'Espaciador para lentes', 'Cargador oficial'],
     imageEmoji: '🥽',
+    imageUrl: '/images/equipos/meta-quest-2.png',
   },
   {
     id: 'vr-04',
@@ -91,6 +111,7 @@ export const mockDevices: DeviceItem[] = [
     specs: ['128 GB', 'Falla reportada en inventario: Display dañado', 'En diagnóstico técnico'],
     accessories: ['2 Controladores Oculus Touch'],
     imageEmoji: '🥽',
+    imageUrl: '/images/equipos/meta-quest-2.png',
   },
   // ── Robótica y Automatización ─────────────────────────────────────
   {
@@ -109,6 +130,7 @@ export const mockDevices: DeviceItem[] = [
     specs: ['Payload 250g', 'Alcance 320 mm', 'Repetibilidad ±0.2 mm', '4 ejes articulados'],
     accessories: ['Cabezal de pluma', 'Succionador de vacío', 'Pinza de agarre', 'Cable USB'],
     imageEmoji: '🦾',
+    imageUrl: '/images/equipos/dobot-magician.png',
   },
   {
     id: 'rob-02',
@@ -126,6 +148,7 @@ export const mockDevices: DeviceItem[] = [
     specs: ['Robots didácticos programables', 'Compatibilidad oficial "Made for iPad" y PC', 'Sensores de color, distancia y fuerza', 'Hub inteligente con matriz LED 5×5'],
     accessories: ['Contenedor amarillo de plástico rígido y apilable', 'Batería recargable', 'Cables y conectores'],
     imageEmoji: '🤖',
+    imageUrl: '/images/equipos/arduino-mega.png',
   },
   {
     id: 'rob-03',
@@ -246,6 +269,7 @@ export const mockDevices: DeviceItem[] = [
     specs: ['Sistema AMS multi-material (4 filamentos)', 'Cinemática Core XY de alta velocidad (500 mm/s)', 'Sensor Micro Lidar y cámara asistida por IA', 'Cámara cerrada con aislamiento térmico', 'Soporta Nylon, Fibra de carbono, ABS, TPU, PLA'],
     accessories: ['Módulo AMS superior', 'Placa de construcción texturizada', 'Juego de boquillas de repuesto'],
     imageEmoji: '🖨️',
+    imageUrl: '/images/equipos/bambu-lab-x1c.png',
   },
   {
     id: 'fab-02',
@@ -263,6 +287,7 @@ export const mockDevices: DeviceItem[] = [
     specs: ['Escáner 3D volumétrico autónomo', 'Proyección de luz infrarroja y láser estructurada', 'Cálculo de distancia y nube de millones de puntos', 'Pantalla táctil abatible', 'Captura fotorealista en color'],
     accessories: ['Kit de calibración con placas cuadrícula', 'Tripié articulado', 'Cable USB-C de transferencia'],
     imageEmoji: '📡',
+    imageUrl: '/images/equipos/revopoint-3d.png',
   },
   {
     id: 'fab-03',
@@ -280,6 +305,7 @@ export const mockDevices: DeviceItem[] = [
     specs: ['Mecanizado sustractivo en 3 ejes simultáneos (X, Y, Z)', 'Husillo giratorio de altas revoluciones', 'Control Numérico por Computadora (Código G)', 'Tallado de madera, plásticos y prototipos PCB'],
     accessories: ['Juego de fresas y brocas', 'Llaves de apriete', 'Cable de control PC'],
     imageEmoji: '⚙️',
+    imageUrl: '/images/equipos/prusa-i3.png',
   },
   {
     id: 'fab-04',
@@ -349,6 +375,7 @@ export const mockDevices: DeviceItem[] = [
     specs: ['Cámara Hasselblad profesional', 'Cuadricóptero para foto y video aéreo de alta resolución', 'Transmisión de video HD de largo alcance', 'Compatible con apps iOS y Android'],
     accessories: ['Control remoto inteligente', '2 Baterías de vuelo', 'Cargador múltiple', 'Estuche rígido'],
     imageEmoji: '🚁',
+    imageUrl: '/images/equipos/dji-mini-3-pro.png',
   },
   {
     id: 'dr-02',
@@ -366,6 +393,7 @@ export const mockDevices: DeviceItem[] = [
     specs: ['Peso sub-249g (Ultraligero)', 'Evasión de obstáculos omnidireccional 360°', 'Gimbal mecánico de 3 ejes estabilizado', 'Vuelo autónomo y seguimiento ActiveTrack con IA'],
     accessories: ['Control remoto con pantalla', 'Baterías inteligentes', 'Protectores de hélices'],
     imageEmoji: '🚁',
+    imageUrl: '/images/equipos/dji-mini-3-pro.png',
   },
   {
     id: 'dr-03',
@@ -453,6 +481,7 @@ export const mockDevices: DeviceItem[] = [
     apps: ['Final Cut Pro', 'Xcode', 'Adobe Creative Suite', 'Logic Pro'],
     accessories: ['Cargador MagSafe 140W', 'USB-C Hub'],
     imageEmoji: '💻',
+    imageUrl: '/images/equipos/macbook-pro.png',
   },
   {
     id: 'comp-04',
@@ -471,6 +500,7 @@ export const mockDevices: DeviceItem[] = [
     apps: ['Unity', 'Unreal Engine 5', 'Blender', 'MATLAB'],
     accessories: ['Monitor 4K 144Hz', 'Teclado mecánico', 'Mouse gaming'],
     imageEmoji: '🖥️',
+    imageUrl: '/images/equipos/oculus-link-pc.png',
   },
 ];
 
@@ -481,7 +511,11 @@ export interface AppItem {
   category: string;
   platform: 'Meta Quest' | 'PC' | 'Meta Quest + PC';
   ageRating: string;
-  iconUrl: string; // Emoji for visual
+  iconUrl?: string; // Emoji or visual placeholder
+  imageUrl?: string;
+  version?: string;
+  devicesInstalled?: number;
+  status?: string;
   description: string;
 }
 
@@ -493,7 +527,7 @@ export const mockApps: AppItem[] = [
     category: 'Arte y Creatividad',
     platform: 'Meta Quest',
     ageRating: 'Todas las edades',
-    iconUrl: '🎨',
+    iconUrl: '/images/apps/tilt-brush.png',
     description: 'Pinta en realidad virtual en 3D con pinceles y materiales mágicos. Ideal para talleres de arte inmersivo con niños.',
   },
   {
@@ -503,7 +537,7 @@ export const mockApps: AppItem[] = [
     category: 'Juego Interactivo',
     platform: 'Meta Quest + PC',
     ageRating: 'Todas las edades',
-    iconUrl: '⚡',
+    iconUrl: '/images/apps/rec-room.png',
     description: 'Mundo social con minijuegos cooperativos: paintball, dodgeball, escape rooms. Excelente para grupos de niños.',
   },
   {
@@ -513,7 +547,7 @@ export const mockApps: AppItem[] = [
     category: 'Ciencia y Naturaleza',
     platform: 'Meta Quest',
     ageRating: 'Todas las edades',
-    iconUrl: '🌊',
+    iconUrl: '/images/apps/ocean-rift.png',
     description: 'Parque acuático virtual con tiburones, ballenas, delfines y tortugas. Experiencia educativa sobre el océano.',
   },
   {
@@ -523,7 +557,7 @@ export const mockApps: AppItem[] = [
     category: 'Juego Interactivo',
     platform: 'Meta Quest',
     ageRating: '6+',
-    iconUrl: '⚡',
+    iconUrl: '/images/apps/beat-saber.png',
     description: 'Juego rítmico con sables de luz. Coordina movimientos con la música. Muy popular en demostraciones para niños.',
   },
   {
@@ -533,7 +567,7 @@ export const mockApps: AppItem[] = [
     category: 'Simulación',
     platform: 'Meta Quest',
     ageRating: 'Todas las edades',
-    iconUrl: '🎮',
+    iconUrl: '/images/apps/job-simulator.png',
     description: 'Simula trabajos cotidianos en un mundo futurista donde los robots hacen todo. Divertido y educativo.',
   },
   {
@@ -543,7 +577,7 @@ export const mockApps: AppItem[] = [
     category: 'Simulación',
     platform: 'Meta Quest',
     ageRating: 'Todas las edades',
-    iconUrl: '🎮',
+    iconUrl: '/images/apps/vacation-simulator.png',
     description: 'Experiencia de vacaciones virtuales en playa, montaña y ciudad. Ideal para primeras experiencias VR con niños pequeños.',
   },
   {
@@ -553,7 +587,7 @@ export const mockApps: AppItem[] = [
     category: 'Ciencia y Naturaleza',
     platform: 'Meta Quest',
     ageRating: 'Todas las edades',
-    iconUrl: '🌊',
+    iconUrl: '/images/apps/national-geographic.png',
     description: 'Explora la Antártida y Machu Picchu en VR. Kayak entre icebergs y aprende sobre ecosistemas.',
   },
   {
@@ -563,7 +597,7 @@ export const mockApps: AppItem[] = [
     category: 'Experiencia VR',
     platform: 'Meta Quest + PC',
     ageRating: 'Todas las edades',
-    iconUrl: '🥽',
+    iconUrl: '/images/apps/spatial.png',
     description: 'Plataforma de colaboración y exhibiciones en VR. Usada para presentaciones de proyectos y galerías virtuales en PLAi.',
   },
   {
@@ -573,7 +607,7 @@ export const mockApps: AppItem[] = [
     category: 'Experiencia VR',
     platform: 'Meta Quest',
     ageRating: '10+',
-    iconUrl: '🥽',
+    iconUrl: '/images/apps/richies-plank.png',
     description: 'Experiencia de altura extrema en VR. Ideal para demostraciones del efecto de presencia en realidad virtual.',
   },
   {
@@ -583,7 +617,7 @@ export const mockApps: AppItem[] = [
     category: 'Juego Interactivo',
     platform: 'Meta Quest',
     ageRating: '12+',
-    iconUrl: '⚡',
+    iconUrl: '/images/apps/pistol-whip.png',
     description: 'Juego de acción rítmica al estilo John Wick. Muévete y dispara al ritmo de la música.',
   },
   {
@@ -593,7 +627,7 @@ export const mockApps: AppItem[] = [
     category: 'Juego Educativo',
     platform: 'Meta Quest',
     ageRating: '10+',
-    iconUrl: '🎓',
+    iconUrl: '/images/apps/the-room-vr.png',
     description: 'Juego de escape room con acertijos y puzzles en VR. Desarrolla pensamiento lógico y resolución de problemas.',
   },
   {
@@ -603,7 +637,7 @@ export const mockApps: AppItem[] = [
     category: 'Juego Educativo',
     platform: 'PC',
     ageRating: '6+',
-    iconUrl: '🎓',
+    iconUrl: '/images/apps/minecraft-education.png',
     description: 'Versión educativa de Minecraft con lecciones de matemáticas, ciencias, historia y código.',
   },
   {
@@ -613,7 +647,7 @@ export const mockApps: AppItem[] = [
     category: 'Ciencia y Naturaleza',
     platform: 'Meta Quest',
     ageRating: 'Todas las edades',
-    iconUrl: '🌊',
+    iconUrl: '/images/apps/star-chart.png',
     description: 'Planetario virtual interactivo. Explora constelaciones, planetas y galaxias. Perfecto para talleres de astronomía.',
   },
   {
@@ -623,7 +657,7 @@ export const mockApps: AppItem[] = [
     category: 'Juego Interactivo',
     platform: 'Meta Quest',
     ageRating: 'Todas las edades',
-    iconUrl: '⚡',
+    iconUrl: '/images/apps/fruit-ninja-2.png',
     description: 'Corta frutas volando con katanas en realidad virtual. Primera experiencia VR perfecta para niños pequeños.',
   },
   {
@@ -633,8 +667,131 @@ export const mockApps: AppItem[] = [
     category: 'Juego Interactivo',
     platform: 'Meta Quest',
     ageRating: '12+',
-    iconUrl: '⚡',
+    iconUrl: '/images/apps/superhot.png',
     description: 'El tiempo solo avanza cuando te mueves. Juego de acción innovador que demuestra las capacidades únicas del VR.',
+  },
+];
+
+export const mockUsageHistory: UsageHistoryItem[] = [
+  {
+    id: 'hist-1',
+    deviceId: 'vr-01',
+    deviceName: 'Meta Quest 3 (512 GB)',
+    user: 'Mtro. Fernando Robles',
+    institution: 'Universidad de Guadalajara (CUCEI)',
+    activity: 'Taller de Desarrollo Inmersivo y Computación Espacial',
+    date: '2026-11-12',
+    startTime: '10:00',
+    endTime: '12:00',
+    hoursUsed: 2.0,
+    status: 'Completado',
+    conditionReturned: 'Excelente',
+    notes: 'Lentes y controladores devueltos con batería al 85%, limpios.',
+  },
+  {
+    id: 'hist-2',
+    deviceId: 'vr-01',
+    deviceName: 'Meta Quest 3 (512 GB)',
+    user: 'Dra. Gabriela Castañeda',
+    institution: 'Tecnológico de Monterrey',
+    activity: 'Evaluación de interfaces hápticas en entorno médico',
+    date: '2026-11-08',
+    startTime: '14:00',
+    endTime: '16:00',
+    hoursUsed: 2.0,
+    status: 'Completado',
+    conditionReturned: 'Excelente',
+    notes: 'Prueba completada satisfactoriamente con software Spatial.',
+  },
+  {
+    id: 'hist-3',
+    deviceId: 'vr-02',
+    deviceName: 'Meta Quest 3 (512 GB) - Lote #4',
+    user: 'Ing. Salvador Mendoza',
+    institution: 'Startup Ecosistema Jalisco',
+    activity: 'Pruebas de concepto de gemelo digital arquitectónico',
+    date: '2026-11-16',
+    startTime: '11:00',
+    endTime: '13:00',
+    hoursUsed: 2.0,
+    status: 'En curso',
+    conditionReturned: 'En revisión',
+    notes: 'Equipo activo en Aula Maker B.',
+  },
+  {
+    id: 'hist-4',
+    deviceId: 'fab-01',
+    deviceName: 'Impresora 3D Bambu Lab X1-Carbon',
+    user: 'Carolina Valdivia',
+    institution: 'ITESO',
+    activity: 'Impresión de carcasa para prótesis robótica infantil',
+    date: '2026-11-14',
+    startTime: '09:00',
+    endTime: '13:30',
+    hoursUsed: 4.5,
+    status: 'Completado',
+    conditionReturned: 'Excelente',
+    notes: 'Usuario aportó su filamento PETG blanco. Placa y boquilla desinfectadas tras término.',
+  },
+  {
+    id: 'hist-5',
+    deviceId: 'fab-01',
+    deviceName: 'Impresora 3D Bambu Lab X1-Carbon',
+    user: 'Alejandro Ramos',
+    institution: 'Laboratorio de Innovación PLAi',
+    activity: 'Fabricación de soportes para sensores IoT',
+    date: '2026-11-10',
+    startTime: '13:00',
+    endTime: '15:00',
+    hoursUsed: 2.0,
+    status: 'Completado',
+    conditionReturned: 'Excelente',
+    notes: 'Filamento PLA aportado por el investigador. Sin incidencias mecánicas.',
+  },
+  {
+    id: 'hist-6',
+    deviceId: 'rob-01',
+    deviceName: 'Brazo Robótico DOBOT Magician',
+    user: 'Prof. Héctor Villalobos',
+    institution: 'UTJ (Universidad Tecnológica de Jalisco)',
+    activity: 'Práctica curricular de cinemática inversa y pick & place',
+    date: '2026-11-11',
+    startTime: '11:00',
+    endTime: '13:00',
+    hoursUsed: 2.0,
+    status: 'Completado',
+    conditionReturned: 'Bueno',
+    notes: 'Se revisó la bomba de vacío y cabezal de pinzas.',
+  },
+  {
+    id: 'hist-7',
+    deviceId: 'dr-01',
+    deviceName: 'Dron DJI Mavic 4 Pro',
+    user: 'Lic. Miguel Ángel Torres',
+    institution: 'SICyT Jalisco',
+    activity: 'Inspección de techumbres en Ciudad Creativa Digital',
+    date: '2026-11-09',
+    startTime: '08:30',
+    endTime: '10:00',
+    hoursUsed: 1.5,
+    status: 'Completado',
+    conditionReturned: 'Excelente',
+    notes: 'Baterías cargadas en Hub inteligente, hélices sin fisuras.',
+  },
+  {
+    id: 'hist-8',
+    deviceId: 'comp-03',
+    deviceName: 'MacBook Pro 16" M3 Max',
+    user: 'Estudiante Valeria Gómez',
+    institution: 'UDG Virtual',
+    activity: 'Edición y renderizado de video 8K para documental cultural',
+    date: '2026-11-15',
+    startTime: '15:00',
+    endTime: '18:00',
+    hoursUsed: 3.0,
+    status: 'Completado',
+    conditionReturned: 'Excelente',
+    notes: 'Uso de Final Cut Pro. Equipo entregado con batería al 90%.',
   },
 ];
 

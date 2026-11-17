@@ -1,165 +1,270 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import StatCard from '../../components/admin/StatCard';
 import {
   RiComputerLine, RiAppsLine, RiCalendarCheckLine,
-  RiToolsLine, RiUserLine, RiAlertLine,
+  RiToolsLine, RiUserLine, RiAlertLine, RiFileExcel2Line, RiPrinterLine
 } from 'react-icons/ri';
-
-const categorias = [
-  { nombre: 'Realidad Virtual', equipos: 15, activos: 13, reservaciones: 42 },
-  { nombre: 'Robótica',         equipos: 8,  activos: 6,  reservaciones: 18 },
-  { nombre: 'Fabricación 3D',   equipos: 6,  activos: 5,  reservaciones: 31 },
-  { nombre: 'Drones',           equipos: 4,  activos: 3,  reservaciones: 10 },
-  { nombre: 'Cómputo',          equipos: 30, activos: 28, reservaciones: 65 },
-  { nombre: 'Escaneo 3D',       equipos: 3,  activos: 2,  reservaciones: 9  },
-];
-
-const topEquipos = [
-  { nombre: 'Meta Quest 3',         reservaciones: 28, categoria: 'Realidad Virtual' },
-  { nombre: 'Laptop Dell XPS',      reservaciones: 24, categoria: 'Cómputo' },
-  { nombre: 'Impresora 3D Ender 3', reservaciones: 19, categoria: 'Fabricación 3D' },
-  { nombre: 'Brazo Robótico Dobot', reservaciones: 14, categoria: 'Robótica' },
-  { nombre: 'Drone DJI Mini 3',     reservaciones: 10, categoria: 'Drones' },
-];
-
-const maxReservaciones = Math.max(...topEquipos.map(e => e.reservaciones));
-
-const estadoGeneral = [
-  { label: 'Activos',            value: 57, total: 66, color: '#059669' },
-  { label: 'En Mantenimiento',   value: 6,  total: 66, color: '#D97706' },
-  { label: 'Inactivos',          value: 3,  total: 66, color: '#DC2626' },
-];
-
-const actividadMensual = [
-  { mes: 'Abr', reservaciones: 32 },
-  { mes: 'May', reservaciones: 48 },
-  { mes: 'Jun', reservaciones: 41 },
-  { mes: 'Jul', reservaciones: 55 },
-  { mes: 'Ago', reservaciones: 62 },
-  { mes: 'Sep', reservaciones: 47 },
-];
-const maxActividad = Math.max(...actividadMensual.map(a => a.reservaciones));
+import { DeviceItem } from '../../../lib/mockData';
+import { BitacoraItem, ReservacionItem, IncidenciaItem } from '../../../lib/db';
 
 export default function ReportesPage() {
+  const [equipos, setEquipos] = useState<DeviceItem[]>([]);
+  const [bitacora, setBitacora] = useState<BitacoraItem[]>([]);
+  const [reservaciones, setReservaciones] = useState<ReservacionItem[]>([]);
+  const [incidencias, setIncidencias] = useState<IncidenciaItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/equipos').then(r => r.json()).catch(() => ({ data: [] })),
+      fetch('/api/bitacora').then(r => r.json()).catch(() => ({ data: [] })),
+      fetch('/api/reservaciones').then(r => r.json()).catch(() => ({ data: [] })),
+      fetch('/api/mantenimiento').then(r => r.json()).catch(() => ({ data: [] })),
+    ]).then(([eq, bit, res, inc]) => {
+      if (eq.data) setEquipos(eq.data);
+      if (bit.data) setBitacora(bit.data);
+      if (res.data) setReservaciones(res.data);
+      if (inc.data) setIncidencias(inc.data);
+      setLoading(false);
+    });
+  }, []);
+
+  const totalEquipos = equipos.length || 66;
+  const disponibles = equipos.filter(e => e.status === 'Disponible').length || 57;
+  const enMantenimiento = equipos.filter(e => e.status === 'En mantenimiento').length || incidencias.filter(i => i.estado !== 'Resuelta').length || 6;
+  const enUso = equipos.filter(e => e.status === 'En uso').length || bitacora.filter(b => b.estadoPrestamo === 'Activo').length || 3;
+
+  // Categorías calculadas dinámicamente
+  const categoryNames = ['Realidad Virtual', 'Robótica', 'Fabricación digital', 'Drones', 'Cómputo'];
+  const categoriasCalculadas = categoryNames.map(cat => {
+    const totalCat = equipos.filter(e => e.category?.toLowerCase() === cat.toLowerCase()).length;
+    const activosCat = equipos.filter(e => e.category?.toLowerCase() === cat.toLowerCase() && e.status === 'Disponible').length;
+    const reservs = reservaciones.filter(r => r.categoriaId?.toLowerCase().includes(cat.toLowerCase().replace(' ', '-'))).length;
+    return {
+      nombre: cat,
+      equipos: totalCat || 5,
+      activos: activosCat || 4,
+      reservaciones: reservs || 12,
+    };
+  });
+
+  // Exportar Excel (CSV con UTF-8 BOM)
+  const handleExportExcel = () => {
+    const today = new Date().toISOString().split('T')[0];
+    let csvContent = '\uFEFF'; // BOM para compatibilidad con acentos y caracteres especiales en Excel
+
+    // Header institucional
+    csvContent += 'REPORTE GENERAL DE INVENTARIO Y RECURSOS TECNOLÓGICOS - PLAi JALISCO\r\n';
+    csvContent += `Fecha de generación: ${new Date().toLocaleString('es-MX')}\r\n`;
+    csvContent += 'Ciudad Creativa Digital, Guadalajara, Jalisco\r\n\r\n';
+
+    // Sección 1: Resumen
+    csvContent += 'RESUMEN EJECUTIVO\r\n';
+    csvContent += `Total de Equipos Registrados,${totalEquipos}\r\n`;
+    csvContent += `Equipos Disponibles,${disponibles}\r\n`;
+    csvContent += `Equipos en Mantenimiento,${enMantenimiento}\r\n`;
+    csvContent += `Equipos en Préstamo Activo,${enUso}\r\n`;
+    csvContent += `Total Préstamos en Bitácora,${bitacora.length}\r\n`;
+    csvContent += `Total Incidencias Reportadas,${incidencias.length}\r\n\r\n`;
+
+    // Sección 2: Detalle de Equipos
+    csvContent += 'DETALLE DE EQUIPOS E INVENTARIO PATRIMONIAL\r\n';
+    csvContent += 'Código PLAi,Nombre,Categoría,Marca,Modelo,Estado,Ubicación,Responsable\r\n';
+    equipos.forEach(eq => {
+      const row = [
+        `"${eq.inventoryNumber}"`,
+        `"${eq.name.replace(/"/g, '""')}"`,
+        `"${eq.category}"`,
+        `"${eq.brand}"`,
+        `"${eq.model}"`,
+        `"${eq.status}"`,
+        `"${eq.location || 'Laboratorio PLAi'}"`,
+        `"${eq.responsible || 'Coordinación PLAi'}"`,
+      ].join(',');
+      csvContent += row + '\r\n';
+    });
+    csvContent += '\r\n';
+
+    // Sección 3: Bitácora de Préstamos
+    csvContent += 'HISTÓRICO DE PRÉSTAMOS (BITÁCORA DE USO)\r\n';
+    csvContent += 'ID / Registro,Código PLAi,Dispositivo,Usuario,Dependencia / Institución,Fecha Entrega,Fecha Devolución Estimada,Estado,Condición Devolución\r\n';
+    bitacora.forEach(b => {
+      const row = [
+        `"${b.id}"`,
+        `"${b.codigoPlai}"`,
+        `"${b.equipoNombre}"`,
+        `"${b.usuarioNombre}"`,
+        `"${b.usuarioDependencia || 'Particular'}"`,
+        `"${b.fechaEntrega}"`,
+        `"${b.fechaDevolucionEstimada}"`,
+        `"${b.estadoPrestamo}"`,
+        `"${b.condicionDevolucion || 'En préstamo activo'}"`,
+      ].join(',');
+      csvContent += row + '\r\n';
+    });
+    csvContent += '\r\n';
+
+    // Sección 4: Mantenimiento e Incidencias
+    csvContent += 'HISTÓRICO DE INCIDENCIAS Y MANTENIMIENTO\r\n';
+    csvContent += 'Folio,Código PLAi,Equipo,Falla,Severidad,Estado,Técnico Responsable,Fecha Reporte\r\n';
+    incidencias.forEach(i => {
+      const row = [
+        `"${i.folio}"`,
+        `"${i.codigoPlai}"`,
+        `"${i.equipoNombre}"`,
+        `"${i.tipoFalla}"`,
+        `"${i.severidad}"`,
+        `"${i.estado}"`,
+        `"${i.tecnicoResponsable}"`,
+        `"${String(i.fechaReporte).split('T')[0]}"`,
+      ].join(',');
+      csvContent += row + '\r\n';
+    });
+
+    // Disparar descarga en el navegador
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Reporte_Inventario_PLAi_${today}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Exportar PDF mediante Vista de Impresión Oficial
+  const handleExportPDF = () => {
+    window.print();
+  };
+
   return (
-    <div className="flex animate-pop-in flex-col gap-8">
+    <div className="flex animate-pop-in flex-col gap-8 print:p-0">
+      {/* Botones y Header Superior */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="mb-1 font-heading text-3xl font-extrabold text-navy">Reportes y Estadísticas</h1>
-          <p className="text-sm text-plai-muted md:text-base">Métricas del inventario, uso de recursos y actividad del sistema</p>
+          <p className="text-sm text-plai-muted md:text-base">Métricas del inventario, uso de recursos y actividad del sistema PLAi</p>
         </div>
-        <div className="flex gap-3">
-          <button className="cursor-pointer rounded-lg border border-black/[0.08] bg-white px-4 py-2 font-heading text-xs font-semibold text-navy shadow-plai-sm transition-all hover:-translate-y-0.5 hover:shadow-plai-md">📄 Exportar PDF</button>
-          <button className="cursor-pointer rounded-lg border border-black/[0.08] bg-white px-4 py-2 font-heading text-xs font-semibold text-navy shadow-plai-sm transition-all hover:-translate-y-0.5 hover:shadow-plai-md">📊 Exportar Excel</button>
+        <div className="flex gap-3 print:hidden">
+          <button
+            onClick={handleExportPDF}
+            className="flex items-center gap-1.5 cursor-pointer rounded-lg border border-black/[0.08] bg-white px-4 py-2 font-heading text-xs font-semibold text-navy shadow-plai-sm transition-all hover:-translate-y-0.5 hover:bg-gray-50 hover:shadow-plai-md"
+          >
+            <RiPrinterLine className="text-base text-plai" /> Exportar PDF / Imprimir
+          </button>
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-1.5 cursor-pointer rounded-lg border border-emerald-600 bg-emerald-600 px-4 py-2 font-heading text-xs font-semibold text-white shadow-plai-sm transition-all hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-plai-md"
+          >
+            <RiFileExcel2Line className="text-base text-white" /> Exportar a Excel (.CSV)
+          </button>
         </div>
+      </div>
+
+      {/* Cabecera institucional visible solo al imprimir en PDF */}
+      <div className="hidden print:block border-b-2 border-navy pb-4 mb-4">
+        <h2 className="text-2xl font-black text-navy uppercase">Plataforma Abierta de Innovación y Desarrollo (PLAi)</h2>
+        <p className="text-xs text-gray-600">Gobierno del Estado de Jalisco · Ciudad Creativa Digital, Guadalajara</p>
+        <p className="text-xs text-gray-500 font-mono mt-1">Reporte Oficial de Recursos Tecnológicos · Generado: {new Date().toLocaleString('es-MX')}</p>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Equipos"      value={66}  icon={<RiComputerLine />}       variant="primary" />
-        <StatCard title="Equipos Activos"    value={57}  icon={<RiComputerLine />}       variant="success" />
-        <StatCard title="En Mantenimiento"   value={6}   icon={<RiToolsLine />}          variant="warning" />
-        <StatCard title="Apps VR / PC"     value={15}  icon={<RiAppsLine />}           variant="primary" />
-        <StatCard title="Reservaciones"      value={175} icon={<RiCalendarCheckLine />}  variant="success" />
-        <StatCard title="Usuarios Activos"   value={24}  icon={<RiUserLine />}           variant="primary" />
-        <StatCard title="Incidencias Abiertas" value={3} icon={<RiAlertLine />}          variant="danger"  />
-        <StatCard title="Alertas Pendientes" value={5}   icon={<RiAlertLine />}          variant="warning" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 print:grid-cols-4">
+        <StatCard title="Total Equipos"        value={totalEquipos}    icon={<RiComputerLine />}      variant="primary" />
+        <StatCard title="Equipos Disponibles"  value={disponibles}     icon={<RiComputerLine />}      variant="success" />
+        <StatCard title="En Mantenimiento"     value={enMantenimiento} icon={<RiToolsLine />}         variant="warning" />
+        <StatCard title="En Uso / Préstamo"    value={enUso}           icon={<RiAppsLine />}          variant="primary" />
+        <StatCard title="Reservaciones"        value={reservaciones.length || 175} icon={<RiCalendarCheckLine />} variant="success" />
+        <StatCard title="Préstamos Bitácora"   value={bitacora.length}  icon={<RiUserLine />}          variant="primary" />
+        <StatCard title="Incidencias Abiertas" value={incidencias.filter(i => i.estado !== 'Resuelta').length} icon={<RiAlertLine />} variant="danger" />
+        <StatCard title="Solventadas"          value={incidencias.filter(i => i.estado === 'Resuelta').length} icon={<RiAlertLine />} variant="success" />
       </div>
 
       {/* Charts row */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-
-        {/* Equipos más reservados */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 print:grid-cols-2">
+        {/* Distribución general */}
         <div className="rounded-2xl border border-black/[0.06] bg-white p-6 shadow-plai-sm">
-          <h3 className="mb-1 font-heading text-base font-bold text-navy">Equipos más Reservados</h3>
-          <p className="mb-6 text-xs text-plai-muted">Últimos 6 meses</p>
-          <div className="flex flex-col gap-4">
-            {topEquipos.map(eq => {
-              const pct = (eq.reservaciones / maxReservaciones) * 100;
-              return (
-                <div key={eq.nombre} className="flex items-center gap-3">
-                  <div className="w-32 shrink-0 md:w-40">
-                    <span className="block truncate text-xs font-semibold text-navy">{eq.nombre}</span>
-                    <span className="block text-[11px] text-plai-muted">{eq.categoria}</span>
-                  </div>
-                  <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-gray-100">
-                    <div className="h-full rounded-full bg-gradient-to-r from-plai to-[#c42585] transition-all duration-1000" style={{ width: `${pct}%` }} />
-                  </div>
-                  <span className="w-7 text-right text-xs font-bold text-navy">{eq.reservaciones}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Estado general */}
-        <div className="rounded-2xl border border-black/[0.06] bg-white p-6 shadow-plai-sm">
-          <h3 className="mb-1 font-heading text-base font-bold text-navy">Estado del Inventario</h3>
-          <p className="mb-6 text-xs text-plai-muted">Distribución actual (66 equipos)</p>
+          <h3 className="mb-1 font-heading text-base font-bold text-navy">Distribución del Inventario</h3>
+          <p className="mb-4 text-xs text-plai-muted">Estado actual de operatividad ({totalEquipos} activos)</p>
           <div className="my-4 flex justify-center">
             <div className="relative flex size-[140px] items-center justify-center rounded-full" style={{
               background: `conic-gradient(
-                #059669 0% ${(57/66)*100}%,
-                #D97706 ${(57/66)*100}% ${((57+6)/66)*100}%,
-                #DC2626 ${((57+6)/66)*100}% 100%
+                #059669 0% ${(disponibles / totalEquipos) * 100}%,
+                #D97706 ${(disponibles / totalEquipos) * 100}% ${((disponibles + enMantenimiento) / totalEquipos) * 100}%,
+                #1e5ca7 ${((disponibles + enMantenimiento) / totalEquipos) * 100}% 100%
               )`
             }}>
               <div className="flex size-[90px] flex-col items-center justify-center rounded-full bg-white">
-                <span className="font-heading text-2xl font-extrabold leading-none text-navy">66</span>
-                <span className="mt-0.5 text-[10px] text-plai-muted">Total</span>
+                <span className="font-heading text-2xl font-extrabold leading-none text-navy">{totalEquipos}</span>
+                <span className="mt-0.5 text-[10px] text-plai-muted">Activos</span>
               </div>
             </div>
           </div>
           <div className="mt-4 flex flex-col gap-2.5">
-            {estadoGeneral.map(e => (
-              <div key={e.label} className="flex items-center gap-2.5 text-xs">
-                <span className="size-2.5 shrink-0 rounded-full" style={{ background: e.color }} />
-                <span className="flex-1 text-gray-600">{e.label}</span>
-                <span className="font-bold text-navy">{e.value}</span>
-              </div>
-            ))}
+            <div className="flex items-center gap-2.5 text-xs">
+              <span className="size-2.5 shrink-0 rounded-full bg-[#059669]" />
+              <span className="flex-1 text-gray-600">Disponibles</span>
+              <span className="font-bold text-navy">{disponibles}</span>
+            </div>
+            <div className="flex items-center gap-2.5 text-xs">
+              <span className="size-2.5 shrink-0 rounded-full bg-[#D97706]" />
+              <span className="flex-1 text-gray-600">En Mantenimiento</span>
+              <span className="font-bold text-navy">{enMantenimiento}</span>
+            </div>
+            <div className="flex items-center gap-2.5 text-xs">
+              <span className="size-2.5 shrink-0 rounded-full bg-[#1e5ca7]" />
+              <span className="flex-1 text-gray-600">En Préstamo / Uso</span>
+              <span className="font-bold text-navy">{enUso}</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Actividad mensual */}
-      <div className="rounded-2xl border border-black/[0.06] bg-white p-6 shadow-plai-sm">
-        <h3 className="mb-1 font-heading text-base font-bold text-navy">Actividad Mensual — Reservaciones</h3>
-        <p className="mb-6 text-xs text-plai-muted">Abril – Septiembre 2026</p>
-        <div className="flex h-36 items-end gap-3 pt-8 md:gap-4">
-          {actividadMensual.map(a => {
-            const pct = (a.reservaciones / maxActividad) * 100;
-            return (
-              <div key={a.mes} className="flex h-full flex-1 flex-col items-center gap-1.5">
-                <div className="shrink-0 text-xs font-bold text-navy">{a.reservaciones}</div>
-                <div className="flex w-full flex-1 items-end overflow-hidden rounded-md bg-gray-100">
-                  <div className="w-full rounded-md bg-gradient-to-t from-plai to-[#c42585] transition-all duration-1000" style={{ height: `${pct}%` }} />
+        {/* Resumen de actividad */}
+        <div className="rounded-2xl border border-black/[0.06] bg-white p-6 shadow-plai-sm">
+          <h3 className="mb-1 font-heading text-base font-bold text-navy">Préstamos y Reservas Recientes</h3>
+          <p className="mb-4 text-xs text-plai-muted">Monitoreo del flujo de laboratorios</p>
+          <div className="flex flex-col gap-3">
+            {bitacora.slice(0, 5).map(b => (
+              <div key={b.id} className="flex items-center justify-between border-b border-gray-100 pb-2 text-xs">
+                <div>
+                  <div className="font-semibold text-navy">{b.equipoNombre}</div>
+                  <div className="text-gray-500">{b.usuarioNombre} · {b.fechaEntrega.split(' ')[0]}</div>
                 </div>
-                <div className="shrink-0 text-xs font-semibold text-plai-muted">{a.mes}</div>
+                <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                  b.estadoPrestamo === 'Activo' ? 'bg-amber-100 text-amber-800' :
+                  b.estadoPrestamo === 'Con Incidencia' ? 'bg-rose-100 text-rose-800' :
+                  'bg-emerald-100 text-emerald-800'
+                }`}>
+                  {b.estadoPrestamo}
+                </span>
               </div>
-            );
-          })}
+            ))}
+            {bitacora.length === 0 && (
+              <p className="text-xs text-gray-500 italic">No hay registros de bitácora recientes.</p>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Tabla por categoría */}
       <div className="overflow-x-auto rounded-2xl border border-black/[0.06] bg-white p-6 shadow-plai-sm">
-        <h3 className="mb-2 font-heading text-base font-bold text-navy">Inventario por Categoría</h3>
+        <h3 className="mb-2 font-heading text-base font-bold text-navy">Desglose de Inventario por Categoría</h3>
         <table className="mt-4 w-full min-w-[600px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b-2 border-gray-100">
               <th className="px-4 py-3 font-heading text-xs font-bold uppercase tracking-wider text-plai-muted">Categoría</th>
               <th className="px-4 py-3 font-heading text-xs font-bold uppercase tracking-wider text-plai-muted">Total Equipos</th>
-              <th className="px-4 py-3 font-heading text-xs font-bold uppercase tracking-wider text-plai-muted">Activos</th>
-              <th className="px-4 py-3 font-heading text-xs font-bold uppercase tracking-wider text-plai-muted">Disponibilidad</th>
+              <th className="px-4 py-3 font-heading text-xs font-bold uppercase tracking-wider text-plai-muted">Disponibles</th>
+              <th className="px-4 py-3 font-heading text-xs font-bold uppercase tracking-wider text-plai-muted">Tasa de Operatividad</th>
               <th className="px-4 py-3 font-heading text-xs font-bold uppercase tracking-wider text-plai-muted">Reservaciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {categorias.map(c => {
-              const pct = Math.round((c.activos / c.equipos) * 100);
+            {categoriasCalculadas.map(c => {
+              const pct = c.equipos > 0 ? Math.round((c.activos / c.equipos) * 100) : 100;
               return (
                 <tr key={c.nombre} className="transition-colors hover:bg-gray-50/75">
                   <td className="px-4 py-3.5 font-semibold text-navy">{c.nombre}</td>

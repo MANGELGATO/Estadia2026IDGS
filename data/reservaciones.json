@@ -1,0 +1,40 @@
+[
+  {
+    "id": "res-001",
+    "folio": "RES-2026-001",
+    "categoriaId": "realidad-virtual",
+    "equipoId": "eq-vr-001",
+    "codigoPlaiAsignado": "PLAI-VR-001",
+    "usuarioNombre": "Ana García Rivera",
+    "usuarioEmail": "ana.garcia@alumnos.udg.mx",
+    "usuarioTelefono": "33 1892 4401",
+    "usuarioInstitucion": "Universidad de Guadalajara (CUAAD)",
+    "fechaUso": "2026-11-20",
+    "horaInicio": "10:00",
+    "horaFin": "12:30",
+    "actividad": "Evaluación de proyecto de grado de arquitectura espacial.",
+    "estado": "Aprobada",
+    "accesoriosIncluidos": "Controles Touch Plus y cable Link Box",
+    "condicionSalida": "Excelente",
+    "observacionesAdmin": "Asignado equipo Meta Quest 3 #01"
+  },
+  {
+    "id": "res-002",
+    "folio": "RES-2026-002",
+    "categoriaId": "fabricacion-digital",
+    "equipoId": "eq-fab-001",
+    "codigoPlaiAsignado": "PLAI-FD-001",
+    "usuarioNombre": "Ing. Carlos Rivas",
+    "usuarioEmail": "carlos.rivas@startupjalisco.com",
+    "usuarioTelefono": "33 2201 9944",
+    "usuarioInstitucion": "Startup Hub CCD",
+    "fechaUso": "2026-11-21",
+    "horaInicio": "09:00",
+    "horaFin": "14:00",
+    "actividad": "Impresión de carcasa para dispositivo IoT médico. Trae filamento PETG propio.",
+    "estado": "Pendiente",
+    "accesoriosIncluidos": "Placa texturizada PEI y boquilla 0.4mm",
+    "condicionSalida": "Excelente",
+    "observacionesAdmin": "Requiere revisión técnica de archivo STL previo"
+  }
+]

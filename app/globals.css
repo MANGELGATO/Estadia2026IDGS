@@ -8,18 +8,18 @@
   name: "plai";
   default: true;
   color-scheme: light;
-  --color-primary: #a81e71;
+  --color-primary: #0086ff;
   --color-primary-content: #ffffff;
-  --color-secondary: #1b365d;
+  --color-secondary: #1e5ca7;
   --color-secondary-content: #ffffff;
-  --color-accent: #004a87;
+  --color-accent: #ed8d1b;
   --color-accent-content: #ffffff;
-  --color-neutral: #1b365d;
+  --color-neutral: #1e5ca7;
   --color-neutral-content: #ffffff;
   --color-base-100: #ffffff;
   --color-base-200: #f4f6f9;
   --color-base-300: #e5e9f0;
-  --color-base-content: #1b365d;
+  --color-base-content: #1e5ca7;
   --radius-box: 1rem;
   --radius-field: 0.5rem;
   --radius-selector: 0.5rem;
@@ -27,10 +27,11 @@
 
 /* Tokens PLAi expuestos como utilidades de Tailwind (bg-navy, text-plai-gray, font-heading...) */
 @theme inline {
-  --color-plai: #a81e71;
-  --color-plai-hover: #004a87;
-  --color-navy: #1b365d;
-  --color-navy-deep: #162e50;
+  --color-plai: #0086ff;
+  --color-plai-hover: #1e5ca7;
+  --color-plai-orange: #ed8d1b;
+  --color-navy: #1e5ca7;
+  --color-navy-deep: #143e72;
   --color-plai-gray: #4b5563;
   --color-plai-muted: #6b7280;
   --font-heading: var(--font-montserrat), "Montserrat", "Segoe UI", sans-serif;
@@ -48,12 +49,13 @@
 
 /* Variables base del tema PLAi */
 :root {
-  --primary: #a81e71;
-  --primary-hover: #004a87;
-  --navy: #1B365D;
-  --navy-deep: #162E50;
+  --primary: #0086ff;
+  --primary-hover: #1e5ca7;
+  --navy: #1e5ca7;
+  --navy-deep: #143e72;
+  --orange: #ed8d1b;
   --bg-light: #F4F6F9;
-  --text-navy: #1B365D;
+  --text-navy: #1e5ca7;
 
   /* Typography */
   --font-heading: var(--font-montserrat), 'Montserrat', 'Segoe UI', sans-serif;
@@ -96,6 +98,6 @@ html.a11y-highlight-links a {
   text-decoration-thickness: 2px !important;
   text-underline-offset: 3px !important;
   font-weight: 700 !important;
-  outline: 2px dashed #a81e71 !important;
+  outline: 2px dashed #0086ff !important;
 }
 

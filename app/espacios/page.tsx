@@ -10,7 +10,7 @@ const espaciosMock = [
     description: 'Espacio ideal para conferencias, presentaciones y eventos corporativos con capacidad para 150 personas.',
     capacity: 150,
     features: ['Proyector 4K', 'Sistema de audio profesional', 'Iluminación escénica', 'Wi-Fi de alta velocidad'],
-    color: '#E91E8C'
+    color: '#0086ff'
   },
   {
     id: 'aula-robotica',

@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import DataTable, { Column } from '../../components/admin/DataTable';
 import StatCard from '../../components/admin/StatCard';
 import ConfirmDialog from '../../components/admin/ConfirmDialog';
-import { DeviceItem, mockDevices } from '../../../lib/mockData';
+import { DeviceItem, mockDevices, UsageHistoryItem, mockUsageHistory } from '../../../lib/mockData';
 import { 
   RiArchiveLine, 
   RiCheckLine, 
@@ -15,7 +15,15 @@ import {
   RiFilter3Line,
   RiCloseLine,
   RiHardDriveLine,
-  RiBarcodeLine
+  RiBarcodeLine,
+  RiHistoryLine,
+  RiAddCircleLine,
+  RiUser3Line,
+  RiBuildingLine,
+  RiCalendarCheckLine,
+  RiCheckboxCircleLine,
+  RiAlertLine,
+  RiFileList3Line
 } from 'react-icons/ri';
 
 function useIsMounted() {
@@ -57,6 +65,13 @@ export default function InventarioPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<DeviceItem | null>(null);
   const [deletingEquipment, setDeletingEquipment] = useState<DeviceItem | null>(null);
+
+  // Historial de uso y bitácora institucional
+  const [historyList, setHistoryList] = useState<UsageHistoryItem[]>(mockUsageHistory);
+  const [selectedHistoryEquipment, setSelectedHistoryEquipment] = useState<DeviceItem | null>(null);
+  const [isGlobalHistoryOpen, setIsGlobalHistoryOpen] = useState(false);
+  const [newHistoryFormOpen, setNewHistoryFormOpen] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
 
   // Cargar datos reales desde la base de datos MySQL en MAMP
   useEffect(() => {
@@ -108,7 +123,15 @@ export default function InventarioPage() {
       label: 'Equipo / Modelo',
       render: (_: unknown, item: DeviceItem) => (
         <div className="flex items-center gap-2.5">
-          <span className="text-xl shrink-0">{item.imageEmoji || '📦'}</span>
+          {item.imageUrl ? (
+            <img
+              src={item.imageUrl}
+              alt={item.name}
+              className="size-10 rounded-lg border border-black/[0.08] bg-slate-50 object-contain p-1 shrink-0 shadow-2xs"
+            />
+          ) : (
+            <span className="text-xl shrink-0">{item.imageEmoji || '📦'}</span>
+          )}
           <div>
             <span className="block font-heading font-semibold text-navy leading-tight">{item.name}</span>
             <span className="text-xs text-plai-muted">{item.brand} · {item.model}</span>
@@ -171,7 +194,7 @@ export default function InventarioPage() {
           color = '#EF4444';
         }
 
-        return (
+  return (
           <span style={{
             display: 'inline-block',
             padding: '0.2rem 0.65rem',
@@ -534,6 +557,401 @@ export default function InventarioPage() {
     </div>
   ) : null;
 
+  // Filtrado y cálculo para el modal de Historial de Uso
+  const activeHistoryLogs = historyList
+    .filter((log) => {
+      if (selectedHistoryEquipment) {
+        return log.deviceId === selectedHistoryEquipment.id || (!!log.deviceName && log.deviceName.toLowerCase().includes(selectedHistoryEquipment.name.toLowerCase()));
+      }
+      return true;
+    })
+    .filter((log) => {
+      if (!historySearch.trim()) return true;
+      const q = historySearch.toLowerCase();
+      return (
+        (!!log.deviceName && log.deviceName.toLowerCase().includes(q)) ||
+        log.user.toLowerCase().includes(q) ||
+        (!!log.institution && log.institution.toLowerCase().includes(q)) ||
+        log.activity.toLowerCase().includes(q) ||
+        (!!log.notes && log.notes.toLowerCase().includes(q))
+      );
+    });
+
+  const totalHistoryHours = activeHistoryLogs.reduce((acc, curr) => acc + (curr.hoursUsed || 0), 0);
+
+  const handleCreateHistoryEntry = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const targetDeviceId = selectedHistoryEquipment ? selectedHistoryEquipment.id : (formData.get('deviceId') as string);
+    const foundDevice = data.find(d => d.id === targetDeviceId);
+    const targetDeviceName = foundDevice 
+      ? `${foundDevice.name} (${foundDevice.inventoryNumber})` 
+      : (selectedHistoryEquipment ? `${selectedHistoryEquipment.name} (${selectedHistoryEquipment.inventoryNumber})` : 'Recurso Tecnológico PLAi');
+
+    const newEntry: UsageHistoryItem = {
+      id: `hist-${Date.now()}`,
+      deviceId: targetDeviceId || 'eq-general',
+      deviceName: targetDeviceName,
+      user: (formData.get('user') as string).trim(),
+      institution: (formData.get('institution') as string).trim() || 'Comunidad PLAi',
+      activity: (formData.get('activity') as string).trim(),
+      date: (formData.get('date') as string) || new Date().toISOString().split('T')[0],
+      startTime: (formData.get('startTime') as string) || '09:00',
+      endTime: (formData.get('endTime') as string) || '12:00',
+      hoursUsed: parseFloat(formData.get('hoursUsed') as string) || 3.0,
+      status: (formData.get('status') as UsageHistoryItem['status']) || 'Completado',
+      conditionReturned: (formData.get('conditionReturned') as UsageHistoryItem['conditionReturned']) || 'Excelente',
+      notes: (formData.get('notes') as string).trim() || 'Sin observaciones.',
+    };
+
+    setHistoryList([newEntry, ...historyList]);
+    setNewHistoryFormOpen(false);
+  };
+
+  const historyModalElement = (selectedHistoryEquipment !== null || isGlobalHistoryOpen) && mounted ? (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-3 sm:p-5 backdrop-blur-sm animate-fade-in"
+      onClick={() => {
+        setSelectedHistoryEquipment(null);
+        setIsGlobalHistoryOpen(false);
+        setNewHistoryFormOpen(false);
+      }}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="relative flex max-h-[92vh] w-full max-w-[880px] animate-pop-in flex-col overflow-hidden rounded-2xl bg-white shadow-2xl border border-black/[0.08]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Cabecera del modal */}
+        <div className="flex shrink-0 items-center justify-between border-b border-black/[0.08] bg-[#F8FAFC] px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600 border border-sky-100">
+              <RiHistoryLine size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="font-heading text-lg sm:text-xl font-bold text-navy">
+                  {selectedHistoryEquipment
+                    ? `Historial de Uso: ${selectedHistoryEquipment.name}`
+                    : 'Bitácora Centralizada de Uso y Préstamos'}
+                </h2>
+                {selectedHistoryEquipment && (
+                  <span className="rounded bg-plai/10 px-2 py-0.5 font-mono text-xs font-bold text-plai">
+                    {selectedHistoryEquipment.inventoryNumber}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-plai-muted">
+                {selectedHistoryEquipment
+                  ? `Serie: ${selectedHistoryEquipment.serialNumber || 'N/A'} · Ubicación: ${selectedHistoryEquipment.location} · Estado: ${selectedHistoryEquipment.status}`
+                  : 'Trazabilidad institucional de sesiones, horas operadas y condiciones de retorno de equipos en PLAi'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="rounded-full p-1.5 text-gray-500 hover:bg-gray-200 hover:text-navy transition-colors"
+            onClick={() => {
+              setSelectedHistoryEquipment(null);
+              setIsGlobalHistoryOpen(false);
+              setNewHistoryFormOpen(false);
+            }}
+            aria-label="Cerrar historial"
+          >
+            <RiCloseLine size={22} />
+          </button>
+        </div>
+
+        {/* Resumen de Métricas de Uso */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 border-b border-black/[0.08] bg-[#FAFBFD] p-4 text-xs">
+          <div className="rounded-xl border border-black/[0.05] bg-white p-3 shadow-2xs">
+            <span className="block text-plai-muted text-[0.7rem] uppercase font-bold tracking-wider">Sesiones Totales</span>
+            <strong className="font-heading text-lg font-extrabold text-navy">{activeHistoryLogs.length}</strong>
+          </div>
+          <div className="rounded-xl border border-black/[0.05] bg-white p-3 shadow-2xs">
+            <span className="block text-plai-muted text-[0.7rem] uppercase font-bold tracking-wider">Horas Acumuladas</span>
+            <strong className="font-heading text-lg font-extrabold text-sky-600">{totalHistoryHours.toFixed(1)} hrs</strong>
+          </div>
+          <div className="rounded-xl border border-black/[0.05] bg-white p-3 shadow-2xs">
+            <span className="block text-plai-muted text-[0.7rem] uppercase font-bold tracking-wider">Estado Operativo</span>
+            <strong className="font-heading text-sm font-bold text-emerald-600">
+              {selectedHistoryEquipment ? selectedHistoryEquipment.status : 'Activo y Verificado'}
+            </strong>
+          </div>
+          <div className="flex items-center justify-center">
+            <button
+              type="button"
+              onClick={() => setNewHistoryFormOpen(!newHistoryFormOpen)}
+              className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-plai px-3 py-2.5 font-heading text-xs font-bold text-white shadow-plai-sm hover:bg-navy transition-all active:scale-95"
+            >
+              <RiAddCircleLine size={16} />
+              {newHistoryFormOpen ? 'Ocultar Formulario' : 'Registrar Nuevo Uso'}
+            </button>
+          </div>
+        </div>
+
+        {/* Formulario desplegable para registrar nuevo uso */}
+        {newHistoryFormOpen && (
+          <form
+            onSubmit={handleCreateHistoryEntry}
+            className="shrink-0 border-b border-sky-100 bg-sky-50/40 p-5 animate-fade-in text-xs flex flex-col gap-3"
+          >
+            <div className="flex items-center justify-between">
+              <strong className="font-heading text-sm text-navy flex items-center gap-1.5">
+                <RiCalendarCheckLine className="text-plai text-base" /> Captura de Nueva Sesión / Préstamo
+              </strong>
+              <span className="text-plai-muted">Todos los campos con * son obligatorios</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {isGlobalHistoryOpen && (
+                <div>
+                  <label className="mb-1 block font-bold text-navy">Equipo Tecnológico *</label>
+                  <select
+                    name="deviceId"
+                    required
+                    className="w-full rounded-lg border border-gray-300 bg-white p-2 text-xs text-navy focus:border-plai focus:outline-none"
+                  >
+                    {data.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.inventoryNumber})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className={isGlobalHistoryOpen ? 'sm:col-span-1' : 'sm:col-span-1'}>
+                <label className="mb-1 block font-bold text-navy">Usuario / Responsable *</label>
+                <input
+                  type="text"
+                  name="user"
+                  required
+                  placeholder="Ej. Ing. Carlos Mendoza"
+                  className="w-full rounded-lg border border-gray-300 bg-white p-2 text-xs text-navy focus:border-plai focus:outline-none"
+                />
+              </div>
+              <div className={isGlobalHistoryOpen ? 'sm:col-span-1' : 'sm:col-span-2'}>
+                <label className="mb-1 block font-bold text-navy">Institución / Empresa *</label>
+                <input
+                  type="text"
+                  name="institution"
+                  required
+                  placeholder="Ej. UDG / ITESO / Startup Ecosistema"
+                  className="w-full rounded-lg border border-gray-300 bg-white p-2 text-xs text-navy focus:border-plai focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div>
+                <label className="mb-1 block font-bold text-navy">Fecha de Uso *</label>
+                <input
+                  type="date"
+                  name="date"
+                  defaultValue={new Date().toISOString().split('T')[0]}
+                  required
+                  className="w-full rounded-lg border border-gray-300 bg-white p-2 text-xs text-navy focus:border-plai focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block font-bold text-navy">Hora Inicio *</label>
+                <input
+                  type="time"
+                  name="startTime"
+                  defaultValue="10:00"
+                  required
+                  className="w-full rounded-lg border border-gray-300 bg-white p-2 text-xs text-navy focus:border-plai focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block font-bold text-navy">Hora Fin *</label>
+                <input
+                  type="time"
+                  name="endTime"
+                  defaultValue="12:30"
+                  required
+                  className="w-full rounded-lg border border-gray-300 bg-white p-2 text-xs text-navy focus:border-plai focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block font-bold text-navy">Horas Computadas</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  name="hoursUsed"
+                  defaultValue="2.5"
+                  required
+                  className="w-full rounded-lg border border-gray-300 bg-white p-2 text-xs text-navy focus:border-plai focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-2">
+                <label className="mb-1 block font-bold text-navy">Actividad / Proyecto Realizado *</label>
+                <input
+                  type="text"
+                  name="activity"
+                  required
+                  placeholder="Ej. Taller de Prototipado 3D para prótesis robótica"
+                  className="w-full rounded-lg border border-gray-300 bg-white p-2 text-xs text-navy focus:border-plai focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block font-bold text-navy">Condición al Retorno *</label>
+                <select
+                  name="conditionReturned"
+                  required
+                  className="w-full rounded-lg border border-gray-300 bg-white p-2 text-xs text-navy focus:border-plai focus:outline-none"
+                >
+                  <option value="Excelente">Excelente (Impecable)</option>
+                  <option value="Bueno">Bueno (Sin fallas)</option>
+                  <option value="Observación">Observación (Detalle/Ajuste)</option>
+                  <option value="En revisión">En revisión (Mantenimiento)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block font-bold text-navy">Observaciones / Notas del Laboratorio</label>
+              <textarea
+                name="notes"
+                rows={2}
+                placeholder="Ej. Equipo devuelto con batería al 100%, accesorios completos y limpieza efectuada."
+                className="w-full rounded-lg border border-gray-300 bg-white p-2 text-xs text-navy focus:border-plai focus:outline-none"
+              ></textarea>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setNewHistoryFormOpen(false)}
+                className="rounded-lg border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 hover:bg-gray-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="rounded-lg bg-plai px-4 py-1.5 font-semibold text-white shadow hover:bg-navy"
+              >
+                Guardar en Bitácora
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Barra de búsqueda interna */}
+        <div className="flex items-center gap-3 border-b border-black/[0.06] bg-white px-6 py-3">
+          <div className="relative flex-1">
+            <RiSearchLine className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Filtrar por solicitante, proyecto, institución o notas..."
+              value={historySearch}
+              onChange={(e) => setHistorySearch(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 py-1.5 pl-8 pr-3 text-xs text-navy placeholder:text-gray-400 focus:border-plai focus:outline-none"
+            />
+          </div>
+          <span className="text-xs text-plai-muted font-mono">
+            {activeHistoryLogs.length} registro{activeHistoryLogs.length === 1 ? '' : 's'}
+          </span>
+        </div>
+
+        {/* Listado desplazable de registros de uso */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {activeHistoryLogs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center text-plai-muted">
+              <RiFileList3Line size={40} className="mb-3 text-gray-300" />
+              <p className="font-heading text-sm font-semibold text-navy">No hay registros de uso coincidentes</p>
+              <p className="mt-1 text-xs max-w-sm">
+                No se encontraron bitácoras de préstamo para los filtros seleccionados. Utiliza el botón superior para capturar un nuevo registro.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {activeHistoryLogs.map((log) => {
+                let badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                if (log.conditionReturned === 'Bueno') badgeColor = 'bg-sky-50 text-sky-700 border-sky-200';
+                if (log.conditionReturned === 'Observación') badgeColor = 'bg-amber-50 text-amber-700 border-amber-200';
+                if (log.conditionReturned === 'En revisión') badgeColor = 'bg-rose-50 text-rose-700 border-rose-200';
+
+                return (
+                  <div
+                    key={log.id}
+                    className="flex flex-col gap-2 rounded-xl border border-black/[0.08] bg-[#FDFDFE] p-4 text-xs transition-shadow hover:shadow-plai-sm"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/[0.04] pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-navy">{log.date}</span>
+                        <span className="text-plai-muted">&bull;</span>
+                        <span className="font-mono text-plai-gray">
+                          {log.startTime} - {log.endTime} ({log.hoursUsed} hrs)
+                        </span>
+                        {isGlobalHistoryOpen && (
+                          <span className="rounded bg-slate-100 px-2 py-0.5 font-heading font-semibold text-slate-700">
+                            {log.deviceName}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.7rem] font-bold ${badgeColor}`}>
+                          <RiCheckboxCircleLine size={12} /> Condición: {log.conditionReturned}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.7rem] font-semibold text-slate-600 uppercase">
+                          {log.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div>
+                        <span className="block text-[0.7rem] uppercase font-bold text-plai-muted">Usuario / Solicitante</span>
+                        <strong className="text-navy">{log.user}</strong>
+                        {log.institution && (
+                          <span className="block text-plai-muted text-[0.75rem]">{log.institution}</span>
+                        )}
+                      </div>
+                      <div className="sm:col-span-2">
+                        <span className="block text-[0.7rem] uppercase font-bold text-plai-muted">Actividad / Proyecto</span>
+                        <p className="text-plai-gray font-medium">{log.activity}</p>
+                      </div>
+                    </div>
+
+                    {log.notes && (
+                      <div className="mt-1 rounded-lg bg-[#F4F6F9] px-3 py-2 text-[0.78rem] text-plai-gray">
+                        <strong className="text-navy">Notas de laboratorio:</strong> {log.notes}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Pie del modal */}
+        <div className="flex items-center justify-between border-t border-black/[0.08] bg-[#F8FAFC] px-6 py-3 text-xs">
+          <span className="text-plai-muted">
+            Bitácora de trazabilidad de activos de la Plataforma Abierta de Innovación
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedHistoryEquipment(null);
+              setIsGlobalHistoryOpen(false);
+              setNewHistoryFormOpen(false);
+            }}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 font-heading font-semibold text-navy hover:bg-gray-50 shadow-2xs"
+          >
+            Cerrar Bitácora
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="flex animate-pop-in flex-col gap-6">
       {/* Título y descripción */}
@@ -609,11 +1027,28 @@ export default function InventarioPage() {
         onAdd={handleAdd}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        customActions={(item: DeviceItem) => (
+          <button
+            type="button"
+            className="cursor-pointer rounded p-1 text-xl text-plai-muted transition-colors duration-[250ms] hover:bg-sky-500/10 hover:text-sky-600"
+            onClick={() => {
+              setSelectedHistoryEquipment(item);
+              setIsGlobalHistoryOpen(false);
+              setNewHistoryFormOpen(false);
+              setHistorySearch('');
+            }}
+            title="Ver historial de uso"
+            aria-label={`Ver historial de uso de ${item.name}`}
+          >
+            <RiHistoryLine />
+          </button>
+        )}
         addActionLabel="Registrar Recurso"
       />
 
       {/* Modal montado vía portal */}
       {modalElement ? createPortal(modalElement, document.body) : null}
+      {historyModalElement ? createPortal(historyModalElement, document.body) : null}
 
       {/* Diálogo de confirmación para baja */}
       <ConfirmDialog

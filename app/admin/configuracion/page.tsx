@@ -184,7 +184,7 @@ export default function ConfiguracionPage() {
           <h2 className="mb-5 border-b border-gray-100 pb-3 font-heading text-base font-bold text-navy">🏷️ Categorías de Recursos</h2>
           <div className="mb-4 flex flex-wrap gap-2">
             {categorias.map(cat => (
-              <div key={cat} className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(168,30,113,0.2)] bg-[rgba(168,30,113,0.08)] px-3 py-1 text-xs font-semibold text-plai">
+              <div key={cat} className="inline-flex items-center gap-1.5 rounded-full border border-plai/20 bg-plai/10 px-3 py-1 text-xs font-semibold text-plai">
                 <span>{cat}</span>
                 <button type="button" className="cursor-pointer text-sm text-plai/60 transition-opacity hover:text-plai" onClick={() => removeCategoria(cat)}>
                   <RiDeleteBinLine />
@@ -201,7 +201,7 @@ export default function ConfiguracionPage() {
               onChange={e => setNewCategoria(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCategoria())}
             />
-            <button type="button" className="flex cursor-pointer items-center gap-1 rounded-lg border border-[rgba(168,30,113,0.25)] bg-[rgba(168,30,113,0.1)] px-4 py-2.5 font-heading text-xs font-semibold text-plai whitespace-nowrap transition-all hover:bg-plai hover:text-white" onClick={addCategoria}>
+            <button type="button" className="flex cursor-pointer items-center gap-1 rounded-lg border border-plai/25 bg-plai/10 px-4 py-2.5 font-heading text-xs font-semibold text-plai whitespace-nowrap transition-all hover:bg-plai hover:text-white" onClick={addCategoria}>
               <RiAddLine /> Agregar
             </button>
           </div>
@@ -224,7 +224,7 @@ export default function ConfiguracionPage() {
         {/* Save */}
         <div className="sticky bottom-4 z-20 mt-2 flex items-center justify-end gap-4 rounded-2xl border border-black/[0.08] bg-white/95 p-4 shadow-xl backdrop-blur-md md:p-5">
           {savedMsg && <span className="animate-pop-in text-sm font-semibold text-emerald-600">{savedMsg}</span>}
-          <button type="submit" className="flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-r from-plai to-[#c42585] px-6 py-2.5 font-heading text-sm font-bold text-white shadow-[0_4px_12px_rgba(168,30,113,0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(168,30,113,0.4)]">
+          <button type="submit" className="flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-r from-plai to-[#1e5ca7] px-6 py-2.5 font-heading text-sm font-bold text-white shadow-[0_4px_12px_rgba(0,134,255,0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(0,134,255,0.4)]">
             <RiSaveLine /> Guardar Configuración
           </button>
         </div>

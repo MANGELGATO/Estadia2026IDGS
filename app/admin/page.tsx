@@ -1,140 +1,267 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import StatCard from '../components/admin/StatCard';
-import DataTable, { Column } from '../components/admin/DataTable';
 import {
   RiComputerLine, RiAlertLine, RiAppsLine, RiCheckDoubleLine,
-  RiCalendarCheckLine, RiTimeLine, RiUserLine, RiToolsLine,
+  RiCalendarCheckLine, RiTimeLine, RiToolsLine, RiHistoryLine,
+  RiAddLine, RiArrowRightLine, RiFileList3Line, RiShieldCheckLine
 } from 'react-icons/ri';
-import { useRouter } from 'next/navigation';
-
-const recentEquipments = [
-  { id: 1, name: 'Impresora 3D Ender 3', category: 'Impresoras 3D', status: 'Activo' },
-  { id: 2, name: 'Lentes Meta Quest 3', category: 'Realidad Virtual', status: 'En mantenimiento' },
-  { id: 3, name: 'Brazo Robótico Dobot', category: 'Robótica', status: 'Inactivo' },
-];
-
-const recentActivity = [
-  { id: 1, user: 'Admin Juan',  action: 'dio de baja el equipo "Laptop Dell XPS".',         time: 'Hace 2 horas', type: 'danger' },
-  { id: 2, user: 'Admin María', action: 'aprobó la reservación de Ana García para Meta Quest 3.', time: 'Hace 3 horas', type: 'success' },
-  { id: 3, user: 'Admin María', action: 'actualizó "Impresora 3D" a En mantenimiento.',        time: 'Hace 5 horas', type: 'warning' },
-  { id: 4, user: 'Sistema',     action: 'registró 3 nuevas aplicaciones en el catálogo.',       time: 'Ayer',         type: 'info' },
-  { id: 5, user: 'Admin Juan',  action: 'agregó al usuario "Pedro Sánchez" como Colaborador.',  time: 'Ayer',         type: 'info' },
-];
-
-const pendingReservations = [
-  { id: 1, usuario: 'Ana García',    recurso: 'Meta Quest 3 #05',    fecha: '2026-09-25', hora: '09:00–11:00' },
-  { id: 2, usuario: 'Lucía Ramírez', recurso: 'Laptop Dell XPS #02', fecha: '2026-09-26', hora: '14:00–15:00' },
-];
-
-const statusRender = (value: string) => {
-  let bg = 'rgba(16, 185, 129, 0.1)', color = '#10B981';
-  if (value === 'En mantenimiento') { bg = 'rgba(245, 158, 11, 0.1)'; color = '#F59E0B'; }
-  else if (value === 'Inactivo')    { bg = 'rgba(239, 68, 68, 0.1)';  color = '#EF4444'; }
-  return (
-    <span style={{ display: 'inline-block', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', backgroundColor: bg, color }}>
-      {value}
-    </span>
-  );
-};
-
-const equipmentColumns: Column[] = [
-  { key: 'name', label: 'Nombre del Equipo' },
-  { key: 'category', label: 'Categoría' },
-  { key: 'status', label: 'Estado', render: statusRender },
-];
-
-const reservColumns: Column[] = [
-  { key: 'usuario', label: 'Usuario' },
-  { key: 'recurso', label: 'Recurso' },
-  { key: 'fecha', label: 'Fecha' },
-  { key: 'hora', label: 'Horario' },
-];
-
-const activityTypeColor: Record<string, string> = {
-  danger:  '#DC2626',
-  success: '#059669',
-  warning: '#D97706',
-  info:    '#4F46E5',
-};
+import type { DeviceItem, AppItem } from '../../lib/mockData';
+import type { ReservacionItem, IncidenciaItem, BitacoraItem } from '../../lib/db';
 
 export default function AdminDashboard() {
   const router = useRouter();
 
+  const [equipos, setEquipos] = useState<DeviceItem[]>([]);
+  const [apps, setApps] = useState<AppItem[]>([]);
+  const [reservaciones, setReservaciones] = useState<ReservacionItem[]>([]);
+  const [incidencias, setIncidencias] = useState<IncidenciaItem[]>([]);
+  const [bitacora, setBitacora] = useState<BitacoraItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/equipos').then(r => r.json()).catch(() => ({ data: [] })),
+      fetch('/api/aplicaciones').then(r => r.json()).catch(() => ({ data: [] })),
+      fetch('/api/reservaciones').then(r => r.json()).catch(() => ({ data: [] })),
+      fetch('/api/mantenimiento').then(r => r.json()).catch(() => ({ data: [] })),
+      fetch('/api/bitacora').then(r => r.json()).catch(() => ({ data: [] })),
+    ]).then(([eqRes, appRes, resRes, incRes, bitRes]) => {
+      if (eqRes.data) setEquipos(eqRes.data);
+      if (appRes.data) setApps(appRes.data);
+      if (resRes.data) setReservaciones(resRes.data);
+      if (incRes.data) setIncidencias(incRes.data);
+      if (bitRes.data) setBitacora(bitRes.data);
+      setIsLoading(false);
+    });
+  }, []);
+
+  const totalEquipos = equipos.length;
+  const equiposDisponibles = equipos.filter(e => e.status === 'Disponible').length;
+  const equiposMantenimiento = equipos.filter(e => e.status === 'En mantenimiento').length;
+  const totalApps = apps.length;
+  const totalReservas = reservaciones.length;
+  const reservasPendientes = reservaciones.filter(r => r.estado === 'Pendiente').length;
+  const prestamosActivos = bitacora.filter(b => b.estadoPrestamo === 'Activo').length;
+  const incidenciasAbiertas = incidencias.filter(i => i.estado !== 'Resuelta').length;
+
+  const pendingList = reservaciones.filter(r => r.estado === 'Pendiente').slice(0, 4);
+  const recentEquiposList = equipos.slice(0, 4);
+
   return (
-    <div className="flex animate-pop-in flex-col gap-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="flex animate-pop-in flex-col gap-8 pb-12">
+      {/* Header & Quick Action Buttons */}
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="mb-1 font-heading text-3xl font-extrabold text-navy">Dashboard</h1>
-          <p className="text-sm text-plai-muted md:text-base">Bienvenido al panel de administración de PLAi</p>
+          <h1 className="mb-1 font-heading text-3xl font-extrabold text-navy">
+            Panel de Control General
+          </h1>
+          <p className="text-sm text-plai-muted md:text-base">
+            Visión centralizada de recursos tecnológicos, bitácoras y reservaciones en Ciudad Creativa Digital
+          </p>
         </div>
-        <div className="rounded-full border border-black/[0.08] bg-white px-4 py-2 text-xs font-semibold capitalize text-plai-muted shadow-plai-sm">
-          {new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => router.push('/admin/inventario')}
+            className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-plai px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-plai-hover"
+          >
+            <RiAddLine size={16} />
+            <span>Nuevo Equipo</span>
+          </button>
+
+          <button
+            onClick={() => router.push('/admin/bitacora')}
+            className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-sky-300 bg-white px-4 py-2 text-xs font-bold text-sky-800 shadow-sm transition hover:bg-sky-50"
+          >
+            <RiHistoryLine size={16} />
+            <span>Bitácora de Uso</span>
+          </button>
+
+          <button
+            onClick={() => router.push('/admin/reportes')}
+            className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 shadow-sm transition hover:bg-gray-50"
+          >
+            <RiFileList3Line size={16} />
+            <span>Reportes</span>
+          </button>
         </div>
       </div>
 
-      {/* Stats Row 1 — Inventory */}
+      {/* Stats Row 1 — Inventario Tecnológico (Todos los botones son interactivos y redirigen a su sección) */}
       <div className="flex flex-col gap-3">
-        <h2 className="font-heading text-xs font-bold uppercase tracking-wider text-plai-muted">Inventario</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-heading text-xs font-bold uppercase tracking-wider text-plai-muted">
+            Inventario y Multimedia (Clic para gestionar)
+          </h2>
+        </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard title="Total Equipos"     value={124} icon={<RiComputerLine />}    variant="primary" />
-          <StatCard title="Equipos Activos"   value={98}  icon={<RiCheckDoubleLine />} variant="success" />
-          <StatCard title="En Mantenimiento"  value={15}  icon={<RiAlertLine />}       variant="warning" />
-          <StatCard title="Apps VR / PC" value={15} icon={<RiAppsLine />}        variant="primary" />
+          <div 
+            onClick={() => router.push('/admin/inventario')} 
+            className="cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+            title="Ver catálogo completo de inventario"
+          >
+            <StatCard title="Total Equipos" value={isLoading ? '...' : totalEquipos} icon={<RiComputerLine />} variant="primary" />
+          </div>
+
+          <div 
+            onClick={() => router.push('/admin/inventario')} 
+            className="cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+            title="Ver equipos disponibles para préstamo"
+          >
+            <StatCard title="Equipos Disponibles" value={isLoading ? '...' : equiposDisponibles} icon={<RiCheckDoubleLine />} variant="success" />
+          </div>
+
+          <div 
+            onClick={() => router.push('/admin/mantenimiento')} 
+            className="cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+            title="Ir a mantenimiento e incidencias"
+          >
+            <StatCard title="En Mantenimiento" value={isLoading ? '...' : equiposMantenimiento} icon={<RiAlertLine />} variant="warning" />
+          </div>
+
+          <div 
+            onClick={() => router.push('/admin/aplicaciones')} 
+            className="cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+            title="Gestionar catálogo de aplicaciones VR y PC"
+          >
+            <StatCard title="Apps VR / PC" value={isLoading ? '...' : totalApps} icon={<RiAppsLine />} variant="primary" />
+          </div>
         </div>
       </div>
 
-      {/* Stats Row 2 — Operations */}
+      {/* Stats Row 2 — Operaciones y Bitácora (Interactivos) */}
       <div className="flex flex-col gap-3">
-        <h2 className="font-heading text-xs font-bold uppercase tracking-wider text-plai-muted">Operaciones</h2>
+        <h2 className="font-heading text-xs font-bold uppercase tracking-wider text-plai-muted">
+          Operaciones y Préstamos Activos (Clic para gestionar)
+        </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard title="Reservaciones Hoy"   value={8}  icon={<RiCalendarCheckLine />} variant="success" />
-          <StatCard title="Pendientes Aprobar"  value={2}  icon={<RiTimeLine />}           variant="warning" />
-          <StatCard title="Usuarios Activos"    value={24} icon={<RiUserLine />}           variant="primary" />
-          <StatCard title="Incidencias Abiertas" value={3} icon={<RiToolsLine />}          variant="danger" />
+          <div 
+            onClick={() => router.push('/admin/reservaciones')} 
+            className="cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+            title="Ver todas las reservaciones"
+          >
+            <StatCard title="Total Reservas" value={isLoading ? '...' : totalReservas} icon={<RiCalendarCheckLine />} variant="primary" />
+          </div>
+
+          <div 
+            onClick={() => router.push('/admin/reservaciones')} 
+            className="cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+            title="Revisar y aprobar reservaciones pendientes"
+          >
+            <StatCard title="Pendientes Aprobar" value={isLoading ? '...' : reservasPendientes} icon={<RiTimeLine />} variant="warning" />
+          </div>
+
+          <div 
+            onClick={() => router.push('/admin/bitacora')} 
+            className="cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+            title="Ver bitácora de préstamos activos"
+          >
+            <StatCard title="Préstamos Activos" value={isLoading ? '...' : prestamosActivos} icon={<RiHistoryLine />} variant="success" />
+          </div>
+
+          <div 
+            onClick={() => router.push('/admin/mantenimiento')} 
+            className="cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+            title="Revisar incidencias abiertas de laboratorio"
+          >
+            <StatCard title="Incidencias Abiertas" value={isLoading ? '...' : incidenciasAbiertas} icon={<RiToolsLine />} variant="danger" />
+          </div>
         </div>
       </div>
 
+      {/* 2 Column Layout: Equipos Recientes y Reservaciones Pendientes */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Recent Equipment */}
-        <DataTable
-          title="Equipos Recientes"
-          columns={equipmentColumns}
-          data={recentEquipments}
-          onAdd={() => router.push('/admin/inventario')}
-          addActionLabel="Ver todos"
-        />
+        {/* Equipos Recientes */}
+        <div className="rounded-2xl border border-black/[0.06] bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3">
+            <h3 className="font-heading text-base font-bold text-navy">
+              Equipos de Inventario
+            </h3>
+            <button
+              onClick={() => router.push('/admin/inventario')}
+              className="flex items-center gap-1 text-xs font-bold text-plai hover:underline cursor-pointer"
+            >
+              <span>Ver todos ({totalEquipos})</span>
+              <RiArrowRightLine />
+            </button>
+          </div>
 
-        {/* Pending Reservations */}
-        <div>
-          <DataTable
-            title="Reservaciones Pendientes"
-            columns={reservColumns}
-            data={pendingReservations}
-            onAdd={() => router.push('/admin/reservaciones')}
-            addActionLabel="Ver todas"
-          />
-        </div>
-      </div>
-
-      {/* Activity Feed */}
-      <div className="rounded-2xl border border-black/[0.06] bg-white p-6 shadow-plai-sm">
-        <h3 className="mb-5 font-heading text-base font-bold text-navy">Actividad Reciente</h3>
-        <ul className="m-0 flex list-none flex-col divide-y divide-black/[0.06] p-0">
-          {recentActivity.map(act => (
-            <li key={act.id} className="flex items-start gap-4 py-3.5 first:pt-0 last:pb-0">
-              <span
-                className="mt-1.5 size-2.5 shrink-0 rounded-full"
-                style={{ background: activityTypeColor[act.type] }}
-              />
-              <div className="flex flex-col gap-0.5 text-sm text-[#374151]">
-                <span><strong>{act.user}</strong> {act.action}</span>
-                <span className="text-xs text-plai-muted">{act.time}</span>
+          <div className="flex flex-col divide-y divide-gray-100">
+            {recentEquiposList.map((eq) => (
+              <div
+                key={eq.id}
+                onClick={() => router.push('/admin/inventario')}
+                className="flex items-center justify-between py-3 cursor-pointer hover:bg-gray-50/80 px-2 rounded-lg transition"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">{eq.imageEmoji || '📦'}</span>
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-900">{eq.name}</h4>
+                    <p className="text-xs text-plai-muted">{eq.inventoryNumber} • {eq.category}</p>
+                  </div>
+                </div>
+                <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                  eq.status === 'Disponible'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : eq.status === 'En mantenimiento'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-blue-100 text-blue-800'
+                }`}>
+                  {eq.status}
+                </span>
               </div>
-            </li>
-          ))}
-        </ul>
+            ))}
+          </div>
+        </div>
+
+        {/* Reservaciones Pendientes con botón interactivo de aprobación */}
+        <div className="rounded-2xl border border-black/[0.06] bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3">
+            <h3 className="font-heading text-base font-bold text-navy">
+              Reservaciones por Atender
+            </h3>
+            <button
+              onClick={() => router.push('/admin/reservaciones')}
+              className="flex items-center gap-1 text-xs font-bold text-plai hover:underline cursor-pointer"
+            >
+              <span>Ver todas ({totalReservas})</span>
+              <RiArrowRightLine />
+            </button>
+          </div>
+
+          {pendingList.length === 0 ? (
+            <div className="p-8 text-center text-xs text-plai-muted">
+              No hay reservaciones pendientes de aprobación en este momento.
+            </div>
+          ) : (
+            <div className="flex flex-col divide-y divide-gray-100">
+              {pendingList.map((res) => (
+                <div
+                  key={res.id}
+                  className="flex items-center justify-between py-3"
+                >
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-900">{res.usuarioNombre}</h4>
+                    <p className="text-xs text-plai-muted">
+                      {res.fechaUso} • {res.horaInicio} - {res.horaFin} • Categ: {res.categoriaId}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => router.push('/admin/reservaciones')}
+                    className="flex cursor-pointer items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700 shadow-sm"
+                  >
+                    <RiShieldCheckLine size={14} />
+                    <span>Revisar y Asignar</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -30,8 +30,8 @@ const initialData: User[] = [
 ];
 
 const roleConfig: Record<UserRole, { bg: string; color: string; icon: React.ReactNode }> = {
-  Administrador: { bg: 'rgba(168,30,113,0.12)', color: '#a81e71',   icon: <RiShieldUserLine /> },
-  Colaborador:   { bg: 'rgba(99,102,241,0.12)', color: '#4F46E5',   icon: <RiUserSettingsLine /> },
+  Administrador: { bg: 'rgba(0,134,255,0.12)', color: '#0086ff',   icon: <RiShieldUserLine /> },
+  Colaborador:   { bg: 'rgba(30,92,167,0.12)', color: '#1e5ca7',   icon: <RiUserSettingsLine /> },
   'Usuario Final': { bg: 'rgba(107,114,128,0.12)', color: '#6B7280', icon: <RiUserLine /> },
 };
 
@@ -121,7 +121,7 @@ export default function UsuariosPage() {
       label: 'Usuario',
       render: (value, item) => (
         <div className="flex items-center gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#a81e71] to-[#c42585] text-sm font-bold text-white">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#0086ff] to-[#1e5ca7] text-sm font-bold text-white">
             {value.charAt(0).toUpperCase()}
           </div>
           <div>

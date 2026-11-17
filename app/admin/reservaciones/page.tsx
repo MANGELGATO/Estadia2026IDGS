@@ -1,35 +1,13 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DataTable, { Column } from '../../components/admin/DataTable';
-import { RiCalendarCheckLine, RiCheckLine, RiCloseLine, RiTimeLine, RiEyeLine } from 'react-icons/ri';
+import { RiCalendarCheckLine, RiCheckLine, RiCloseLine, RiTimeLine, RiEyeLine, RiEdit2Line } from 'react-icons/ri';
 import StatCard from '../../components/admin/StatCard';
-import ConfirmDialog from '../../components/admin/ConfirmDialog';
+import { ReservacionItem } from '../../../lib/db';
+import { DeviceItem } from '../../../lib/mockData';
 
-type ReservationStatus = 'Pendiente' | 'Aprobada' | 'Rechazada' | 'En uso' | 'Completada';
-
-type Reservation = {
-  id: number;
-  usuario: string;
-  recurso: string;
-  categoria: string;
-  fecha: string;
-  horaInicio: string;
-  horaFin: string;
-  actividad: string;
-  observaciones: string;
-  status: ReservationStatus;
-};
-
-const initialData: Reservation[] = [
-  { id: 1, usuario: 'Ana García', recurso: 'Meta Quest 3 #05', categoria: 'Realidad Virtual', fecha: '2026-09-25', horaInicio: '09:00', horaFin: '11:00', actividad: 'Taller de Realidad Virtual', observaciones: '', status: 'Pendiente' },
-  { id: 2, usuario: 'Carlos López', recurso: 'Impresora 3D Ender 3', categoria: 'Fabricación Digital', fecha: '2026-09-23', horaInicio: '14:00', horaFin: '16:00', actividad: 'Proyecto de prototipado', observaciones: 'Necesita filamento PLA azul', status: 'Aprobada' },
-  { id: 3, usuario: 'María Torres', recurso: 'Brazo Robótico Dobot', categoria: 'Robótica', fecha: '2026-09-22', horaInicio: '10:00', horaFin: '12:00', actividad: 'Demostración para visita', observaciones: '', status: 'En uso' },
-  { id: 4, usuario: 'Pedro Sánchez', recurso: 'Drone DJI Mini 3', categoria: 'Drones', fecha: '2026-09-20', horaInicio: '08:00', horaFin: '09:00', actividad: 'Captura para reel PLAI', observaciones: 'Necesita espacio exterior', status: 'Completada' },
-  { id: 5, usuario: 'Lucía Ramírez', recurso: 'Laptop Dell XPS 15', categoria: 'Cómputo', fecha: '2026-09-21', horaInicio: '13:00', horaFin: '15:00', actividad: 'Desarrollo de proyecto', observaciones: '', status: 'Rechazada' },
-];
-
-const statusConfig: Record<ReservationStatus, { bg: string; color: string; label: string }> = {
+const statusConfig: Record<string, { bg: string; color: string; label: string }> = {
   Pendiente:   { bg: 'rgba(245,158,11,0.12)',  color: '#D97706', label: 'Pendiente' },
   Aprobada:    { bg: 'rgba(16,185,129,0.12)',  color: '#059669', label: 'Aprobada' },
   Rechazada:   { bg: 'rgba(239,68,68,0.12)',   color: '#DC2626', label: 'Rechazada' },
@@ -37,99 +15,279 @@ const statusConfig: Record<ReservationStatus, { bg: string; color: string; label
   Completada:  { bg: 'rgba(107,114,128,0.12)', color: '#6B7280', label: 'Completada' },
 };
 
-function StatusBadge({ value }: { value: ReservationStatus }) {
-  const cfg = statusConfig[value];
+function StatusBadge({ value }: { value: string }) {
+  const cfg = statusConfig[value] || statusConfig['Pendiente'];
   return (
-    <span style={{
-      display: 'inline-block',
-      padding: '0.25rem 0.75rem',
-      borderRadius: '9999px',
-      fontSize: '0.75rem',
-      fontWeight: 600,
-      backgroundColor: cfg.bg,
-      color: cfg.color,
-    }}>
+    <span
+      className="inline-block rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap"
+      style={{ backgroundColor: cfg.bg, color: cfg.color }}
+    >
       {cfg.label}
     </span>
   );
 }
 
 export default function ReservacionesPage() {
-  const [data, setData] = useState<Reservation[]>(initialData);
-  const [selectedItem, setSelectedItem] = useState<Reservation | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [data, setData] = useState<ReservacionItem[]>([]);
+  const [equipos, setEquipos] = useState<DeviceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Modals
+  const [selectedItem, setSelectedItem] = useState<ReservacionItem | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [cancelingReservation, setCancelingReservation] = useState<Reservation | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isApprovalOpen, setIsApprovalOpen] = useState(false);
+
+  // Approval form state
+  const [assigningDevice, setAssigningDevice] = useState<DeviceItem | null>(null);
+  const [accesoriosText, setAccesoriosText] = useState('');
+  const [condicionSalida, setCondicionSalida] = useState('Excelente');
+  const [observacionesAdmin, setObservacionesAdmin] = useState('');
+
   const [filterStatus, setFilterStatus] = useState<string>('Todas');
 
-  const pendientes = data.filter(r => r.status === 'Pendiente').length;
-  const aprobadas = data.filter(r => r.status === 'Aprobada' || r.status === 'En uso').length;
-  const completadas = data.filter(r => r.status === 'Completada').length;
-
-  const filteredData = filterStatus === 'Todas' ? data : data.filter(r => r.status === filterStatus);
-
-  const changeStatus = (item: Reservation, newStatus: ReservationStatus) => {
-    setData(data.map(r => r.id === item.id ? { ...r, status: newStatus } : r));
-    setIsDetailOpen(false);
+  const fetchData = async () => {
+    try {
+      const [resRes, resEq] = await Promise.all([
+        fetch('/api/reservaciones'),
+        fetch('/api/equipos'),
+      ]);
+      if (resRes.ok) {
+        const json = await resRes.json();
+        if (json.data) setData(json.data);
+      }
+      if (resEq.ok) {
+        const jsonEq = await resEq.json();
+        if (jsonEq.data) setEquipos(jsonEq.data);
+      }
+    } catch (err) {
+      console.error('Error fetching data:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDelete = (item: Reservation) => {
-    setCancelingReservation(item);
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const pendientes = data.filter(r => r.estado === 'Pendiente').length;
+  const aprobadas = data.filter(r => r.estado === 'Aprobada' || r.estado === 'En uso').length;
+  const completadas = data.filter(r => r.estado === 'Completada').length;
+
+  const filteredData = filterStatus === 'Todas' ? data : data.filter(r => r.estado === filterStatus);
+
+  // Get available devices matching the category of the reservation
+  const getAvailableDevicesForCategory = (categoriaId: string) => {
+    const normCat = categoriaId.toLowerCase().replace(/-/g, ' ');
+    return equipos.filter(eq => {
+      const isSameCategory = eq.category.toLowerCase().includes(normCat) || normCat.includes(eq.category.toLowerCase());
+      return isSameCategory && eq.status === 'Disponible';
+    });
   };
 
-  const handleAdd = () => {
-    setSelectedItem(null);
-    setIsModalOpen(true);
-  };
-
-  const handleDetail = (item: Reservation) => {
+  const handleOpenApproval = (item: ReservacionItem) => {
     setSelectedItem(item);
-    setIsDetailOpen(true);
+    const available = getAvailableDevicesForCategory(item.categoriaId);
+    if (available.length > 0) {
+      const first = available[0];
+      setAssigningDevice(first);
+      setAccesoriosText(first.accessories?.join(', ') || 'Equipo completo con cargador y cables');
+    } else {
+      setAssigningDevice(null);
+      setAccesoriosText('Equipo base con cables');
+    }
+    setCondicionSalida('Excelente');
+    setObservacionesAdmin('Aprobado para uso académico en las instalaciones de PLAi.');
+    setIsApprovalOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleConfirmApproval = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedItem) return;
+
+    const payload = {
+      id: selectedItem.id,
+      estado: 'Aprobada',
+      equipoId: assigningDevice?.id,
+      codigoPlaiAsignado: assigningDevice?.inventoryNumber || 'PLAI-AUTO-01',
+      accesoriosIncluidos: accesoriosText,
+      condicionSalida: condicionSalida,
+      observacionesAdmin: observacionesAdmin,
+      aprobadoPor: 'Administrador PLAi',
+    };
+
+    try {
+      const res = await fetch('/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        setData(prev => prev.map(r => r.id === selectedItem.id ? { ...r, ...payload, estado: 'Aprobada' } : r));
+        setIsApprovalOpen(false);
+        fetchData();
+      } else {
+        alert('Error al aprobar y asignar dispositivo');
+      }
+    } catch (err) {
+      console.error('Error al aprobar reservación:', err);
+    }
+  };
+
+  const handleEdit = (item: ReservacionItem) => {
+    setSelectedItem(item);
+    setIsEditOpen(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedItem) return;
     const fd = new FormData(e.currentTarget);
-    const newItem: Reservation = {
-      id: Date.now(),
-      usuario: fd.get('usuario') as string,
-      recurso: fd.get('recurso') as string,
-      categoria: fd.get('categoria') as string,
-      fecha: fd.get('fecha') as string,
+
+    const updated: Partial<ReservacionItem> = {
+      usuarioNombre: (fd.get('usuarioNombre') as string).trim(),
+      fechaUso: fd.get('fechaUso') as string,
       horaInicio: fd.get('horaInicio') as string,
       horaFin: fd.get('horaFin') as string,
-      actividad: fd.get('actividad') as string,
-      observaciones: fd.get('observaciones') as string,
-      status: 'Pendiente',
+      actividad: (fd.get('actividad') as string).trim(),
+      estado: fd.get('estado') as ReservacionItem['estado'],
+      codigoPlaiAsignado: (fd.get('codigoPlaiAsignado') as string)?.trim() || undefined,
+      accesoriosIncluidos: (fd.get('accesoriosIncluidos') as string)?.trim() || undefined,
+      condicionSalida: fd.get('condicionSalida') as string,
+      observacionesAdmin: (fd.get('observacionesAdmin') as string)?.trim() || undefined,
     };
-    setData([newItem, ...data]);
-    setIsModalOpen(false);
+
+    try {
+      const res = await fetch('/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: selectedItem.id, ...updated }),
+      });
+
+      if (res.ok) {
+        setData(prev => prev.map(r => r.id === selectedItem.id ? { ...r, ...updated } : r));
+        setIsEditOpen(false);
+      } else {
+        alert('Error al guardar cambios');
+      }
+    } catch (err) {
+      console.error('Error al editar reservación:', err);
+    }
+  };
+
+  const handleReject = async (item: ReservacionItem) => {
+    if (!confirm(`¿Rechazar la solicitud de reservación de ${item.usuarioNombre}?`)) return;
+
+    try {
+      const res = await fetch('/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: item.id,
+          estado: 'Rechazada',
+          observacionesAdmin: 'Rechazada por indisponibilidad de horarios o mantenimiento.',
+        }),
+      });
+
+      if (res.ok) {
+        setData(prev => prev.map(r => r.id === item.id ? { ...r, estado: 'Rechazada' } : r));
+      }
+    } catch (err) {
+      console.error('Error al rechazar:', err);
+    }
   };
 
   const columns: Column[] = [
-    { key: 'usuario', label: 'Usuario' },
-    { key: 'recurso', label: 'Recurso' },
-    { key: 'fecha', label: 'Fecha' },
-    { 
-      key: 'horaInicio', 
-      label: 'Horario',
-      render: (value, item) => `${value} – ${item.horaFin}`,
+    {
+      key: 'folio',
+      label: 'Folio / Solicitante',
+      render: (_, item: ReservacionItem) => (
+        <div>
+          <span className="font-mono text-xs font-bold text-plai">{item.folio}</span>
+          <div className="text-sm font-semibold text-navy">{item.usuarioNombre}</div>
+          <div className="text-xs text-plai-muted">{item.usuarioEmail}</div>
+        </div>
+      ),
     },
     {
-      key: 'status',
+      key: 'categoriaId',
+      label: 'Categoría / Equipo Asignado',
+      render: (v: string, item: ReservacionItem) => (
+        <div>
+          <div className="text-xs font-semibold capitalize text-navy">
+            {v.replace('-', ' ')}
+          </div>
+          {item.codigoPlaiAsignado ? (
+            <div className="mt-0.5 inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-[11px] font-mono font-bold text-blue-700">
+              Cód: {item.codigoPlaiAsignado}
+            </div>
+          ) : (
+            <div className="mt-0.5 text-[11px] italic text-amber-600">
+              Sin dispositivo asignado
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'fechaUso',
+      label: 'Fecha y Horario',
+      render: (v: string, item: ReservacionItem) => (
+        <div>
+          <div className="font-mono text-xs font-semibold text-navy">{v}</div>
+          <div className="text-xs text-plai-muted">{item.horaInicio} – {item.horaFin}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'actividad',
+      label: 'Actividad',
+      render: (v: string) => (
+        <span className="block max-w-[200px] truncate text-xs text-gray-800">{v}</span>
+      ),
+    },
+    {
+      key: 'estado',
       label: 'Estado',
-      render: (value) => <StatusBadge value={value} />,
+      render: (v: string) => <StatusBadge value={v} />,
     },
     {
-      key: 'id',
-      label: 'Detalle',
-      render: (_, item) => (
-        <button
-          onClick={() => handleDetail(item)}
-          className="flex items-center gap-1 rounded-lg bg-[rgba(168,30,113,0.1)] px-3 py-1.5 text-xs font-semibold text-plai transition-colors hover:bg-plai hover:text-white"
-        >
-          <RiEyeLine /> Ver
-        </button>
+      key: 'acciones_custom',
+      label: 'Gestión',
+      render: (_, item: ReservacionItem) => (
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
+          {item.estado === 'Pendiente' ? (
+            <button
+              onClick={() => handleOpenApproval(item)}
+              className="flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700"
+              title="Aprobar y asignar dispositivo disponible"
+            >
+              <RiCheckLine /> Asignar
+            </button>
+          ) : null}
+
+          {item.estado === 'Pendiente' ? (
+            <button
+              onClick={() => handleReject(item)}
+              className="flex items-center gap-1 rounded-md bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100"
+              title="Rechazar solicitud"
+            >
+              <RiCloseLine />
+            </button>
+          ) : null}
+
+          <button
+            onClick={() => {
+              setSelectedItem(item);
+              setIsDetailOpen(true);
+            }}
+            className="flex items-center gap-1 rounded-md bg-plai/10 px-2.5 py-1 text-xs font-semibold text-plai hover:bg-plai hover:text-white"
+          >
+            <RiEyeLine /> Ver
+          </button>
+        </div>
       ),
     },
   ];
@@ -139,7 +297,9 @@ export default function ReservacionesPage() {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <h1 className="mb-1 font-heading text-3xl font-extrabold text-navy">Reservaciones</h1>
-          <p className="text-sm text-plai-muted md:text-base">Gestión de solicitudes y reservas de recursos tecnológicos</p>
+          <p className="text-sm text-plai-muted md:text-base">
+            Aprobación inteligente con asignación automática de equipos y control de accesorios
+          </p>
         </div>
       </div>
 
@@ -147,7 +307,7 @@ export default function ReservacionesPage() {
         <StatCard title="Pendientes" value={pendientes} icon={<RiTimeLine />} variant="warning" />
         <StatCard title="Activas" value={aprobadas} icon={<RiCheckLine />} variant="success" />
         <StatCard title="Completadas" value={completadas} icon={<RiCalendarCheckLine />} variant="primary" />
-        <StatCard title="Total" value={data.length} icon={<RiCalendarCheckLine />} variant="primary" />
+        <StatCard title="Total Registros" value={data.length} icon={<RiCalendarCheckLine />} variant="primary" />
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -167,136 +327,367 @@ export default function ReservacionesPage() {
       </div>
 
       <DataTable
-        title="Solicitudes de Reservación"
+        title={`Solicitudes de Reservación (${filteredData.length})`}
         columns={columns}
         data={filteredData}
-        onAdd={handleAdd}
-        onDelete={handleDelete}
-        addActionLabel="Nueva Reservación"
+        onEdit={handleEdit}
+        // Se omite onDelete expresamente conforme al requerimiento 6
       />
 
-      {/* Detail/Action Modal */}
-      {isDetailOpen && selectedItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-pop-in" onClick={() => setIsDetailOpen(false)}>
-          <div className="w-full max-w-[560px] rounded-2xl border border-black/[0.08] bg-white p-6 shadow-2xl md:p-8" onClick={e => e.stopPropagation()}>
+      {/* Modal de Aprobación y Asignación de Dispositivo (Req 6) */}
+      {isApprovalOpen && selectedItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-pop-in" onClick={() => setIsApprovalOpen(false)}>
+          <div className="max-h-[90vh] w-full max-w-[620px] overflow-y-auto rounded-2xl border border-black/[0.08] bg-white p-6 shadow-2xl md:p-8" onClick={e => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3">
-              <h2 className="font-heading text-xl font-bold text-navy">Detalle de Reservación</h2>
-              <StatusBadge value={selectedItem.status} />
-            </div>
-            <div className="my-4 grid grid-cols-1 gap-4 rounded-xl border border-black/[0.04] bg-gray-50 p-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-1"><span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Usuario</span><span className="text-sm font-semibold text-gray-800">{selectedItem.usuario}</span></div>
-              <div className="flex flex-col gap-1"><span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Recurso</span><span className="text-sm font-semibold text-gray-800">{selectedItem.recurso}</span></div>
-              <div className="flex flex-col gap-1"><span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Categoría</span><span className="text-sm font-semibold text-gray-800">{selectedItem.categoria}</span></div>
-              <div className="flex flex-col gap-1"><span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Fecha</span><span className="text-sm font-semibold text-gray-800">{selectedItem.fecha}</span></div>
-              <div className="flex flex-col gap-1"><span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Horario</span><span className="text-sm font-semibold text-gray-800">{selectedItem.horaInicio} – {selectedItem.horaFin}</span></div>
-              <div className="flex flex-col gap-1 sm:col-span-2"><span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Actividad</span><span className="text-sm font-semibold text-gray-800">{selectedItem.actividad}</span></div>
-              {selectedItem.observaciones && (
-                <div className="flex flex-col gap-1 sm:col-span-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Observaciones</span>
-                  <span className="text-sm font-semibold text-gray-800">{selectedItem.observaciones}</span>
-                </div>
-              )}
-            </div>
-            {selectedItem.status === 'Pendiente' && (
-              <div className="my-4 flex gap-3">
-                <button className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-emerald-700" onClick={() => changeStatus(selectedItem, 'Aprobada')}>
-                  <RiCheckLine /> Aprobar
-                </button>
-                <button className="flex items-center gap-1.5 rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-rose-700" onClick={() => changeStatus(selectedItem, 'Rechazada')}>
-                  <RiCloseLine /> Rechazar
-                </button>
+              <div>
+                <h2 className="font-heading text-xl font-bold text-navy">Aprobar y Asignar Dispositivo</h2>
+                <p className="text-xs text-plai-muted">Folio: {selectedItem.folio} · Solicitante: {selectedItem.usuarioNombre}</p>
               </div>
-            )}
-            {selectedItem.status === 'Aprobada' && (
-              <div className="my-4 flex gap-3">
-                <button className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-indigo-700" onClick={() => changeStatus(selectedItem, 'En uso')}>
-                  <RiCheckLine /> Marcar En Uso
-                </button>
-              </div>
-            )}
-            {selectedItem.status === 'En uso' && (
-              <div className="my-4 flex gap-3">
-                <button className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-emerald-700" onClick={() => changeStatus(selectedItem, 'Completada')}>
-                  <RiCheckLine /> Completar
-                </button>
-              </div>
-            )}
-            <div className="mt-6 flex justify-end">
-              <button className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100" onClick={() => setIsDetailOpen(false)}>Cerrar</button>
+              <button className="text-gray-400 hover:text-gray-700" onClick={() => setIsApprovalOpen(false)}>
+                <RiCloseLine className="text-2xl" />
+              </button>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* New Reservation Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-pop-in" onClick={() => setIsModalOpen(false)}>
-          <div className="w-full max-w-[600px] rounded-2xl border border-black/[0.08] bg-white p-6 shadow-2xl md:p-8" onClick={e => e.stopPropagation()}>
-            <h2 className="mb-6 font-heading text-xl font-bold text-navy md:text-2xl">Nueva Reservación</h2>
-            <form onSubmit={handleSubmit}>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Usuario</label>
-                  <input type="text" name="usuario" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" required placeholder="Nombre completo" />
+            <form onSubmit={handleConfirmApproval} className="flex flex-col gap-4">
+              <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-navy uppercase tracking-wider">Categoría solicitada:</span>
+                  <span className="rounded bg-blue-600 px-2 py-0.5 font-bold uppercase text-white">
+                    {selectedItem.categoriaId.replace('-', ' ')}
+                  </span>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Recurso</label>
-                  <input type="text" name="recurso" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" required placeholder="Nombre del equipo" />
+                <div className="mt-2 text-xs text-gray-600">
+                  Fecha requerida: <strong className="text-navy">{selectedItem.fechaUso}</strong> ({selectedItem.horaInicio} a {selectedItem.horaFin})
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Categoría</label>
-                  <select name="categoria" className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20">
-                    <option>Realidad Virtual</option>
-                    <option>Robótica</option>
-                    <option>Fabricación Digital</option>
-                    <option>Drones</option>
-                    <option>Cómputo</option>
-                    <option>Escaneo 3D</option>
-                    <option>Electrónica</option>
-                  </select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Fecha</label>
-                  <input type="date" name="fecha" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" required />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Hora Inicio</label>
-                  <input type="time" name="horaInicio" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" required />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Hora Fin</label>
-                  <input type="time" name="horaFin" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" required />
-                </div>
-                <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Actividad / Propósito</label>
-                  <input type="text" name="actividad" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" required placeholder="Describe el uso del recurso" />
-                </div>
-                <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Observaciones</label>
-                  <textarea name="observaciones" className="w-full resize-y rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" rows={2} placeholder="Notas adicionales (opcional)" />
+                <div className="mt-1 text-xs text-gray-600">
+                  Actividad: <span className="italic">{selectedItem.actividad}</span>
                 </div>
               </div>
-              <div className="mt-6 flex justify-end gap-3">
-                <button type="button" className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100" onClick={() => setIsModalOpen(false)}>Cancelar</button>
-                <button type="submit" className="rounded-lg bg-plai px-5 py-2 text-sm font-semibold text-white shadow-md transition-all hover:bg-plai-dark">Registrar Solicitud</button>
+
+              {/* Selector de Dispositivos Disponibles */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">
+                  Dispositivo asignado (Detectados disponibles para el día y hora)
+                </label>
+                {getAvailableDevicesForCategory(selectedItem.categoriaId).length > 0 ? (
+                  <select
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20"
+                    value={assigningDevice?.id || ''}
+                    onChange={e => {
+                      const dev = equipos.find(eq => eq.id === e.target.value);
+                      setAssigningDevice(dev || null);
+                      if (dev) {
+                        setAccesoriosText(dev.accessories?.join(', ') || 'Equipo completo con cargador y cables');
+                      }
+                    }}
+                    required
+                  >
+                    {getAvailableDevicesForCategory(selectedItem.categoriaId).map(eq => (
+                      <option key={eq.id} value={eq.id}>
+                        {eq.name} (Código: {eq.inventoryNumber}) - {eq.brand} {eq.model}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
+                    ⚠️ No hay dispositivos con estado <strong>Disponible</strong> en esta categoría actualmente. Puedes asignar uno de otra categoría o liberar un equipo desde Inventario.
+                  </div>
+                )}
+              </div>
+
+              {/* Accesorios que se prestan */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">
+                  Accesorios que se entregan con el dispositivo
+                </label>
+                <input
+                  type="text"
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none"
+                  value={accesoriosText}
+                  onChange={e => setAccesoriosText(e.target.value)}
+                  placeholder="Ej. 2 Controles Touch Plus, Cable USB-C, Eliminador, Estuche..."
+                  required
+                />
+              </div>
+
+              {/* Condición física de salida */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">
+                  Condición física de entrega
+                </label>
+                <select
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none"
+                  value={condicionSalida}
+                  onChange={e => setCondicionSalida(e.target.value)}
+                >
+                  <option value="Excelente">Excelente (Sin detalles estéticos ni funcionales)</option>
+                  <option value="Bueno">Bueno (Marcas normales de uso superficial)</option>
+                  <option value="Regular">Regular (Desgaste visible, 100% operativo)</option>
+                </select>
+              </div>
+
+              {/* Observaciones del administrador */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">
+                  Observaciones administrativas
+                </label>
+                <textarea
+                  className="w-full resize-y rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none"
+                  rows={2}
+                  value={observacionesAdmin}
+                  onChange={e => setObservacionesAdmin(e.target.value)}
+                  placeholder="Indicaciones especiales, software precargado o restricciones de uso..."
+                />
+              </div>
+
+              <div className="mt-4 flex justify-end gap-3">
+                <button
+                  type="button"
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
+                  onClick={() => setIsApprovalOpen(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-md transition-all hover:bg-emerald-700"
+                >
+                  <RiCheckLine /> Confirmar Aprobación y Asignación
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      <ConfirmDialog
-        isOpen={!!cancelingReservation}
-        title="¿Cancelar reservación?"
-        description={`Se cancelará la solicitud de "${cancelingReservation?.usuario}" para "${cancelingReservation?.recurso}".`}
-        confirmText="Cancelar Reservación"
-        onConfirm={() => {
-          if (cancelingReservation) {
-            setData(data.filter(r => r.id !== cancelingReservation.id));
-          }
-        }}
-        onClose={() => setCancelingReservation(null)}
-      />
+      {/* Modal Editar Registro (Req 6) */}
+      {isEditOpen && selectedItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-pop-in" onClick={() => setIsEditOpen(false)}>
+          <div className="max-h-[90vh] w-full max-w-[620px] overflow-y-auto rounded-2xl border border-black/[0.08] bg-white p-6 shadow-2xl md:p-8" onClick={e => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3">
+              <div>
+                <h2 className="font-heading text-xl font-bold text-navy">Editar Reservación: {selectedItem.folio}</h2>
+                <p className="text-xs text-plai-muted">Modificación de parámetros y estatus de reservación</p>
+              </div>
+              <button className="text-gray-400 hover:text-gray-700" onClick={() => setIsEditOpen(false)}>
+                <RiCloseLine className="text-2xl" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Solicitante</label>
+                <input
+                  type="text"
+                  name="usuarioNombre"
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm text-gray-800"
+                  defaultValue={selectedItem.usuarioNombre}
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Estado</label>
+                <select
+                  name="estado"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm text-gray-800"
+                  defaultValue={selectedItem.estado}
+                >
+                  <option value="Pendiente">Pendiente</option>
+                  <option value="Aprobada">Aprobada</option>
+                  <option value="En uso">En uso</option>
+                  <option value="Completada">Completada</option>
+                  <option value="Rechazada">Rechazada</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Fecha de Uso</label>
+                <input
+                  type="date"
+                  name="fechaUso"
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm text-gray-800"
+                  defaultValue={selectedItem.fechaUso}
+                  required
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Hora Inicio</label>
+                  <input
+                    type="time"
+                    name="horaInicio"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800"
+                    defaultValue={selectedItem.horaInicio}
+                    required
+                  />
+                </div>
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Hora Fin</label>
+                  <input
+                    type="time"
+                    name="horaFin"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800"
+                    defaultValue={selectedItem.horaFin}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Código PLAi Asignado</label>
+                <input
+                  type="text"
+                  name="codigoPlaiAsignado"
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm text-gray-800 font-mono"
+                  defaultValue={selectedItem.codigoPlaiAsignado || ''}
+                  placeholder="Ej. 5151000013-1"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Accesorios Incluidos</label>
+                <input
+                  type="text"
+                  name="accesoriosIncluidos"
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm text-gray-800"
+                  defaultValue={selectedItem.accesoriosIncluidos || ''}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Condición de Salida</label>
+                <select
+                  name="condicionSalida"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm text-gray-800"
+                  defaultValue={selectedItem.condicionSalida || 'Excelente'}
+                >
+                  <option value="Excelente">Excelente</option>
+                  <option value="Bueno">Bueno</option>
+                  <option value="Regular">Regular</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Actividad</label>
+                <input
+                  type="text"
+                  name="actividad"
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm text-gray-800"
+                  defaultValue={selectedItem.actividad}
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">Observaciones del Administrador</label>
+                <textarea
+                  name="observacionesAdmin"
+                  rows={2}
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm text-gray-800"
+                  defaultValue={selectedItem.observacionesAdmin || ''}
+                />
+              </div>
+
+              <div className="mt-4 flex justify-end gap-3 sm:col-span-2">
+                <button
+                  type="button"
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
+                  onClick={() => setIsEditOpen(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-plai px-5 py-2 text-sm font-semibold text-white shadow-md transition-all hover:bg-plai-dark"
+                >
+                  Guardar Modificaciones
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Detalle */}
+      {isDetailOpen && selectedItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-pop-in" onClick={() => setIsDetailOpen(false)}>
+          <div className="w-full max-w-[560px] rounded-2xl border border-black/[0.08] bg-white p-6 shadow-2xl md:p-8" onClick={e => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3">
+              <div>
+                <h2 className="font-heading text-xl font-bold text-navy">Ficha de Reservación</h2>
+                <span className="font-mono text-xs text-plai font-bold">{selectedItem.folio}</span>
+              </div>
+              <StatusBadge value={selectedItem.estado} />
+            </div>
+
+            <div className="my-4 grid grid-cols-1 gap-3 rounded-xl border border-black/[0.04] bg-gray-50 p-4 text-xs sm:grid-cols-2">
+              <div>
+                <span className="font-bold text-plai-muted uppercase">Usuario:</span>
+                <p className="font-semibold text-navy text-sm">{selectedItem.usuarioNombre}</p>
+                <p className="text-gray-500">{selectedItem.usuarioEmail}</p>
+              </div>
+              <div>
+                <span className="font-bold text-plai-muted uppercase">Institución:</span>
+                <p className="font-semibold text-navy">{selectedItem.usuarioInstitucion || 'Particular'}</p>
+              </div>
+              <div>
+                <span className="font-bold text-plai-muted uppercase">Categoría:</span>
+                <p className="font-semibold text-navy capitalize">{selectedItem.categoriaId.replace('-', ' ')}</p>
+              </div>
+              <div>
+                <span className="font-bold text-plai-muted uppercase">Código PLAi Asignado:</span>
+                <p className="font-mono font-bold text-plai">{selectedItem.codigoPlaiAsignado || 'Sin asignar'}</p>
+              </div>
+              <div>
+                <span className="font-bold text-plai-muted uppercase">Fecha de Uso:</span>
+                <p className="font-semibold text-navy">{selectedItem.fechaUso}</p>
+              </div>
+              <div>
+                <span className="font-bold text-plai-muted uppercase">Horario:</span>
+                <p className="font-semibold text-navy">{selectedItem.horaInicio} – {selectedItem.horaFin}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <span className="font-bold text-plai-muted uppercase">Accesorios entregados:</span>
+                <p className="font-semibold text-gray-800">{selectedItem.accesoriosIncluidos || 'No especificados'}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <span className="font-bold text-plai-muted uppercase">Condición de salida:</span>
+                <p className="font-semibold text-emerald-700">{selectedItem.condicionSalida || 'Excelente'}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <span className="font-bold text-plai-muted uppercase">Actividad:</span>
+                <p className="text-gray-800">{selectedItem.actividad}</p>
+              </div>
+              {selectedItem.observacionesAdmin && (
+                <div className="sm:col-span-2">
+                  <span className="font-bold text-plai-muted uppercase">Observaciones Admin:</span>
+                  <p className="italic text-gray-700">{selectedItem.observacionesAdmin}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100"
+                onClick={() => setIsDetailOpen(false)}
+              >
+                Cerrar
+              </button>
+              <button
+                className="rounded-lg bg-plai px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-plai-dark"
+                onClick={() => {
+                  setIsDetailOpen(false);
+                  handleEdit(selectedItem);
+                }}
+              >
+                Editar Registro
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

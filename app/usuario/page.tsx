@@ -4,7 +4,7 @@ import Link from 'next/link';
 export default function UserDashboard() {
   return (
     <div className="flex animate-pop-in flex-col gap-8">
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#E91E8C] to-[#F59E0B] p-8 text-white shadow-[0_10px_30px_rgba(233,30,140,0.2)] md:p-10">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-plai to-[#1e5ca7] p-8 text-white shadow-[0_10px_30px_rgba(0,134,255,0.2)] md:p-10">
         <h1 className="relative z-10 mb-2 font-heading text-3xl font-extrabold md:text-[2.2rem]">¡Hola de nuevo!</h1>
         <p className="relative z-10 text-base opacity-90 md:text-[1.1rem]">Bienvenido a tu panel de institución. Aquí tienes un resumen de tu actividad.</p>
       </div>
@@ -12,7 +12,7 @@ export default function UserDashboard() {
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <Link href="/usuario/prestamos" className="no-underline">
           <div className="flex cursor-pointer items-center gap-6 rounded-2xl border border-black/[0.08] bg-white p-6 shadow-plai-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-plai-md">
-            <div className="flex size-[60px] items-center justify-center rounded-xl bg-[rgba(233,30,140,0.1)] text-3xl text-[#E91E8C]">
+            <div className="flex size-[60px] items-center justify-center rounded-xl bg-plai/10 text-3xl text-plai">
               <RiMacbookLine />
             </div>
             <div>

@@ -126,7 +126,7 @@ export default function ReservationForm({ device, onClose }: Props) {
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex shrink-0 items-start justify-between border-b-[1.5px] border-black/[0.08] p-6 bg-[linear-gradient(135deg,rgba(168,30,113,0.06)_0%,transparent_100%)]">
+        <div className="flex shrink-0 items-start justify-between border-b-[1.5px] border-black/[0.08] p-6 bg-[linear-gradient(135deg,rgba(0,134,255,0.08)_0%,transparent_100%)]">
           <div>
             <p className="mb-[0.2rem] font-heading text-[0.68rem] font-extrabold uppercase tracking-[0.06em] text-plai">
               Formulario de Reserva

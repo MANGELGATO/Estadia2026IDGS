@@ -9,11 +9,11 @@ interface Props {
 
 // Color per category
 const categoryColors: Record<string, string> = {
-  'Realidad Virtual': '#7c3aed',
+  'Realidad Virtual': '#1e5ca7',
   'Robótica': '#0ea5e9',
-  'Fabricación digital': '#f59e0b',
+  'Fabricación digital': '#ed8d1b',
   'Drones': '#10b981',
-  'Cómputo': '#a81e71',
+  'Cómputo': '#0086ff',
 };
 
 const statusClasses: Record<string, string> = {
@@ -30,19 +30,28 @@ const btnBase =
   'flex w-full items-center justify-center gap-[0.4rem] rounded-[0.65rem] p-[0.6rem] font-heading text-[0.82rem] transition-all duration-[250ms]';
 
 export default function EquipmentCard({ device, onViewDetails, onReserve }: Props) {
-  const catColor = categoryColors[device.category] ?? '#a81e71';
+  const catColor = categoryColors[device.category] ?? '#0086ff';
   const isAvailable = device.status === 'Disponible';
 
   return (
-    <div className="group flex flex-col overflow-hidden rounded-2xl border-[1.5px] border-black/[0.08] bg-white transition-all duration-[250ms] hover:-translate-y-1 hover:border-[rgba(168,30,113,0.2)] hover:shadow-[0_8px_32px_rgba(27,54,93,0.12)]">
+    <div className="group flex flex-col overflow-hidden rounded-2xl border-[1.5px] border-black/[0.08] bg-white transition-all duration-[250ms] hover:-translate-y-1 hover:border-plai/40 hover:shadow-[0_8px_32px_rgba(30,92,167,0.12)]">
       {/* Image area */}
       <div
-        className="relative flex h-[148px] items-center justify-center border-b-[1.5px] border-black/[0.08] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--cat-color)_10%,white)_0%,color-mix(in_srgb,var(--cat-color)_4%,white)_100%)]"
+        className="relative flex h-[148px] items-center justify-center overflow-hidden border-b-[1.5px] border-black/[0.08] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--cat-color)_10%,white)_0%,color-mix(in_srgb,var(--cat-color)_4%,white)_100%)] p-2"
         style={{ '--cat-color': catColor } as React.CSSProperties}
       >
-        <span className="text-5xl leading-none drop-shadow-[0_4px_8px_rgba(0,0,0,0.12)] transition-transform duration-300 group-hover:rotate-[-3deg] group-hover:scale-110">
-          {device.imageEmoji}
-        </span>
+        {device.imageUrl ? (
+          <img
+            src={device.imageUrl}
+            alt={device.name}
+            className="h-28 w-auto max-w-[85%] object-contain drop-shadow transition-transform duration-300 group-hover:scale-105"
+            loading="lazy"
+          />
+        ) : (
+          <span className="text-5xl leading-none drop-shadow-[0_4px_8px_rgba(0,0,0,0.12)] transition-transform duration-300 group-hover:rotate-[-3deg] group-hover:scale-110">
+            {device.imageEmoji}
+          </span>
+        )}
         <span
           className={`absolute right-3 top-3 rounded-full px-[0.65rem] py-[0.28rem] font-heading text-[0.65rem] font-bold uppercase tracking-[0.05em] ${statusClasses[device.status] ?? statusFallback}`}
         >

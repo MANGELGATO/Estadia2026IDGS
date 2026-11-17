@@ -2,7 +2,7 @@
 import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { mockDevices, DeviceItem } from '../../../lib/mockData';
-import { ArrowLeft, Lightbulb, Target, CheckCircle2, Box, Layers, Coins } from 'lucide-react';
+import { ArrowLeft, Lightbulb, Target, CheckCircle2, Box, Layers, Printer, Sparkles, AlertCircle } from 'lucide-react';
 import EquipmentCard from '../../components/EquipmentCard';
 import EquipmentDetailModal from '../../components/EquipmentDetailModal';
 import ReservationForm from '../../components/ReservationForm';
@@ -12,7 +12,7 @@ const categoryMeta: Record<string, { name: string; description: string; plaiUsag
     name: 'Realidad Virtual',
     description: 'Explora nuestra colección de dispositivos de realidad virtual. Visores, controles y accesorios de última generación para experiencias inmersivas.',
     plaiUsage: 'En PLAi utilizamos los visores de Realidad Virtual para simular entornos de alto riesgo, recorridos inmersivos de arquitectura y diseño, y desarrollar competencias en metaverso e interacción 3D para instituciones educativas y empresas.',
-    color: '#7c3aed',
+    color: '#1e5ca7',
     benefits: ['Simulación de entornos seguros', 'Aprendizaje inmersivo 3D', 'Reducción de costos en prototipos'],
     successCases: [
       { title: 'Recorrido Arquitectónico', desc: 'Visualización de un complejo habitacional antes de su construcción.' },
@@ -33,9 +33,9 @@ const categoryMeta: Record<string, { name: string; description: string; plaiUsag
   'fabricacion-digital': {
     name: 'Fabricación Digital',
     description: 'Impresoras 3D, escáneres y materiales para transformar diseños en objetos reales.',
-    plaiUsage: 'Promovemos la cultura Maker en Jalisco permitiendo que emprendedores y estudiantes validen sus diseños físicos rápidamente antes de pasar a producción masiva, abaratando los costos de innovación y desarrollo de producto.',
-    color: '#f59e0b',
-    benefits: ['Validación de diseños', 'Cultura Maker', 'Abaratamiento de innovación'],
+    plaiUsage: 'Promovemos la cultura Maker en Jalisco permitiendo que emprendedores y estudiantes validen sus diseños físicos rápidamente antes de pasar a producción masiva, sin costo de maquinaria ni licencias.',
+    color: '#ed8d1b',
+    benefits: ['Validación de diseños', 'Cultura Maker', 'Sin costo de maquinaria'],
     successCases: [
       { title: 'Prótesis 3D', desc: 'Desarrollo e impresión de prótesis de bajo costo para niños.' },
       { title: 'Moldes Industriales', desc: 'Creación de moldes rápidos para inyección de plásticos.' }
@@ -56,7 +56,7 @@ const categoryMeta: Record<string, { name: string; description: string; plaiUsag
     name: 'Cómputo / Multimedia',
     description: 'Equipos de alto rendimiento para diseño, edición, gaming y desarrollo.',
     plaiUsage: 'Estaciones de trabajo de grado profesional disponibles para compilar código complejo, realizar renders arquitectónicos o desarrollar videojuegos pesados sin depender de infraestructura costosa propia.',
-    color: '#a81e71',
+    color: '#0086ff',
     benefits: ['Renders ultrarrápidos', 'Desarrollo sin límites', 'Edición de video 8K'],
     successCases: [
       { title: 'Desarrollo de Videojuego', desc: 'Creación de assets y compilación de un título indie en Unreal Engine 5.' },
@@ -75,8 +75,10 @@ const categoryToDeviceCategory: Record<string, string> = {
 
 export default function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = use(params);
-  const meta = categoryMeta[resolvedParams.slug];
+  const fallbackMeta = categoryMeta[resolvedParams.slug];
   const deviceCategory = categoryToDeviceCategory[resolvedParams.slug];
+  const [currentMeta, setCurrentMeta] = useState(fallbackMeta);
+  const meta = currentMeta;
   const [allDevices, setAllDevices] = useState<DeviceItem[]>(mockDevices);
 
   useEffect(() => {
@@ -99,14 +101,41 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
   const [quoteSubmitted, setQuoteSubmitted] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
     const frame = requestAnimationFrame(() => {
       setIsLoaded(true);
-      const savedVideo = localStorage.getItem(`category_video_${resolvedParams.slug}`);
+      // 1. Cargar desde la API centralizada del servidor
+      fetch(`/api/categorias?slug=${resolvedParams.slug}`)
+        .then(res => res.json())
+        .then(data => {
+          if (isMounted && data.success && data.category) {
+            const cat = data.category;
+            setCurrentMeta(prev => ({
+              ...prev,
+              name: cat.name || prev.name,
+              description: cat.description || prev.description,
+              plaiUsage: cat.plaiUsage || prev.plaiUsage,
+              benefits: Array.isArray(cat.benefits) && cat.benefits.length > 0 ? cat.benefits : prev.benefits,
+              successCases: Array.isArray(cat.successCases) && cat.successCases.length > 0 ? cat.successCases : prev.successCases,
+            }));
+            if (cat.videoUrl) {
+              setVideoUrl(cat.videoUrl);
+            }
+          }
+        })
+        .catch(() => {});
+
+      // 2. Fallback de localStorage
+      const savedVideo = typeof window !== 'undefined' ? localStorage.getItem(`category_video_${resolvedParams.slug}`) : null;
       if (savedVideo) {
         setVideoUrl(savedVideo);
       }
     });
-    return () => cancelAnimationFrame(frame);
+
+    return () => {
+      isMounted = false;
+      cancelAnimationFrame(frame);
+    };
   }, [resolvedParams.slug]);
 
   const deviceForDetails = allDevices.find(d => d.id === selectedDetailsId);
@@ -132,12 +161,22 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
       >
         <div className="pointer-events-none absolute -left-[20%] -top-[50%] h-[200%] w-[140%] rotate-[15deg] bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.1)_0%,transparent_60%)]" />
         <div className="relative z-10 mx-auto max-w-[1440px] px-6">
-          <Link href="/#dispositivos" className="mb-8 inline-flex items-center gap-[0.4rem] font-heading text-[0.9rem] font-semibold text-white/80 transition-all hover:-translate-x-1 hover:text-white">
-            <ArrowLeft size={18} /> Volver al Catálogo
+          <Link href="/categorias" className="mb-8 inline-flex items-center gap-[0.4rem] font-heading text-[0.9rem] font-semibold text-white/80 transition-all hover:-translate-x-1 hover:text-white">
+            <ArrowLeft size={18} /> Volver a Categorías
           </Link>
           <div className="max-w-[800px]">
-            <div className="mb-6 inline-block rounded-full border border-white/30 bg-white/20 px-4 py-[0.4rem] font-heading text-[0.85rem] font-bold uppercase tracking-[0.05em] backdrop-blur-md">
-              Saber Más
+            <div className="mb-6 flex items-center gap-3">
+              <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 p-2.5 backdrop-blur-md shadow-md border border-white/30">
+                <img
+                  src={`/images/categorias/${resolvedParams.slug === 'computo-multimedia' ? 'computo' : resolvedParams.slug}.png`}
+                  alt={meta.name}
+                  className="size-9 object-contain"
+                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                />
+              </div>
+              <div className="inline-block rounded-full border border-white/30 bg-white/20 px-4 py-[0.4rem] font-heading text-[0.85rem] font-bold uppercase tracking-[0.05em] backdrop-blur-md">
+                Categoría Oficial PLAi
+              </div>
             </div>
             <h1 className="mb-4 font-heading text-4xl font-black leading-[1.1] tracking-[-0.03em] drop-shadow-[0_4px_20px_rgba(0,0,0,0.15)] sm:text-[3.5rem]">{meta.name}</h1>
             <p className="mb-8 max-w-[650px] text-lg leading-[1.6] opacity-95 sm:text-[1.25rem]">{meta.description}</p>
@@ -188,7 +227,13 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
                     <iframe
                       width="100%"
                       height="315"
-                      src={videoUrl.includes('watch?v=') ? videoUrl.replace("watch?v=", "embed/") : videoUrl}
+                      src={
+                        videoUrl.includes('watch?v=')
+                          ? videoUrl.replace('watch?v=', 'embed/')
+                          : videoUrl.includes('youtu.be/')
+                          ? videoUrl.replace('youtu.be/', 'www.youtube.com/embed/')
+                          : videoUrl
+                      }
                       title="Video de categoría"
                       frameBorder="0"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -197,6 +242,18 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
                     ></iframe>
                   )}
                 </div>
+
+                {/* Casos de éxito editables */}
+                {meta.successCases && meta.successCases.length > 0 && (
+                  <div className="mt-5 flex flex-col gap-3">
+                    {meta.successCases.map((c, i) => (
+                      <div key={i} className="rounded-xl border border-gray-100 bg-[#F4F6F9] p-3.5 transition-all hover:bg-white hover:shadow-sm">
+                        <h4 className="font-heading text-sm font-bold text-navy">{c.title}</h4>
+                        <p className="mt-1 text-xs text-plai-gray leading-relaxed">{c.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -232,37 +289,48 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
               
               <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
                 <div className="rounded-2xl border border-black/[0.08] bg-white p-8 shadow-[0_8px_30px_rgba(0,0,0,0.03)] md:p-10">
-                  <div className="mb-6 flex items-center gap-4">
+                  <div className="mb-4 flex items-center gap-4">
                     <Box className="size-8 shrink-0" style={{ color: meta.color }} />
-                    <h2 className="font-heading text-2xl font-extrabold tracking-[-0.02em] text-navy sm:text-[1.8rem]">Inventario de Filamentos</h2>
+                    <h2 className="font-heading text-2xl font-extrabold tracking-[-0.02em] text-navy sm:text-[1.8rem]">Materiales Compatibles</h2>
                   </div>
-                  <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <div className="flex items-center gap-4 rounded-xl bg-[#F4F6F9] p-4 transition-transform hover:-translate-y-0.5">
-                      <div className="size-10 shrink-0 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]" style={{ backgroundColor: '#ff0000' }}></div>
+                  <p className="mb-6 text-sm text-plai-gray leading-relaxed">
+                    <strong>Modalidad &quot;Trae tu Filamento&quot;:</strong> PLAi pone a disposición la maquinaria de grado industrial y formativo (Bambu Lab X1-Carbon, Prusa i3 MK3S+), el software de laminado y la asesoría técnica sin costo. Para tus prototipos o impresiones, únicamente debes traer tu propia bobina de filamento de <strong>1.75 mm</strong> compatible.
+                  </p>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="flex items-center gap-4 rounded-xl bg-[#F4F6F9] p-4 transition-transform hover:-translate-y-0.5 border border-black/[0.04]">
+                      <div className="size-10 shrink-0 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] flex items-center justify-center font-bold text-xs text-white" style={{ backgroundColor: '#0086ff' }}>
+                        PLA
+                      </div>
                       <div>
-                        <strong className="block font-heading text-[0.95rem] text-navy">PLA Rojo</strong>
-                        <p className="m-0 text-[0.8rem] text-plai-gray">1.75mm - 800g disponibles</p>
+                        <strong className="block font-heading text-[0.95rem] text-navy">PLA Estándar / PLA+</strong>
+                        <p className="m-0 text-[0.8rem] text-plai-gray">1.75 mm &bull; Boquilla 200-220°C. Ideal maquetas y prototipos rápidos.</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 rounded-xl bg-[#F4F6F9] p-4 transition-transform hover:-translate-y-0.5">
-                      <div className="size-10 shrink-0 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]" style={{ backgroundColor: '#000000' }}></div>
+                    <div className="flex items-center gap-4 rounded-xl bg-[#F4F6F9] p-4 transition-transform hover:-translate-y-0.5 border border-black/[0.04]">
+                      <div className="size-10 shrink-0 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] flex items-center justify-center font-bold text-xs text-white" style={{ backgroundColor: '#1e5ca7' }}>
+                        PETG
+                      </div>
                       <div>
-                        <strong className="block font-heading text-[0.95rem] text-navy">PLA Negro</strong>
-                        <p className="m-0 text-[0.8rem] text-plai-gray">1.75mm - 1.2kg disponibles</p>
+                        <strong className="block font-heading text-[0.95rem] text-navy">PETG Funcional</strong>
+                        <p className="m-0 text-[0.8rem] text-plai-gray">1.75 mm &bull; Boquilla 230-250°C. Alta resistencia mecánica y térmica.</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 rounded-xl bg-[#F4F6F9] p-4 transition-transform hover:-translate-y-0.5">
-                      <div className="size-10 shrink-0 rounded-full border border-gray-300 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]" style={{ backgroundColor: '#ffffff' }}></div>
+                    <div className="flex items-center gap-4 rounded-xl bg-[#F4F6F9] p-4 transition-transform hover:-translate-y-0.5 border border-black/[0.04]">
+                      <div className="size-10 shrink-0 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] flex items-center justify-center font-bold text-xs text-white" style={{ backgroundColor: '#ed8d1b' }}>
+                        TPU
+                      </div>
                       <div>
-                        <strong className="block font-heading text-[0.95rem] text-navy">PETG Blanco</strong>
-                        <p className="m-0 text-[0.8rem] text-plai-gray">1.75mm - 450g disponibles</p>
+                        <strong className="block font-heading text-[0.95rem] text-navy">TPU Flexible (95A)</strong>
+                        <p className="m-0 text-[0.8rem] text-plai-gray">1.75 mm &bull; Piezas elásticas, fundas y empaques industriales.</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 rounded-xl bg-[#F4F6F9] p-4 transition-transform hover:-translate-y-0.5">
-                      <div className="size-10 shrink-0 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]" style={{ backgroundColor: '#3b82f6' }}></div>
+                    <div className="flex items-center gap-4 rounded-xl bg-[#F4F6F9] p-4 transition-transform hover:-translate-y-0.5 border border-black/[0.04]">
+                      <div className="size-10 shrink-0 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] flex items-center justify-center font-bold text-xs text-white" style={{ backgroundColor: '#475569' }}>
+                        ABS
+                      </div>
                       <div>
-                        <strong className="block font-heading text-[0.95rem] text-navy">TPU Azul (Flexible)</strong>
-                        <p className="m-0 text-[0.8rem] text-plai-gray">1.75mm - 600g disponibles</p>
+                        <strong className="block font-heading text-[0.95rem] text-navy">ABS / ASA</strong>
+                        <p className="m-0 text-[0.8rem] text-plai-gray">1.75 mm &bull; Cabina cerrada Bambu Lab con filtro de carbón activo.</p>
                       </div>
                     </div>
                   </div>
@@ -274,50 +342,72 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
                     <h2 className="font-heading text-2xl font-extrabold tracking-[-0.02em] text-navy sm:text-[1.8rem]">Recomendaciones de Impresión</h2>
                   </div>
                   <ul className="mt-4 flex list-none flex-col gap-5 p-0">
-                    <li className="relative pl-6 text-[0.95rem] leading-[1.6] text-plai-gray before:absolute before:left-0 before:top-0 before:font-bold before:text-plai before:content-['✓']"><strong className="text-navy">Formatos admitidos:</strong> Exporta tu modelo en formato .STL, .OBJ o .3MF.</li>
-                    <li className="relative pl-6 text-[0.95rem] leading-[1.6] text-plai-gray before:absolute before:left-0 before:top-0 before:font-bold before:text-plai before:content-['✓']"><strong className="text-navy">Verifica las normales:</strong> Asegúrate de que tu malla sea &quot;manifold&quot; (cerrada) y no tenga caras invertidas.</li>
-                    <li className="relative pl-6 text-[0.95rem] leading-[1.6] text-plai-gray before:absolute before:left-0 before:top-0 before:font-bold before:text-plai before:content-['✓']"><strong className="text-navy">Soportes:</strong> Considera la orientación para minimizar el uso de soportes, ahorrarás material y tiempo.</li>
-                    <li className="relative pl-6 text-[0.95rem] leading-[1.6] text-plai-gray before:absolute before:left-0 before:top-0 before:font-bold before:text-plai before:content-['✓']"><strong className="text-navy">Tolerancias:</strong> Deja al menos 0.2mm de tolerancia para piezas que deben embonar.</li>
+                    <li className="relative pl-6 text-[0.95rem] leading-[1.6] text-plai-gray before:absolute before:left-0 before:top-0 before:font-bold before:text-plai before:content-['✓']"><strong className="text-navy">Formatos admitidos:</strong> Exporta tu modelo en formato .STL, .OBJ o .3MF listo para laminar.</li>
+                    <li className="relative pl-6 text-[0.95rem] leading-[1.6] text-plai-gray before:absolute before:left-0 before:top-0 before:font-bold before:text-plai before:content-['✓']"><strong className="text-navy">Verifica las normales:</strong> Asegúrate de que tu malla sea &quot;manifold&quot; (cerrada herméticamente) y sin caras invertidas.</li>
+                    <li className="relative pl-6 text-[0.95rem] leading-[1.6] text-plai-gray before:absolute before:left-0 before:top-0 before:font-bold before:text-plai before:content-['✓']"><strong className="text-navy">Soportes y orientación:</strong> Orienta la pieza para reducir voladizos y ahorrar tiempo y filamento.</li>
+                    <li className="relative pl-6 text-[0.95rem] leading-[1.6] text-plai-gray before:absolute before:left-0 before:top-0 before:font-bold before:text-plai before:content-['✓']"><strong className="text-navy">Tolerancias de ensamble:</strong> Deja al menos 0.2 mm a 0.3 mm de separación para piezas que deban embonar.</li>
                   </ul>
                 </div>
               </div>
 
               <div className="rounded-2xl border border-black/[0.08] bg-white p-8 shadow-[0_8px_30px_rgba(0,0,0,0.03)] md:p-10">
                 <div className="mb-6 flex items-center gap-4">
-                  <Coins className="size-8 shrink-0" style={{ color: meta.color }} />
-                  <h2 className="font-heading text-2xl font-extrabold tracking-[-0.02em] text-navy sm:text-[1.8rem]">Cotización de Impresión 3D</h2>
+                  <Printer className="size-8 shrink-0" style={{ color: meta.color }} />
+                  <div>
+                    <h2 className="font-heading text-2xl font-extrabold tracking-[-0.02em] text-navy sm:text-[1.8rem]">Solicitud de Impresión 3D</h2>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                      <Sparkles size={13} /> Servicio Gratuito &bull; Trae tu Filamento
+                    </span>
+                  </div>
                 </div>
                 <div className="mt-4 flex flex-col gap-6">
-                  <p className="text-base text-plai-gray">¿Tienes un diseño listo pero no necesitas solicitar el equipo completo? Podemos imprimirlo por ti.</p>
+                  <p className="text-base text-plai-gray">
+                    ¿Tienes un archivo 3D listo pero necesitas que el equipo técnico valide el laminado y prepare la impresora? Registra tu solicitud. El servicio y el uso de las máquinas son totalmente gratuitos para la comunidad.
+                  </p>
+
+                  <div className="flex items-start gap-3 rounded-xl border border-sky-100 bg-sky-50/70 p-4 text-xs text-sky-900">
+                    <AlertCircle className="size-5 shrink-0 text-sky-600 mt-0.5" />
+                    <div>
+                      <strong>Compromiso del Usuario:</strong> No se realizan cobros por horas de máquina ni por servicio. El solicitante debe presentarse en el laboratorio con su bobina de filamento compatible de 1.75 mm en buenas condiciones de conservación.
+                    </div>
+                  </div>
+
                   {quoteSubmitted ? (
                     <div role="alert" className="flex items-center gap-4 rounded-xl border border-emerald-200 bg-emerald-50 p-6 text-emerald-800 animate-pop-in">
                       <CheckCircle2 size={32} className="shrink-0 text-emerald-600" />
                       <div>
-                        <h3 className="font-heading font-bold text-emerald-900">¡Solicitud de cotización enviada con éxito!</h3>
-                        <p className="mt-1 text-sm text-emerald-700">El equipo técnico de manufactura aditiva de PLAi revisará tu modelo y responderá a la brevedad.</p>
+                        <h3 className="font-heading font-bold text-emerald-900">¡Solicitud de impresión registrada con éxito!</h3>
+                        <p className="mt-1 text-sm text-emerald-700">El equipo técnico de manufactura aditiva de PLAi revisará la geometría de tu archivo y los parámetros de impresión. Te notificaremos por correo electrónico para confirmar la fecha y hora en la que podrás acudir al laboratorio con tu bobina de filamento de 1.75 mm.</p>
                       </div>
                     </div>
                   ) : (
                     <form className="flex flex-col gap-5 rounded-xl bg-[#F4F6F9] p-6" onSubmit={(e) => { e.preventDefault(); setQuoteSubmitted(true); }}>
                       <div className="flex flex-col gap-2">
-                        <label className="font-heading text-[0.9rem] font-bold text-navy">Archivo 3D (.stl, .obj)</label>
+                        <label className="font-heading text-[0.9rem] font-bold text-navy">Archivo 3D (.stl, .obj, .3mf) *</label>
                         <input type="file" accept=".stl,.obj,.3mf" className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] file:mr-4 file:rounded-full file:border-0 file:bg-plai/10 file:px-4 file:py-2 file:font-heading file:font-semibold file:text-plai" required />
                       </div>
-                      <div className="flex flex-col gap-2">
-                        <label className="font-heading text-[0.9rem] font-bold text-navy">Material deseado</label>
-                        <select className="w-full cursor-pointer rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] text-navy outline-none focus:border-plai">
-                          <option>PLA</option>
-                          <option>PETG</option>
-                          <option>TPU (Flexible)</option>
-                          <option>ABS</option>
-                        </select>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="flex flex-col gap-2">
+                          <label className="font-heading text-[0.9rem] font-bold text-navy">Filamento que traerás *</label>
+                          <select className="w-full cursor-pointer rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] text-navy outline-none focus:border-plai">
+                            <option>PLA (1.75 mm)</option>
+                            <option>PLA+ (1.75 mm)</option>
+                            <option>PETG (1.75 mm)</option>
+                            <option>TPU Flexible 95A (1.75 mm)</option>
+                            <option>ABS / ASA (1.75 mm)</option>
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <label className="font-heading text-[0.9rem] font-bold text-navy">Marca y Color del filamento *</label>
+                          <input type="text" placeholder="Ej. eSUN PLA+ Blanco, Polymaker PETG Gris..." className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] text-navy outline-none focus:border-plai" required />
+                        </div>
                       </div>
                       <div className="flex flex-col gap-2">
-                        <label className="font-heading text-[0.9rem] font-bold text-navy">Detalles adicionales</label>
-                        <textarea className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] outline-none focus:border-plai" placeholder="Ej. Relleno al 20%, color preferido..." rows={2}></textarea>
+                        <label className="font-heading text-[0.9rem] font-bold text-navy">Parámetros de impresión sugeridos o notas</label>
+                        <textarea className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] outline-none focus:border-plai" placeholder="Ej. Relleno al 20% giroidal, 4 paredes para resistencia, orientación vertical..." rows={3}></textarea>
                       </div>
-                      <button type="submit" className="mt-2 cursor-pointer self-start rounded-xl px-6 py-3 font-heading text-base font-bold text-white transition-all hover:-translate-y-0.5 hover:opacity-90" style={{ backgroundColor: meta.color }}>
-                        Solicitar Cotización
+                      <button type="submit" className="mt-2 cursor-pointer self-start rounded-xl px-6 py-3 font-heading text-base font-bold text-white transition-all hover:-translate-y-0.5 hover:opacity-90 shadow-md" style={{ backgroundColor: meta.color }}>
+                        Enviar Solicitud de Impresión (Trae tu Filamento)
                       </button>
                     </form>
                   )}
