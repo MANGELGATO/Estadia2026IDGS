@@ -171,8 +171,7 @@ export default async function CategoriasPage() {
                 {/* Botón de acceso a la categoría */}
                 <Link
                   href={`/categoria/${cat.id}`}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl py-3 font-heading text-sm font-bold text-white shadow-md transition-all hover:opacity-95 active:scale-[0.99]"
-                  style={{ backgroundColor: cat.color }}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#ed8d1b] py-3 font-heading text-sm font-bold text-white shadow-md transition-all hover:bg-[#d67a10] active:scale-[0.99]"
                 >
                   Explorar Equipos de {cat.name.split(' ')[0]} <ArrowRight size={15} />
                 </Link>
@@ -193,7 +192,7 @@ export default async function CategoriasPage() {
           </div>
           <Link
             href="/equipos"
-            className="shrink-0 inline-flex items-center gap-2 rounded-2xl bg-primary px-6 py-3.5 font-heading text-sm font-bold text-white shadow-plai-sm hover:bg-[#004a87] transition-all hover:-translate-y-0.5 active:translate-y-0"
+            className="shrink-0 inline-flex items-center gap-2 rounded-2xl bg-[#ed8d1b] px-6 py-3.5 font-heading text-sm font-bold text-white shadow-plai-sm hover:bg-[#d67a10] transition-all hover:-translate-y-0.5 active:translate-y-0"
           >
             Ver Catálogo Completo de Equipos <ArrowRight size={16} />
           </Link>

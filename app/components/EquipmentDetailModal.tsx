@@ -235,7 +235,7 @@ export default function EquipmentDetailModal({ device, onClose, onReserve }: Pro
           <button
             className={`flex items-center gap-1.5 rounded-full px-5 py-2 font-heading text-xs sm:text-sm font-bold text-white transition-all ${
               isAvailable
-                ? 'cursor-pointer bg-plai hover:bg-navy shadow-sm'
+                ? 'cursor-pointer bg-[#ed8d1b] hover:bg-[#d67a10] shadow-sm'
                 : 'cursor-not-allowed bg-gray-400'
             }`}
             onClick={() => { if (isAvailable) { onReserve(device.id); onClose(); } }}

@@ -160,7 +160,7 @@ export default function PrivacyPolicyModal({ isOpen, onClose }: PrivacyPolicyMod
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-heading text-sm font-bold text-white shadow-plai-sm hover:bg-[#004a87] transition-all active:scale-95"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#ed8d1b] px-5 py-2.5 font-heading text-sm font-bold text-white shadow-plai-sm hover:bg-[#d67a10] transition-all active:scale-95"
           >
             <Check size={16} />
             Entendido y Aceptar

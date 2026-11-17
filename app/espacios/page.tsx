@@ -142,8 +142,7 @@ export default function EspaciosPage() {
                   )}
                 </ul>
                 <button 
-                  className="w-full cursor-pointer rounded-xl py-3 font-heading text-base font-bold text-white transition-opacity duration-200 hover:opacity-90" 
-                  style={{ backgroundColor: espacio.color }}
+                  className="w-full cursor-pointer rounded-xl bg-[#ed8d1b] py-3 font-heading text-base font-bold text-white transition-all duration-200 hover:bg-[#d67a10]" 
                   onClick={() => setSelectedEspacio(espacio.id)}
                 >
                   Solicitar Reserva
@@ -177,7 +176,7 @@ export default function EspaciosPage() {
               <button
                 type="button"
                 onClick={() => router.push('/login?callbackUrl=/espacios')}
-                className="w-full rounded-full bg-plai py-2.5 font-heading text-xs font-bold text-white shadow-md hover:bg-navy"
+                className="w-full rounded-full bg-[#ed8d1b] py-2.5 font-heading text-xs font-bold text-white shadow-md hover:bg-[#d67a10]"
               >
                 Iniciar Sesión
               </button>
@@ -204,8 +203,7 @@ export default function EspaciosPage() {
                 <div className="flex flex-wrap justify-center gap-3">
                   <Link
                     href="/usuario/prestamos"
-                    className="rounded-xl px-6 py-3 font-heading text-sm font-bold text-white transition-opacity hover:opacity-90"
-                    style={{ backgroundColor: activeEspacio.color }}
+                    className="rounded-xl bg-[#ed8d1b] px-6 py-3 font-heading text-sm font-bold text-white transition-all hover:bg-[#d67a10]"
                   >
                     Ver en Mis Solicitudes
                   </Link>
@@ -278,7 +276,7 @@ export default function EspaciosPage() {
                     </label>
                   </div>
 
-                  <button type="submit" disabled={isSubmitting} className="mt-4 cursor-pointer rounded-xl p-4 font-heading text-base font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: activeEspacio.color }}>
+                  <button type="submit" disabled={isSubmitting} className="mt-4 cursor-pointer rounded-xl bg-[#ed8d1b] p-4 font-heading text-base font-bold text-white transition-all hover:bg-[#d67a10] disabled:opacity-60">
                     {isSubmitting ? 'Registrando solicitud...' : 'Enviar Solicitud'}
                   </button>
                 </form>

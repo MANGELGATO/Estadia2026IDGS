@@ -30,7 +30,7 @@ export default function HeroSection() {
           <Link
             href="#equipos"
             id="hero-explorar"
-            className="inline-flex items-center gap-[0.6rem] rounded-full bg-plai px-8 py-[0.85rem] text-base font-bold text-white transition-all duration-[250ms] hover:gap-[0.9rem] hover:bg-[#8b145d]"
+            className="inline-flex items-center gap-[0.6rem] rounded-full bg-[#ed8d1b] px-8 py-[0.85rem] text-base font-bold text-white shadow-md transition-all duration-[250ms] hover:gap-[0.9rem] hover:bg-[#d67a10]"
           >
             Explorar equipos y cursos <ArrowRight size={18} />
           </Link>

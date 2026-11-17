@@ -393,7 +393,7 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
                       </div>
                       <Link
                         href="/usuario/prestamos"
-                        className="shrink-0 rounded-full bg-emerald-700 px-5 py-2.5 font-heading text-xs font-bold text-white shadow-sm hover:bg-emerald-800"
+                        className="shrink-0 rounded-full bg-[#ed8d1b] px-5 py-2.5 font-heading text-xs font-bold text-white shadow-sm hover:bg-[#d67a10]"
                       >
                         Ver en Mis Solicitudes
                       </Link>
@@ -463,7 +463,7 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
                         <label className="font-heading text-[0.9rem] font-bold text-navy">Parámetros de impresión sugeridos o notas</label>
                         <textarea name="notas" className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] outline-none focus:border-plai" placeholder="Ej. Relleno al 20% giroidal, 4 paredes para resistencia, orientación vertical..." rows={3}></textarea>
                       </div>
-                      <button type="submit" disabled={isSubmittingPrint} className="mt-2 cursor-pointer self-start rounded-xl px-6 py-3 font-heading text-base font-bold text-white transition-all hover:-translate-y-0.5 hover:opacity-90 shadow-md disabled:opacity-60" style={{ backgroundColor: meta.color }}>
+                      <button type="submit" disabled={isSubmittingPrint} className="mt-2 cursor-pointer self-start rounded-xl bg-[#ed8d1b] px-6 py-3 font-heading text-base font-bold text-white transition-all hover:-translate-y-0.5 hover:bg-[#d67a10] shadow-md disabled:opacity-60">
                         {isSubmittingPrint ? 'Registrando solicitud...' : 'Enviar Solicitud de Impresión (Trae tu Filamento)'}
                       </button>
                     </form>

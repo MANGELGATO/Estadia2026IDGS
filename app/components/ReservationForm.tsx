@@ -170,7 +170,7 @@ export default function ReservationForm({ device, onClose }: Props) {
             <button
               type="button"
               onClick={() => router.push(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`)}
-              className="w-full rounded-full bg-plai py-2.5 font-heading text-xs font-bold text-white shadow-md hover:bg-navy transition-all"
+              className="w-full rounded-full bg-[#ed8d1b] py-2.5 font-heading text-xs font-bold text-white shadow-md hover:bg-[#d67a10] transition-all"
             >
               Iniciar Sesión
             </button>
@@ -214,7 +214,7 @@ export default function ReservationForm({ device, onClose }: Props) {
               Cerrar
             </button>
             <button
-              className="w-full rounded-full bg-plai py-2.5 font-heading text-xs font-bold text-white shadow-md hover:bg-navy transition-all"
+              className="w-full rounded-full bg-[#ed8d1b] py-2.5 font-heading text-xs font-bold text-white shadow-md hover:bg-[#d67a10] transition-all"
               onClick={() => router.push('/usuario/prestamos')}
             >
               Ver en Mis Préstamos →
@@ -502,7 +502,7 @@ export default function ReservationForm({ device, onClose }: Props) {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex cursor-pointer items-center gap-2 rounded-full bg-plai px-6 py-[0.7rem] font-heading text-[0.9rem] font-bold text-white transition-all duration-[250ms] hover:bg-navy disabled:opacity-60 disabled:cursor-not-allowed shadow-md"
+              className="flex cursor-pointer items-center gap-2 rounded-full bg-[#ed8d1b] px-6 py-[0.7rem] font-heading text-[0.9rem] font-bold text-white transition-all duration-[250ms] hover:bg-[#d67a10] disabled:opacity-60 disabled:cursor-not-allowed shadow-md"
               id="res-submit"
             >
               <CheckCircle2 size={16} /> {isSubmitting ? 'Validando...' : 'Enviar solicitud'}

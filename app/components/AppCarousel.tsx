@@ -92,7 +92,7 @@ export default function AppCarousel() {
         <div className="mt-6 flex justify-center">
           <Link
             href="/aplicaciones"
-            className="inline-flex items-center gap-2 rounded-full border-2 border-plai px-8 py-3 font-heading text-[0.9rem] font-bold text-plai transition-all duration-[250ms] hover:gap-3 hover:bg-plai hover:text-white"
+            className="inline-flex items-center gap-2 rounded-full bg-[#ed8d1b] px-8 py-3 font-heading text-[0.9rem] font-bold text-white shadow-sm transition-all duration-[250ms] hover:gap-3 hover:bg-[#d67a10]"
           >
             Ver las {apps.length} aplicaciones disponibles <ArrowRight size={15} />
           </Link>

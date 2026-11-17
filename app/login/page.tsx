@@ -188,7 +188,7 @@ function LoginFormContent() {
               <button
                 type="submit"
                 disabled={loading || quickLoginRole !== null}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1B365D] py-3 text-sm font-semibold text-white shadow-md transition hover:bg-[#142642] active:scale-[0.99] disabled:opacity-60"
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#ed8d1b] py-3 text-sm font-semibold text-white shadow-md transition hover:bg-[#d67a10] active:scale-[0.99] disabled:opacity-60"
               >
                 {loading ? (
                   <>

@@ -82,7 +82,7 @@ export default function AgendaPage() {
                 <span className="text-xs text-gray-500">Instructor: <strong>{curso.instructor}</strong></span>
                 <button 
                   onClick={() => setSelectedCurso(curso)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-navy transition-all hover:border-plai hover:bg-plai hover:text-white"
+                  className="inline-flex items-center gap-1 rounded-lg bg-[#ed8d1b] px-3.5 py-1.5 text-xs font-semibold text-white transition-all hover:bg-[#d67a10]"
                 >
                   Ver Ficha <RiArrowRightLine />
                 </button>
@@ -134,7 +134,7 @@ export default function AgendaPage() {
             <div className="mt-5 flex justify-end">
               <button
                 onClick={() => setSelectedCurso(null)}
-                className="rounded-lg bg-[#1e5ca7] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-navy"
+                className="rounded-lg bg-[#ed8d1b] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#d67a10]"
               >
                 Cerrar
               </button>

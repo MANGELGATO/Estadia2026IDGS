@@ -109,8 +109,8 @@ export default function EquipmentFilterGrid({ activeFilter, onFilterChange }: Pr
               key={tab}
               className={`cursor-pointer rounded-full border-[1.5px] px-[1.1rem] py-[0.48rem] font-heading text-[0.83rem] font-semibold transition-all duration-[250ms] ${
                 filter === tab
-                  ? 'border-plai bg-plai text-white'
-                  : 'border-black/[0.08] bg-white text-plai-gray hover:border-plai hover:text-plai'
+                  ? 'border-[#ed8d1b] bg-[#ed8d1b] text-white'
+                  : 'border-black/[0.08] bg-white text-plai-gray hover:border-[#ed8d1b] hover:text-[#ed8d1b]'
               }`}
               onClick={() => handleFilterClick(tab)}
               id={`filter-${tab.replace(/\s+/g, '-').toLowerCase()}`}
@@ -155,7 +155,7 @@ export default function EquipmentFilterGrid({ activeFilter, onFilterChange }: Pr
             <span className="text-[2.5rem]">🔍</span>
             <p className="text-base text-plai-gray">No se encontraron equipos con los filtros aplicados.</p>
             <button
-              className="cursor-pointer rounded-full bg-plai px-6 py-[0.6rem] font-heading text-[0.88rem] font-bold text-white transition-all duration-[250ms] hover:bg-navy"
+              className="cursor-pointer rounded-full bg-[#ed8d1b] px-6 py-[0.6rem] font-heading text-[0.88rem] font-bold text-white transition-all duration-[250ms] hover:bg-[#d67a10]"
               onClick={() => { setSearch(''); setStatusFilter('Todos los estados'); onFilterChange?.('Todos'); }}
             >
               Limpiar filtros

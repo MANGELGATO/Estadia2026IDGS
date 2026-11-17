@@ -136,7 +136,7 @@ export default function CategoryCarousel() {
                   <div className="flex flex-wrap gap-2">
                     <Link
                       href={`/categoria/${cat.id}`}
-                      className="inline-flex items-center gap-[0.35rem] rounded-full bg-plai px-[0.85rem] py-[0.45rem] font-heading text-[0.75rem] font-bold text-white transition-all duration-[250ms] hover:bg-navy"
+                      className="inline-flex items-center gap-[0.35rem] rounded-full bg-[#ed8d1b] px-[0.85rem] py-[0.45rem] font-heading text-[0.75rem] font-bold text-white transition-all duration-[250ms] hover:bg-[#d67a10]"
                     >
                       Saber más <ArrowRight size={14} />
                     </Link>

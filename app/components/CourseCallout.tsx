@@ -53,9 +53,9 @@ export default function CourseCallout() {
             <Link
               href={selected ? `/agendar-curso/${selected}` : '#'}
               id="btn-agendar"
-              className={`inline-flex items-center gap-[0.6rem] self-start rounded-full bg-plai px-8 py-[0.85rem] text-[0.97rem] font-bold text-white transition-all duration-[250ms] ${
+              className={`inline-flex items-center gap-[0.6rem] self-start rounded-full bg-[#ed8d1b] px-8 py-[0.85rem] text-[0.97rem] font-bold text-white transition-all duration-[250ms] ${
                 selected
-                  ? 'hover:-translate-y-0.5 hover:bg-navy hover:shadow-[0_8px_24px_rgba(27,54,93,0.25)]'
+                  ? 'hover:-translate-y-0.5 hover:bg-[#d67a10] hover:shadow-[0_8px_24px_rgba(237,141,27,0.3)]'
                   : 'cursor-not-allowed opacity-40'
               }`}
               onClick={e => { if (!selected) e.preventDefault(); }}

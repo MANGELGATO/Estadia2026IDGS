@@ -75,7 +75,7 @@ export default function AgendarCursoPage({ params }: { params: Promise<{ type: s
             Hemos registrado tu solicitud como <strong>{typeLabel}</strong> en el sistema de agenda y reservaciones de PLAi.
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Link href="/usuario/agenda" className="rounded-full bg-plai px-7 py-[0.8rem] font-heading text-[0.9rem] font-bold text-white transition-colors hover:bg-navy">
+            <Link href="/usuario/agenda" className="rounded-full bg-[#ed8d1b] px-7 py-[0.8rem] font-heading text-[0.9rem] font-bold text-white transition-colors hover:bg-[#d67a10]">
               Ver en Mi Agenda
             </Link>
             <Link href="/" className="rounded-full border border-gray-300 bg-white px-7 py-[0.8rem] font-heading text-[0.9rem] font-bold text-navy transition-colors hover:bg-gray-50">
@@ -220,7 +220,7 @@ export default function AgendarCursoPage({ params }: { params: Promise<{ type: s
                 <textarea name="comentarios" className="resize-y rounded-xl border-[1.5px] border-black/[0.08] bg-white px-4 py-[0.8rem] font-body text-[0.95rem] text-navy outline-none transition-all placeholder:text-plai-muted focus:border-plai focus:ring-2 focus:ring-plai/10" rows={4} placeholder={isInstitucion ? "Detalles del grupo escolar, requerimientos especiales o dudas..." : "Detalles específicos del proyecto o capacitación, áreas de interés de su equipo..."}></textarea>
               </div>
 
-              <button type="submit" disabled={isSubmitting} className="mt-4 w-full cursor-pointer rounded-full bg-plai py-4 font-heading text-[1.05rem] font-extrabold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-navy disabled:opacity-60">
+              <button type="submit" disabled={isSubmitting} className="mt-4 w-full cursor-pointer rounded-full bg-[#ed8d1b] py-4 font-heading text-[1.05rem] font-extrabold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#d67a10] disabled:opacity-60">
                 {isSubmitting ? 'Registrando solicitud...' : 'Enviar solicitud'}
               </button>
             </form>

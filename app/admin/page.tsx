@@ -66,7 +66,7 @@ export default function AdminDashboard() {
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={() => router.push('/admin/inventario')}
-            className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-plai px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-plai-hover"
+            className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#ed8d1b] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#d67a10]"
           >
             <RiAddLine size={16} />
             <span>Nuevo Equipo</span>
@@ -74,7 +74,7 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => router.push('/admin/bitacora')}
-            className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-sky-300 bg-white px-4 py-2 text-xs font-bold text-sky-800 shadow-sm transition hover:bg-sky-50"
+            className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#ed8d1b] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#d67a10]"
           >
             <RiHistoryLine size={16} />
             <span>Bitácora de Uso</span>
@@ -82,7 +82,7 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => router.push('/admin/reportes')}
-            className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 shadow-sm transition hover:bg-gray-50"
+            className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#ed8d1b] px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#d67a10]"
           >
             <RiFileList3Line size={16} />
             <span>Reportes</span>
@@ -252,7 +252,7 @@ export default function AdminDashboard() {
 
                   <button
                     onClick={() => router.push('/admin/reservaciones')}
-                    className="flex cursor-pointer items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700 shadow-sm"
+                    className="flex cursor-pointer items-center gap-1 rounded-lg bg-[#ed8d1b] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#d67a10] shadow-sm"
                   >
                     <RiShieldCheckLine size={14} />
                     <span>Revisar y Asignar</span>

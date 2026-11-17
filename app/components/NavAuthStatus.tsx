@@ -58,7 +58,7 @@ export default function NavAuthStatus() {
       <Link
         href="/login"
         id="nav-login"
-        className="btn btn-primary btn-sm h-auto shrink-0 whitespace-nowrap rounded-full border-0 px-[1.3rem] py-[0.55rem] text-[0.88rem] font-semibold shadow-none transition-all hover:-translate-y-px hover:bg-navy"
+        className="inline-flex h-auto shrink-0 items-center gap-2 whitespace-nowrap rounded-full border-0 bg-[#ed8d1b] px-[1.3rem] py-[0.55rem] text-[0.88rem] font-semibold text-white shadow-sm transition-all hover:-translate-y-px hover:bg-[#d67a10]"
       >
         <UserCircle2 size={17} />
         Iniciar Sesión

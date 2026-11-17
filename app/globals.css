@@ -30,6 +30,8 @@
   --color-plai: #0086ff;
   --color-plai-hover: #1e5ca7;
   --color-plai-orange: #ed8d1b;
+  --color-accent: #ed8d1b;
+  --color-accent-hover: #d67a10;
   --color-navy: #1e5ca7;
   --color-navy-deep: #143e72;
   --color-plai-gray: #4b5563;
@@ -100,4 +102,33 @@ html.a11y-highlight-links a {
   font-weight: 700 !important;
   outline: 2px dashed #0086ff !important;
 }
+
+/* Unificación institucional de todos los botones principales de acción al color naranja secundario (#ed8d1b) */
+button.bg-plai,
+a.bg-plai,
+button.bg-primary,
+a.bg-primary,
+button.bg-emerald-600,
+button.bg-indigo-600,
+button.bg-\[\#1e5ca7\],
+button.btn-primary,
+a.btn-primary {
+  background-color: #ed8d1b !important;
+  border-color: #ed8d1b !important;
+  color: #ffffff !important;
+}
+
+button.bg-plai:hover,
+a.bg-plai:hover,
+button.bg-primary:hover,
+a.bg-primary:hover,
+button.bg-emerald-600:hover,
+button.bg-indigo-600:hover,
+button.bg-\[\#1e5ca7\]:hover,
+button.btn-primary:hover,
+a.btn-primary:hover {
+  background-color: #d67a10 !important;
+  border-color: #d67a10 !important;
+}
+
 

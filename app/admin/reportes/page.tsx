@@ -180,13 +180,13 @@ export default function ReportesPage() {
         <div className="flex gap-3 print:hidden">
           <button
             onClick={handleExportPDF}
-            className="flex items-center gap-1.5 cursor-pointer rounded-lg border border-black/[0.08] bg-white px-4 py-2 font-heading text-xs font-semibold text-navy shadow-plai-sm transition-all hover:-translate-y-0.5 hover:bg-gray-50 hover:shadow-plai-md"
+            className="flex items-center gap-1.5 cursor-pointer rounded-lg bg-[#ed8d1b] px-4 py-2 font-heading text-xs font-semibold text-white shadow-plai-sm transition-all hover:-translate-y-0.5 hover:bg-[#d67a10] hover:shadow-plai-md"
           >
-            <RiPrinterLine className="text-base text-plai" /> Exportar PDF / Imprimir
+            <RiPrinterLine className="text-base text-white" /> Exportar PDF / Imprimir
           </button>
           <button
             onClick={handleExportExcel}
-            className="flex items-center gap-1.5 cursor-pointer rounded-lg border border-emerald-600 bg-emerald-600 px-4 py-2 font-heading text-xs font-semibold text-white shadow-plai-sm transition-all hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-plai-md"
+            className="flex items-center gap-1.5 cursor-pointer rounded-lg bg-[#ed8d1b] px-4 py-2 font-heading text-xs font-semibold text-white shadow-plai-sm transition-all hover:-translate-y-0.5 hover:bg-[#d67a10] hover:shadow-plai-md"
           >
             <RiFileExcel2Line className="text-base text-white" /> Exportar a Excel (.CSV)
           </button>

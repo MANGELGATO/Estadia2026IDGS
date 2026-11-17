@@ -38,7 +38,7 @@ export default function DataTable<T extends Record<string, any> = any>({
         <h3 className="font-heading text-xl font-bold text-navy">{title}</h3>
         {onAdd && (
           <button
-            className="flex items-center gap-2 rounded-lg bg-plai px-4 py-2 font-heading font-semibold text-white transition-all duration-[250ms] hover:-translate-y-px hover:bg-plai-hover"
+            className="flex items-center gap-2 rounded-lg bg-[#ed8d1b] px-4 py-2 font-heading font-semibold text-white transition-all duration-[250ms] hover:-translate-y-px hover:bg-[#d67a10]"
             onClick={onAdd}
           >
             <RiAddLine /> {addActionLabel}

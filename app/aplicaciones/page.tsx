@@ -80,8 +80,8 @@ export default function AplicacionesPage() {
                 key={p}
                 className={`whitespace-nowrap rounded-full border px-4 py-[0.45rem] font-heading text-[0.82rem] font-semibold transition-all duration-200 ${
                   filterPlatform === p
-                    ? 'border-plai bg-plai text-white shadow-[0_2px_8px_rgba(0,134,255,0.25)]'
-                    : 'border-black/[0.08] bg-white text-plai-gray hover:border-plai hover:text-plai'
+                    ? 'border-[#ed8d1b] bg-[#ed8d1b] text-white shadow-[0_2px_8px_rgba(237,141,27,0.25)]'
+                    : 'border-black/[0.08] bg-white text-plai-gray hover:border-[#ed8d1b] hover:text-[#ed8d1b]'
                 }`}
                 onClick={() => setFilterPlatform(p)}
               >

@@ -64,7 +64,7 @@ export default function PrestamosPage() {
         </div>
         <Link
           href="/equipos"
-          className="inline-flex items-center gap-2 rounded-xl bg-plai px-5 py-2.5 font-heading text-xs font-bold text-white shadow-plai-sm transition-all hover:bg-navy hover:-translate-y-0.5"
+          className="inline-flex items-center gap-2 rounded-xl bg-[#ed8d1b] px-5 py-2.5 font-heading text-xs font-bold text-white shadow-plai-sm transition-all hover:bg-[#d67a10] hover:-translate-y-0.5"
         >
           <RiAddCircleLine className="text-base" /> Nueva Solicitud
         </Link>
@@ -78,8 +78,8 @@ export default function PrestamosPage() {
               onClick={() => setOnlyMine(!onlyMine)}
               className={`rounded-full px-3.5 py-1 text-xs font-bold transition-all inline-flex items-center gap-1.5 ${
                 onlyMine
-                  ? 'bg-navy text-white shadow-sm ring-2 ring-plai'
-                  : 'border border-plai/30 bg-plai/10 text-plai hover:bg-plai hover:text-white'
+                  ? 'bg-[#ed8d1b] text-white shadow-sm ring-2 ring-[#ed8d1b]/30'
+                  : 'border border-[#ed8d1b]/30 bg-[#ed8d1b]/10 text-[#ed8d1b] hover:bg-[#ed8d1b] hover:text-white'
               }`}
             >
               <RiUser3Line />
@@ -92,7 +92,7 @@ export default function PrestamosPage() {
               onClick={() => setStatusFilter(s)}
               className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
                 statusFilter === s
-                  ? 'bg-plai text-white shadow-sm'
+                  ? 'bg-[#ed8d1b] text-white shadow-sm'
                   : 'border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
               }`}
             >
@@ -161,7 +161,7 @@ export default function PrestamosPage() {
                   <td className="px-6 py-4 text-center">
                     <button
                       onClick={() => setSelectedItem(item)}
-                      className="inline-flex items-center gap-1 rounded-md bg-plai/10 px-3 py-1.5 text-xs font-bold text-plai transition hover:bg-plai hover:text-white"
+                      className="inline-flex items-center gap-1 rounded-md bg-[#ed8d1b] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#d67a10]"
                     >
                       <RiEyeLine /> Ver Ficha
                     </button>
@@ -239,7 +239,7 @@ export default function PrestamosPage() {
             <div className="mt-5 flex justify-end">
               <button
                 onClick={() => setSelectedItem(null)}
-                className="rounded-lg bg-[#1e5ca7] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-navy"
+                className="rounded-lg bg-[#ed8d1b] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#d67a10]"
               >
                 Cerrar Ficha
               </button>

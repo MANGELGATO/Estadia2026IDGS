@@ -105,7 +105,7 @@ export default function EquipmentCard({ device, onViewDetails, onReserve }: Prop
         {/* Actions */}
         <div className="mt-auto flex flex-col gap-2">
           <button
-            className={`${btnBase} cursor-pointer border-[1.5px] border-black/[0.08] bg-white font-semibold text-navy hover:border-plai hover:text-plai`}
+            className={`${btnBase} cursor-pointer border-[1.5px] border-[#ed8d1b]/30 bg-[#ed8d1b]/10 font-bold text-[#ed8d1b] hover:bg-[#ed8d1b] hover:text-white`}
             onClick={() => onViewDetails(device.id)}
             id={`details-${device.id}`}
           >
@@ -116,7 +116,7 @@ export default function EquipmentCard({ device, onViewDetails, onReserve }: Prop
             <button
               className={`${btnBase} font-bold text-white ${
                 isAvailable
-                  ? 'cursor-pointer bg-plai hover:bg-navy'
+                  ? 'cursor-pointer bg-[#ed8d1b] hover:bg-[#d67a10]'
                   : 'cursor-not-allowed bg-[#94a3b8] opacity-60'
               }`}
               onClick={() => isAvailable && onReserve(device.id)}

@@ -137,14 +137,14 @@ export default function EquipmentCarousel() {
                         <button
                           type="button"
                           onClick={() => setSelectedReserveId(device.id)}
-                          className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-plai px-2.5 py-1 text-[0.7rem] font-bold text-white hover:bg-navy transition-colors"
+                          className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-[#ed8d1b] px-2.5 py-1 text-[0.7rem] font-bold text-white hover:bg-[#d67a10] transition-colors"
                         >
                           <Calendar size={11} /> Reservar
                         </button>
                       )}
                       <Link
                         href={`/categoria/${catSlug}`}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-plai hover:text-navy transition-colors"
+                        className="inline-flex items-center gap-1 text-xs font-bold text-[#ed8d1b] hover:text-[#d67a10] transition-colors"
                       >
                         Detalles <ArrowRight size={13} />
                       </Link>
@@ -159,7 +159,7 @@ export default function EquipmentCarousel() {
         <div className="mt-6 flex justify-center">
           <Link
             href="/equipos"
-            className="inline-flex items-center gap-2 rounded-full border border-black/[0.1] bg-white px-6 py-2.5 font-heading text-xs font-bold text-navy shadow-2xs hover:border-plai hover:bg-plai/5 hover:text-plai transition-all"
+            className="inline-flex items-center gap-2 rounded-full bg-[#ed8d1b] px-6 py-2.5 font-heading text-xs font-bold text-white shadow-sm hover:bg-[#d67a10] transition-all"
           >
             Explorar todos los equipos disponibles ({devices.length}) <ArrowRight size={14} />
           </Link>
