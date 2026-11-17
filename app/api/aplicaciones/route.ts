@@ -42,7 +42,8 @@ export async function POST(req: NextRequest) {
       platform: body.platform,
       ageRating: body.ageRating || 'Todas las edades',
       description: body.description?.trim() || 'Sin descripción',
-      imageUrl: body.imageUrl?.trim() || '/images/apps/default.jpg',
+      imageUrl: body.imageUrl?.trim() || body.iconUrl?.trim() || '/images/apps/beat-saber.png',
+      iconUrl: body.iconUrl?.trim() || body.imageUrl?.trim() || '/images/apps/beat-saber.png',
       devicesInstalled: Number(body.devicesInstalled || 1),
       status: body.status || 'Activa',
     };

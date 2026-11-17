@@ -87,6 +87,7 @@ CREATE TABLE `equipos` (
   `especificaciones` JSON NULL COMMENT 'Lista de atributos técnicos en formato JSON',
   `accesorios` JSON NULL COMMENT 'Lista de accesorios incluidos en formato JSON',
   `imagen_emoji` VARCHAR(20) DEFAULT '📦',
+  `imagen_url` VARCHAR(255) NULL COMMENT 'Ruta de la imagen oficial del equipo',
   `responsable` VARCHAR(120) DEFAULT 'Laboratorio de Tecnologías Inmersivas',
   `observaciones` TEXT NULL,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -112,6 +113,7 @@ CREATE TABLE `aplicaciones` (
   `plataforma` ENUM('Meta Quest', 'PC', 'Meta Quest + PC') NOT NULL DEFAULT 'Meta Quest',
   `clasificacion_edad` VARCHAR(30) DEFAULT 'Todas las edades',
   `icono` VARCHAR(20) DEFAULT '🎮',
+  `imagen_url` VARCHAR(255) NULL COMMENT 'Ruta del icono o caratula de la aplicacion',
   `descripcion` TEXT NULL,
   `estado` ENUM('Activa', 'Inactiva') NOT NULL DEFAULT 'Activa',
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -274,133 +276,52 @@ INSERT INTO `categorias` (`id`, `nombre`, `slug`, `descripcion`, `icono`, `video
 ('computo-multimedia', 'Cómputo / Multimedia', 'computo-multimedia', 'Estaciones de trabajo de alto rendimiento gráfico (GPU RTX) y laptops profesionales para desarrollo inmersivo.', '💻', '');
 
 -- --- 3. EQUIPOS (CATÁLOGO REAL EXTRAÍDO DE INVENTARIO PLAi) ---
-INSERT INTO `equipos` (`id`, `categoria_id`, `nombre`, `marca`, `modelo`, `numero_serie`, `codigo_plai`, `estado`, `ubicacion`, `especificaciones`, `accesorios`, `imagen_emoji`, `responsable`) VALUES
--- Realidad Virtual
-('vr-01', 'realidad-virtual', 'Meta Quest 3 (512 GB)', 'Meta', 'Quest 3 512 GB', '1WMHH8100A01', '5151000013-1', 'Disponible', 'Área de Realidad Virtual (Laboratorio)', 
- '["Almacenamiento 512 GB", "Chip Snapdragon XR2 Gen 2", "Passthrough a color alta resolución (MR)", "Hand Tracking con IA", "Lentes Fresnel"]', 
- '["2 Controladores Touch Plus", "Correa estándar", "Cable USB-C y adaptador de corriente"]', '🥽', 'Laboratorio de Tecnologías Inmersivas'),
-
-('vr-02', 'realidad-virtual', 'Meta Quest 3 (512 GB) - Lote #4', 'Meta', 'Quest 3 512 GB', '1WMHH8100A04', '5151000013-4', 'En uso', 'Área de Realidad Virtual', 
- '["Almacenamiento 512 GB", "Chip Snapdragon XR2 Gen 2", "Conectividad inalámbrica PC-VR Wi-Fi 6E", "Autonomía 2.2 hrs"]', 
- '["2 Controladores Touch Plus", "Cable de carga"]', '🥽', 'Laboratorio de Tecnologías Inmersivas'),
-
-('vr-03', 'realidad-virtual', 'Oculus Quest VR (128 GB)', 'Oculus', 'Quest VR 128 GB', '1WMHH8007701', '5151000077-1', 'Disponible', 'Área de Realidad Virtual', 
- '["Almacenamiento 128 GB", "Pantalla dual OLED 1440x1600", "Tracking Oculus Insight 6DoF", "Audio espacial integrado"]', 
- '["2 Controladores Oculus Touch", "Espaciador para lentes", "Cargador oficial"]', '🥽', 'Laboratorio de Tecnologías Inmersivas'),
-
-('vr-04', 'realidad-virtual', 'Oculus Quest VR (128 GB) - Incidencia', 'Oculus', 'Quest VR 128 GB', '1WMHH8007712', '5151000077-12', 'En mantenimiento', 'Taller de Soporte / Mantenimiento', 
- '["128 GB", "Falla reportada en inventario: Display dañado", "En diagnóstico técnico"]', 
- '["2 Controladores Oculus Touch"]', '🥽', 'Laboratorio de Tecnologías Inmersivas'),
-
--- Robótica
-('rob-01', 'robotica', 'Brazo Robótico DOBOT Magician', 'DOBOT', 'Magician Lite', 'DB-MAG-2024-011', 'PLAI-ROB-011', 'Disponible', 'Laboratorio de Robótica', 
- '["Payload 250g", "Alcance 320 mm", "Repetibilidad ±0.2 mm", "4 ejes articulados"]', 
- '["Cabezal de pluma", "Succionador de vacío", "Pinza de agarre", "Cable USB"]', '🦾', 'Área de Automatización'),
-
-('rob-02', 'robotica', 'Kit Lego Education SPIKE (5 piezas)', 'Lego Education', 'SPIKE Prime', 'LEGO-SPIKE-5151', '5151000085', 'Disponible', 'Laboratorio de Robótica y Aulas STEAM', 
- '["Robots didácticos programables", "Compatibilidad oficial Made for iPad y PC", "Sensores de color, distancia y fuerza", "Hub inteligente con matriz LED 5x5"]', 
- '["Contenedor amarillo de plástico rígido y apilable", "Batería recargable", "Cables y conectores"]', '🤖', 'Área de Automatización'),
-
-('rob-03', 'robotica', 'OHBOT Cabeza Robótica Expresiva', 'OHBOT', 'Humanoid Head V2', 'OHBOT-V2-052', 'PLAI-ROB-052', 'Disponible', 'Laboratorio de Robótica', 
- '["Servomotores acoplados laterales", "Expresiones faciales y giros de cabeza", "Ojos esféricos realistas", "Boca curva en sonrisa", "Programable en Python/Scratch"]', 
- '["Base de soporte", "Cable de conexión USB"]', '🗣️', 'Área de Automatización'),
-
-('rob-04', 'robotica', 'Mano Robótica con Tendones', 'PLAi Lab', 'Bionic Hand Pro', 'PLAI-BIONIC-063', 'PLAI-ROB-063', 'Disponible', 'Laboratorio de Robótica', 
- '["Sistema de tendones con hilos tensores en falanges", "Microcontrolador Arduino", "Control de apertura y agarre articulado"]', 
- '["Protoboard de pruebas", "Cables de conexión jumper", "Placa Arduino"]', '🖐️', 'Área de Automatización'),
-
-('rob-05', 'robotica', 'Robot Cuadrúpedo Tipo Araña', 'PLAi Lab', 'Spider Bot Nano', 'PLAI-SPIDER-074', 'PLAI-ROB-074', 'Disponible', 'Laboratorio de Robótica', 
- '["Chasis y patas en acrílico negro", "4 patas articuladas", "Micro servomotores en articulaciones", "Arduino Nano con shield azul"]', 
- '["Batería LiPo", "Shield de conexiones"]', '🕷️', 'Área de Automatización'),
-
-('rob-06', 'robotica', 'Robot Cuadrúpedo 3D', 'PLAi Lab', 'Quadruped SG90', 'PLAI-QUAD-075', 'PLAI-ROB-075', 'Disponible', 'Laboratorio de Robótica', 
- '["Estructura impresa en 3D en PLA", "Múltiples servomotores SG-90", "Marcha omnidireccional"]', 
- '["Controlador de servomotores", "Portapilas"]', '🐾', 'Área de Automatización'),
-
-('rob-07', 'robotica', 'Robot Humanoide Abilix H1 Standard', 'Abilix', 'H1 Standard Set', 'ABX-H1-2023-041', 'PLAI-ROB-041', 'Disponible', 'Laboratorio de Robótica', 
- '["Robot bípedo programable", "Múltiples servomotores de precisión", "Control de equilibrio dinámico y coreografías"]', 
- '["Caja original de empaque", "Batería y cargador", "Manual de programación"]', '🤖', 'Área de Automatización'),
-
-('rob-08', 'robotica', 'Creative Brick C1-S Abilix', 'Abilix', 'Creative Brick C1-S', 'ABX-C1S-2023-042', 'PLAI-ROB-042', 'Disponible', 'Laboratorio de Robótica', 
- '["Módulo cerebral de control robótico", "Engranes y transmisión mecánica", "Programación por bloques"]', 
- '["Caja de almacenamiento", "Sensores y motores modulares"]', '⚙️', 'Área de Automatización'),
-
--- Fabricación Digital
-('fab-01', 'fabricacion-digital', 'Impresora 3D Bambu Lab X1-Carbon', 'Bambu Lab', 'X1 Carbon AMS', '01P00A3810009', 'PLAI-FAB-009', 'En uso', 'Taller de Fabricación Digital', 
- '["Sistema AMS multi-material (4 filamentos)", "Cinemática Core XY a 500 mm/s", "Sensor Micro Lidar y cámara IA", "Cámara cerrada con aislamiento térmico", "Soporta Nylon, Fibra de carbono, ABS, TPU, PLA"]', 
- '["Módulo AMS superior", "Placa de construcción texturizada", "Juego de boquillas de repuesto"]', '🖨️', 'Taller de Fabricación'),
-
-('fab-02', 'fabricacion-digital', 'Escáner 3D Miraco Plus', 'Revopoint 3D Technologies', 'Miraco Plus Standalone', 'REV-MIRACO-014', 'PLAI-FAB-014', 'Disponible', 'Taller de Fabricación Digital', 
- '["Escáner 3D volumétrico autónomo", "Proyección de luz infrarroja y láser estructurada", "Nube de millones de puntos", "Pantalla táctil abatible", "Captura fotorealista en color"]', 
- '["Kit de calibración con placas cuadrícula", "Tripié articulado", "Cable USB-C"]', '📡', 'Taller de Fabricación'),
-
-('fab-03', 'fabricacion-digital', 'Mini Fresadora CNC de Escritorio', 'CNC Desktop Pro', '3-Axis Micro CNC', 'CNC-3AX-2023-021', 'PLAI-FAB-021', 'Disponible', 'Taller de Fabricación Digital', 
- '["Mecanizado sustractivo en 3 ejes (X, Y, Z)", "Husillo giratorio alta velocidad", "Control Numérico Código G", "Tallado de madera, plásticos y prototipos PCB"]', 
- '["Juego de fresas y brocas", "Llaves de apriete", "Cable de control PC"]', '⚙️', 'Taller de Fabricación'),
-
-('fab-04', 'fabricacion-digital', 'Mini Torno de Escritorio Manual', 'Precision Mini Lathe', 'Benchtop Lathe 100', 'LATHE-MINI-022', 'PLAI-FAB-022', 'Disponible', 'Taller de Fabricación Digital', 
- '["Fabricación de piezas cilíndricas y roscas", "Mandril con mordazas ajustables", "Carro transversal y bancada rectificada", "Diales milimétricos en cobre", "Control manual por manivelas"]', 
- '["Llave de mandril", "Juego de buriles de corte", "Centro giratorio"]', '🔩', 'Taller de Fabricación'),
-
-('fab-05', 'fabricacion-digital', 'Mini Fresadora / Taladro Vertical', 'Modular Drill Pro', 'Vertical Mill 200', 'DRILL-VERT-023', 'PLAI-FAB-023', 'Disponible', 'Taller de Fabricación Digital', 
- '["Perforado, tallado y desbastado", "Mesa cruzada con manivelas X e Y", "Prensa tornillo de banco", "Estructura modular en aluminio interconectable"]', 
- '["Prensa de sujeción", "Juego de brocas milimétricas"]', '🔧', 'Taller de Fabricación'),
-
-('fab-06', 'fabricacion-digital', 'Módulo de Grabado Láser Snapmaker', 'Snapmaker', 'Laser Module 200mW', 'SNAP-LASER-024', 'PLAI-FAB-024', 'Disponible', 'Taller de Fabricación Digital', 
- '["Cabezal intercambiable para quemado y marcado", "Láser diodo 200mW 405nm (Clase 3B)", "Grabado en madera, cartón y cuero", "Carcasa metálica con conectores rápidos"]', 
- '["Gafas de seguridad certificadas para láser", "Materiales de muestra"]', '⚡', 'Taller de Fabricación'),
-
--- Drones
-('dr-01', 'drones', 'Dron DJI Mavic 4 Pro', 'DJI', 'Mavic 4 Pro', 'DJI-M4P-2023-001', 'PLAI-DR-001', 'Disponible', 'Gabinete de Drones y Filmación', 
- '["Cámara Hasselblad profesional", "Cuadricóptero foto y video aéreo alta resolución", "Transmisión HD de largo alcance", "Compatible con apps iOS y Android"]', 
- '["Control remoto inteligente", "2 Baterías de vuelo", "Cargador múltiple", "Estuche rígido"]', '🚁', 'Coordinación de Operaciones'),
-
-('dr-02', 'drones', 'Dron DJI Mini 5 Pro (4 piezas)', 'DJI', 'Mini 5 Pro', 'DJI-M5P-2024-002', 'PLAI-DR-002', 'Reservado', 'Gabinete de Drones', 
- '["Peso sub-249g (Ultraligero sin licencia)", "Evasión de obstáculos omnidireccional 360°", "Gimbal mecánico 3 ejes estabilizado", "ActiveTrack con IA"]', 
- '["Control remoto con pantalla", "Baterías inteligentes", "Protectores de hélices"]', '🚁', 'Coordinación de Operaciones'),
-
-('dr-03', 'drones', 'Dron DJI FLIP Fly More Combo', 'DJI', 'DJI FLIP Fly More', 'DJI-FLIP-2024-003', 'PLAI-DR-003', 'Disponible', 'Gabinete de Drones', 
- '["Categoría ultraligera 249g", "Protectores de hélices circulares completas", "Cámara frontal montada en estabilizador", "Control remoto DJI RC 2 integrado"]', 
- '["Control DJI RC 2 con pantalla", "Baterías adicionales de reemplazo", "Cargador de baterías"]', '🚁', 'Coordinación de Operaciones'),
-
-('dr-04', 'drones', 'Centro de Carga Inteligente DJI', 'DJI', 'Battery Charging Hub', 'DJI-HUB-2023-004', 'PLAI-DR-004', 'Disponible', 'Gabinete de Drones', 
- '["Gestor inteligente múltiples baterías dron", "Carga secuencial priorizada", "Modo almacenamiento 60% para celdas", "Modo Power Bank para recarga externa", "Protección térmica"]', 
- '["Cables de alimentación", "Adaptador AC de alta potencia"]', '🔋', 'Coordinación de Operaciones'),
-
--- Cómputo y Microelectrónica
-('comp-01', 'computo-multimedia', 'Fuente de Alimentación Baku BK-1502D+', 'Baku', 'BK-1502D+ Regulable', 'BAKU-1502-001', 'PLAI-COMP-001', 'Disponible', 'Área de Microelectrónica y Diagnóstico', 
- '["Voltaje regulable 0 a 15V", "Corriente continua hasta 2A", "Pantalla digital monitoreo en tiempo real", "Alarma acústica y corte anti-cortocircuitos", "Inyección de energía manual"]', 
- '["Cables banana y pinzas caimán", "Cable AC"]', '🔌', 'Área de Cómputo y Electrónica'),
-
-('comp-02', 'computo-multimedia', 'Kit Domótico micro:bit Smart Home', 'BBC micro:bit', 'Smart Home Kit IoT', 'MBIT-HOME-002', 'PLAI-COMP-002', 'Disponible', 'Laboratorio de Microelectrónica y STEAM', 
- '["Placa micro:bit programable + placa expansión", "Sensores: temperatura, luz LDR, sonido, humedad/nivel agua", "Actuadores: mini ventilador, lámpara LED, pantalla OLED", "Proyectos IoT y STEAM"]', 
- '["Estructura modular de habitación", "Cables dupont", "Sensor kit completo"]', '🏠', 'Área de Cómputo y Electrónica'),
-
-('comp-03', 'computo-multimedia', 'MacBook Pro 16" M3 Max', 'Apple', 'MacBook Pro M3 Max', 'C02G90PL005', 'PLAI-COMP-005', 'Disponible', 'Sala de Cómputo Principal', 
- '["Chip M3 Max 14-core", "36 GB RAM unificada", "1 TB SSD", "Pantalla Liquid Retina XDR"]', 
- '["Cargador MagSafe 140W", "USB-C Hub"]', '💻', 'Área de Cómputo'),
-
-('comp-04', 'computo-multimedia', 'Oculus Link PC Alienware Aurora', 'Alienware', 'Aurora R15', 'AW-R15-2023-012', 'PLAI-COMP-012', 'No disponible', 'Sala de Cómputo Principal', 
- '["Intel Core i9-13900KF", "NVIDIA RTX 4090 24GB", "64 GB DDR5", "2 TB NVMe SSD"]', 
- '["Monitor 4K 144Hz", "Teclado mecánico", "Mouse gaming"]', '🖥️', 'Área de Cómputo');
+INSERT INTO `equipos` (`id`, `categoria_id`, `nombre`, `marca`, `modelo`, `numero_serie`, `codigo_plai`, `estado`, `ubicacion`, `especificaciones`, `accesorios`, `imagen_emoji`, `imagen_url`, `responsable`) VALUES
+('vr-01', 'realidad-virtual', 'Meta Quest 3 (512 GB)', 'Meta', 'Quest 3 512 GB', '1WMHH8100A01', '5151000013-1', 'Disponible', 'Área de Realidad Virtual (Laboratorio)', '["Almacenamiento 512 GB","Chip Snapdragon XR2 Gen 2","Passthrough a color alta resolución (MR)","Seguimiento de manos (Hand Tracking) con IA","Lentes Fresnel de alto rendimiento"]', '["2 Controladores Touch Plus","Correa estándar","Cable USB-C y adaptador de corriente"]', '🥽', '/images/equipos/meta-quest-3.png', 'Laboratorio de Tecnologías Inmersivas'),
+('vr-02', 'realidad-virtual', 'Meta Quest 3 (512 GB) - Lote #4', 'Meta', 'Quest 3 512 GB', '1WMHH8100A04', '5151000013-4', 'En uso', 'Área de Realidad Virtual', '["Almacenamiento 512 GB","Chip Snapdragon XR2 Gen 2","Conectividad inalámbrica PC-VR Wi-Fi 6E","Autonomía 2.2 hrs"]', '["2 Controladores Touch Plus","Cable de carga"]', '🥽', '/images/equipos/meta-quest-3.png', 'Laboratorio de Tecnologías Inmersivas'),
+('vr-03', 'realidad-virtual', 'Oculus Quest VR (128 GB)', 'Oculus', 'Quest VR 128 GB', '1WMHH8007701', '5151000077-1', 'Disponible', 'Área de Realidad Virtual', '["Almacenamiento 128 GB","Pantalla dual OLED 1440×1600 por ojo","Sistema de tracking Oculus Insight 6DoF","Audio espacial integrado"]', '["2 Controladores Oculus Touch","Espaciador para lentes","Cargador oficial"]', '🥽', '/images/equipos/meta-quest-2.png', 'Laboratorio de Tecnologías Inmersivas'),
+('vr-04', 'realidad-virtual', 'Oculus Quest VR (128 GB) - Incidencia', 'Oculus', 'Quest VR 128 GB', '1WMHH8007712', '5151000077-12', 'En mantenimiento', 'Taller de Soporte / Mantenimiento', '["128 GB","Falla reportada en inventario: Display dañado","En diagnóstico técnico"]', '["2 Controladores Oculus Touch"]', '🥽', '/images/equipos/meta-quest-2.png', 'Laboratorio de Tecnologías Inmersivas'),
+('vr-05', 'realidad-virtual', 'HTC Vive Pro 2 Kit Completo', 'HTC', 'Vive Pro 2', 'HTC-VP2-2023-001', '5151000015-1', 'Disponible', 'Área de Realidad Virtual (Laboratorio)', '["Resolución 5K (4896×2448)","Frecuencia de actualización hasta 120 Hz","Campo de visión de 120 grados (FOV)","Tracking SteamVR 2.0 con estaciones base"]', '["2 Estaciones base SteamVR 2.0","2 Controladores HTC Vive Wand","Cables de enlace y Link Box"]', '🥽', '/images/equipos/htc-vive-pro-2.png', 'Laboratorio de Tecnologías Inmersivas'),
+('rob-01', 'robotica', 'Brazo Robótico DOBOT Magician', 'DOBOT', 'Magician Lite', 'DB-MAG-2024-011', 'PLAI-ROB-011', 'Disponible', 'Laboratorio de Robótica', '["Payload 250g","Alcance 320 mm","Repetibilidad ±0.2 mm","4 ejes articulados"]', '["Cabezal de pluma","Succionador de vacío","Pinza de agarre","Cable USB"]', '🦾', '/images/equipos/dobot-magician.png', 'Área de Automatización'),
+('rob-02', 'robotica', 'Kit Lego Education SPIKE (5 piezas)', 'Lego Education', 'SPIKE Prime', 'LEGO-SPIKE-5151', '5151000085', 'Disponible', 'Laboratorio de Robótica y Aulas STEAM', '["Robots didácticos programables","Compatibilidad oficial \"Made for iPad\" y PC","Sensores de color, distancia y fuerza","Hub inteligente con matriz LED 5×5"]', '["Contenedor amarillo de plástico rígido y apilable","Batería recargable","Cables y conectores"]', '🤖', '/images/equipos/arduino-mega.png', 'Área de Automatización'),
+('rob-03', 'robotica', 'OHBOT Cabeza Robótica Expresiva', 'OHBOT', 'Humanoid Head V2', 'OHBOT-V2-052', 'PLAI-ROB-052', 'Disponible', 'Laboratorio de Robótica', '["Servomotores acoplados laterales","Generación de expresiones faciales y giros de cabeza","Ojos esféricos con diseño realista","Boca curva en forma de sonrisa","Programable en Python y Scratch"]', '["Base de soporte","Cable de conexión USB"]', '🗣️', '/images/equipos/dobot-magician.png', 'Área de Automatización'),
+('rob-04', 'robotica', 'Mano Robótica con Tendones', 'PLAi Lab / Open Hardware', 'Bionic Hand Pro', 'PLAI-BIONIC-063', 'PLAI-ROB-063', 'Disponible', 'Laboratorio de Robótica', '["Sistema de tendones con hilos tensores en falanges","Operado mediante microcontrolador Arduino","Control de apertura y agarre articulado"]', '["Protoboard de pruebas","Cables de conexión tipo jumper","Placa Arduino"]', '🖐️', '/images/equipos/arduino-mega.png', 'Área de Automatización'),
+('rob-05', 'robotica', 'Robot Cuadrúpedo Tipo Araña', 'PLAi Lab', 'Spider Bot Nano', 'PLAI-SPIDER-074', 'PLAI-ROB-074', 'Disponible', 'Laboratorio de Robótica', '["Chasis y patas de plástico/acrílico negro","4 patas articuladas con múltiples grados de libertad","Micro servomotores en cada articulación","Arduino Nano con shield de expansión azul"]', '["Batería LiPo","Shield de conexiones"]', '🕷️', '/images/equipos/arduino-mega.png', 'Área de Automatización'),
+('rob-06', 'robotica', 'Robot Cuadrúpedo 3D', 'PLAi Lab', 'Quadruped SG90', 'PLAI-QUAD-075', 'PLAI-ROB-075', 'Disponible', 'Laboratorio de Robótica', '["Estructura impresa en 3D en PLA","Múltiples servomotores SG-90","Marcha omnidireccional"]', '["Controlador de servomotores","Portapilas"]', '🐾', '/images/equipos/arduino-mega.png', 'Área de Automatización'),
+('rob-07', 'robotica', 'Robot Humanoide Abilix H1 Standard', 'Abilix', 'Humanoid Robot H1 Standard Set', 'ABX-H1-2023-041', 'PLAI-ROB-041', 'Disponible', 'Laboratorio de Robótica', '["Robot bípedo programable","Múltiples servomotores de precisión","Control de equilibrio dinámico y coreografías"]', '["Caja original de empaque","Batería y cargador","Manual de programación"]', '🤖', '/images/equipos/dobot-magician.png', 'Área de Automatización'),
+('rob-08', 'robotica', 'Creative Brick C1-S Abilix', 'Abilix', 'Creative Brick C1-S', 'ABX-C1S-2023-042', 'PLAI-ROB-042', 'Disponible', 'Laboratorio de Robótica', '["Módulo cerebral de control robótico","Engranes y transmisión mecánica","Programación por bloques"]', '["Caja de almacenamiento","Sensores y motores modulares"]', '⚙️', '/images/equipos/arduino-mega.png', 'Área de Automatización'),
+('fab-01', 'fabricacion-digital', 'Impresora 3D Bambu Lab X1-Carbon', 'Bambu Lab', 'X1 Carbon AMS', 'BAMBU-X1C-9912', 'PLAI-FAB-009', 'En uso', 'Taller de Fabricación Digital', '["Sistema AMS multi-material (4 filamentos)","Cinemática Core XY de alta velocidad (500 mm/s)","Sensor Micro Lidar y cámara asistida por IA","Cámara cerrada con aislamiento térmico","Soporta Nylon, Fibra de carbono, ABS, TPU, PLA"]', '["Módulo AMS superior","Placa de construcción texturizada","Juego de boquillas de repuesto"]', '🖨️', '/images/equipos/bambu-lab-x1c.png', 'Taller de Fabricación Digital'),
+('fab-02', 'fabricacion-digital', 'Escáner 3D Miraco Plus', 'Revopoint 3D Technologies', 'Miraco Plus Standalone', 'MIRACO-PLUS-008', 'PLAI-FAB-014', 'Disponible', 'Taller de Fabricación Digital', '["Escáner 3D volumétrico autónomo","Proyección de luz infrarroja y láser estructurada","Cálculo de distancia y nube de millones de puntos","Pantalla táctil abatible","Captura fotorealista en color"]', '["Kit de calibración con placas cuadrícula","Tripié articulado","Cable USB-C de transferencia"]', '📡', '/images/equipos/revopoint-3d.png', 'Taller de Fabricación Digital'),
+('fab-03', 'fabricacion-digital', 'Mini Fresadora CNC de Escritorio', 'CNC Desktop Pro', '3-Axis Micro CNC', 'CNC-3018-091', 'PLAI-FAB-021', 'Disponible', 'Taller de Fabricación Digital', '["Mecanizado sustractivo en 3 ejes simultáneos (X, Y, Z)","Husillo giratorio de altas revoluciones","Control Numérico por Computadora (Código G)","Tallado de madera, plásticos y prototipos PCB"]', '["Juego de fresas y brocas","Llaves de apriete","Cable de control PC"]', '⚙️', '/images/equipos/prusa-i3.png', 'Taller de Fabricación Digital'),
+('fab-04', 'fabricacion-digital', 'Mini Torno de Escritorio Manual', 'Precision Mini Lathe', 'Benchtop Lathe 100', 'LATHE-100-019', 'PLAI-FAB-022', 'Disponible', 'Taller de Fabricación Digital', '["Fabricación de piezas cilíndricas y roscas","Mandril (Chuck) con mordazas ajustables","Carro transversal y bancada rectificada","Diales de precisión milimétricos en cobre","Control manual con volantes frontales"]', '["Llave de mandril","Juego de buriles de corte","Centro giratorio"]', '🔩', '/images/equipos/prusa-i3.png', 'Taller de Fabricación Digital'),
+('fab-05', 'fabricacion-digital', 'Mini Fresadora / Taladro Vertical Manual', 'Modular Drill Pro', 'Vertical Mill 200', 'MILL-200-043', 'PLAI-FAB-023', 'Disponible', 'Taller de Fabricación Digital', '["Perforado, tallado y desbastado de precisión","Mesa cruzada con manivelas en ejes X e Y","Prensa tornillo de banco para sujeción","Estructura modular en aluminio interconectable"]', '["Prensa de sujeción","Juego de brocas milimétricas"]', '🔧', '/images/equipos/prusa-i3.png', 'Taller de Fabricación Digital'),
+('fab-06', 'fabricacion-digital', 'Módulo de Grabado Láser Snapmaker', 'Snapmaker', 'Laser Module 200mW', 'SNAP-200-881', 'PLAI-FAB-024', 'Disponible', 'Taller de Fabricación Digital', '["Cabezal intercambiable para quemado y marcado","Láser de diodo 200mW a 405nm (Clase 3B)","Grabado en madera, cartón y cuero","Carcasa metálica con conectores rápidos"]', '["Gafas de seguridad certificadas para láser","Materiales de muestra"]', '⚡', '/images/equipos/bambu-lab-x1c.png', 'Taller de Fabricación Digital'),
+('dr-01', 'drones', 'Dron DJI Mavic 4 Pro', 'DJI', 'Mavic 4 Pro', 'DJI-MAV4-7711', 'PLAI-DR-001', 'Disponible', 'Gabinete de Drones y Filmación', '["Cámara Hasselblad profesional","Cuadricóptero para foto y video aéreo de alta resolución","Transmisión de video HD de largo alcance","Compatible con apps iOS y Android"]', '["Control remoto inteligente","2 Baterías de vuelo","Cargador múltiple","Estuche rígido"]', '🚁', '/images/equipos/dji-mini-3-pro.png', 'Coordinación de Infraestructura y Vuelo'),
+('dr-02', 'drones', 'Dron DJI Mini 5 Pro (4 piezas)', 'DJI', 'Mini 5 Pro', 'DJI-MINI5-2234', 'PLAI-DR-002', 'Reservado', 'Gabinete de Drones', '["Peso sub-249g (Ultraligero)","Evasión de obstáculos omnidireccional 360°","Gimbal mecánico de 3 ejes estabilizado","Vuelo autónomo y seguimiento ActiveTrack con IA"]', '["Control remoto con pantalla","Baterías inteligentes","Protectores de hélices"]', '🚁', '/images/equipos/dji-mini-3-pro.png', 'Coordinación de Infraestructura y Vuelo'),
+('dr-03', 'drones', 'Dron DJI FLIP Fly More Combo', 'DJI', 'DJI FLIP Fly More', 'DJI-FLIP-9011', 'PLAI-DR-003', 'Disponible', 'Gabinete de Drones', '["Categoría ultraligera 249g","Estructura con protectores de hélices circulares completas","Cámara frontal montada en estabilizador","Control remoto DJI RC 2 integrado"]', '["Control DJI RC 2 con pantalla","Baterías adicionales de reemplazo","Cargador de baterías"]', '🚁', '/images/equipos/dji-mini-3-pro.png', 'Coordinación de Infraestructura y Vuelo'),
+('dr-04', 'drones', 'Centro de Carga Inteligente DJI', 'DJI', 'Battery Charging Hub', 'DJI-HUB-4001', 'PLAI-DR-004', 'Disponible', 'Gabinete de Drones', '["Gestor inteligente para múltiples baterías de dron","Carga secuencial priorizando la batería con más carga","Modo almacenamiento al 60% para preservación de celdas","Modo Power Bank para recarga de controles y celulares","Protección térmica y bloqueo por sobrecarga"]', '["Cables de alimentación","Adaptador AC de alta potencia"]', '🔋', '/images/equipos/dji-mini-3-pro.png', 'Coordinación de Infraestructura y Vuelo'),
+('comp-01', 'computo-multimedia', 'Fuente de Alimentación Baku BK-1502D+', 'Baku', 'BK-1502D+ Regulable', 'BAKU-1502D-882', 'PLAI-COMP-001', 'Disponible', 'Área de Microelectrónica y Diagnóstico', '["Voltaje regulable de 0 a 15 Voltios","Corriente continua de hasta 2 Amperios","Pantalla digital para monitoreo de consumo en tiempo real","Alarma acústica y corte automático anti-cortocircuitos","Inyección de energía manual para revivir baterías"]', '["Cables con terminales banana y pinzas caimán","Cable de corriente AC"]', '🔌', '/images/equipos/raspberry-pi-4.png', 'Laboratorio de Microelectrónica y Diagnóstico'),
+('comp-02', 'computo-multimedia', 'Kit Domótico micro:bit Smart Home', 'BBC micro:bit', 'Smart Home Kit IoT', 'MBIT-IOT-3321', 'PLAI-COMP-002', 'Disponible', 'Laboratorio de Microelectrónica y STEAM', '["Placa micro:bit programable + placa de expansión","Sensores: temperatura, luz (LDR), sonido/ruido, humedad/nivel de agua","Actuadores: mini ventilador, lámpara LED, pantalla OLED","Educación STEAM y proyectos de Internet de las Cosas (IoT)"]', '["Estructura de maqueta modular de habitación","Cables dupont","Sensor kit completo"]', '🏠', '/images/equipos/raspberry-pi-4.png', 'Laboratorio de Microelectrónica y Diagnóstico'),
+('comp-03', 'computo-multimedia', 'MacBook Pro 16" M3 Max', 'Apple', 'MacBook Pro M3 Max', 'APPL-MBP16-M3M', 'PLAI-COMP-005', 'Disponible', 'Sala de Cómputo Principal', '["Chip M3 Max 14-core","36 GB RAM unificada","1 TB SSD","Pantalla Liquid Retina XDR"]', '["Cargador MagSafe 140W","USB-C Hub"]', '💻', '/images/equipos/macbook-pro.png', 'Laboratorio de Innovación PLAi'),
+('comp-04', 'computo-multimedia', 'Oculus Link PC Alienware Aurora', 'Alienware', 'Aurora R15', 'ALW-AUR15-4090', 'PLAI-COMP-012', 'No disponible', 'Sala de Cómputo Principal', '["Intel Core i9-13900KF","NVIDIA RTX 4090 24GB","64 GB DDR5","2 TB NVMe SSD"]', '["Monitor 4K 144Hz","Teclado mecánico","Mouse gaming"]', '🖥️', '/images/equipos/oculus-link-pc.png', 'Laboratorio de Innovación PLAi');
 
 -- --- 4. APLICACIONES ---
-INSERT INTO `aplicaciones` (`id`, `nombre`, `desarrollador`, `version`, `categoria`, `plataforma`, `clasificacion_edad`, `icono`, `descripcion`, `estado`) VALUES
-('app-1', 'Tilt Brush', 'Google', '22.0', 'Arte y Creatividad', 'Meta Quest', 'Todas las edades', '🎨', 'Pinta en realidad virtual en 3D con pinceles y materiales mágicos. Ideal para talleres de arte inmersivo.', 'Activa'),
-('app-2', 'Rec Room', 'Against Gravity', '2026.2', 'Juego Interactivo', 'Meta Quest + PC', 'Todas las edades', '⚡', 'Mundo social con minijuegos cooperativos: paintball, dodgeball, escape rooms.', 'Activa'),
-('app-3', 'Ocean Rift', 'Llyr ap Cenydd', '3.1', 'Ciencia y Naturaleza', 'Meta Quest', 'Todas las edades', '🌊', 'Parque acuático virtual con tiburones, ballenas, delfines y tortugas.', 'Activa'),
-('app-4', 'Beat Saber', 'Beat Games', '1.34', 'Juego Interactivo', 'Meta Quest', '6+', '⚡', 'Juego rítmico con sables de luz. Coordina movimientos con la música.', 'Activa'),
-('app-5', 'Job Simulator', 'Owlchemy Labs', '1.8', 'Simulación', 'Meta Quest', 'Todas las edades', '🎮', 'Simula trabajos cotidianos en un mundo futurista donde los robots hacen todo.', 'Activa'),
-('app-6', 'Vacation Simulator', 'Owlchemy Labs', '1.4', 'Simulación', 'Meta Quest', 'Todas las edades', '🎮', 'Experiencia de vacaciones virtuales en playa, montaña y ciudad.', 'Activa'),
-('app-7', 'National Geographic Explore VR', 'National Geographic', '2.0', 'Ciencia y Naturaleza', 'Meta Quest', 'Todas las edades', '🌊', 'Explora la Antártida y Machu Picchu en VR.', 'Activa'),
-('app-8', 'Spatial', 'Spatial Systems', '5.10', 'Experiencia VR', 'Meta Quest + PC', 'Todas las edades', '🥽', 'Plataforma de colaboración y exhibiciones en VR para presentaciones y galerías virtuales.', 'Activa'),
-('app-9', "Richie's Plank Experience", 'Toast VR', '2.1', 'Experiencia VR', 'Meta Quest', '10+', '🥽', 'Experiencia de altura extrema en VR para demostraciones de inmersión y presencia.', 'Activa'),
-('app-10', 'Pistol Whip', 'Cloudhead Games', '1.9', 'Juego Interactivo', 'Meta Quest', '12+', '⚡', 'Juego de acción rítmica y movimiento corporal.', 'Activa'),
-('app-11', 'The Room VR', 'Fireproof Games', '1.2', 'Juego Educativo', 'Meta Quest', '10+', '🎓', 'Escape room con acertijos y puzzles en VR. Fomenta el pensamiento lógico.', 'Activa'),
-('app-12', 'Minecraft Education Edition', 'Microsoft', '1.20', 'Juego Educativo', 'PC', '6+', '🎓', 'Versión educativa de Minecraft con lecciones de ciencias y programación.', 'Activa'),
-('app-13', 'Star Chart', 'Escape Velocity Limited', '3.5', 'Ciencia y Naturaleza', 'Meta Quest', 'Todas las edades', '🌊', 'Planetario virtual interactivo para talleres de astronomía.', 'Activa'),
-('app-14', 'Fruit Ninja VR 2', 'Halfbrick Studios', '1.1', 'Juego Interactivo', 'Meta Quest', 'Todas las edades', '⚡', 'Corta frutas volando con katanas en realidad virtual.', 'Activa'),
-('app-15', 'Superhot VR', 'Superhot Team', '2.0', 'Juego Interactivo', 'Meta Quest', '12+', '⚡', 'El tiempo solo avanza cuando te mueves.', 'Activa');
+INSERT INTO `aplicaciones` (`id`, `nombre`, `desarrollador`, `version`, `categoria`, `plataforma`, `clasificacion_edad`, `icono`, `imagen_url`, `descripcion`, `estado`) VALUES
+('app-1', 'Tilt Brush', 'Google', '1.0', 'Arte y Creatividad', 'Meta Quest', 'Todas las edades', '🎨', '/images/apps/tilt-brush.png', 'Pinta en realidad virtual en 3D con pinceles y materiales mágicos. Ideal para talleres de arte inmersivo con niños.', 'Activa'),
+('app-2', 'Rec Room', 'Against Gravity', '1.0', 'Juego Interactivo', 'Meta Quest + PC', 'Todas las edades', '⚡', '/images/apps/rec-room.png', 'Mundo social con minijuegos cooperativos: paintball, dodgeball, escape rooms. Excelente para grupos de niños.', 'Activa'),
+('app-3', 'Ocean Rift', 'Llyr ap Cenydd', '1.0', 'Ciencia y Naturaleza', 'Meta Quest', 'Todas las edades', '🌊', '/images/apps/ocean-rift.png', 'Parque acuático virtual con tiburones, ballenas, delfines y tortugas. Experiencia educativa sobre el océano.', 'Activa'),
+('app-4', 'Beat Saber', 'Beat Games', '1.0', 'Juego Interactivo', 'Meta Quest', '6+', '⚡', '/images/apps/beat-saber.png', 'Juego rítmico con sables de luz. Coordina movimientos con la música. Muy popular en demostraciones para niños.', 'Activa'),
+('app-5', 'Job Simulator', 'Owlchemy Labs', '1.0', 'Simulación', 'Meta Quest', 'Todas las edades', '🎮', '/images/apps/job-simulator.png', 'Simula trabajos cotidianos en un mundo futurista donde los robots hacen todo. Divertido y educativo.', 'Activa'),
+('app-6', 'Vacation Simulator', 'Owlchemy Labs', '1.0', 'Simulación', 'Meta Quest', 'Todas las edades', '🎮', '/images/apps/vacation-simulator.png', 'Experiencia de vacaciones virtuales en playa, montaña y ciudad. Ideal para primeras experiencias VR con niños pequeños.', 'Activa'),
+('app-7', 'National Geographic Explore VR', 'National Geographic', '1.0', 'Ciencia y Naturaleza', 'Meta Quest', 'Todas las edades', '🌊', '/images/apps/national-geographic.png', 'Explora la Antártida y Machu Picchu en VR. Kayak entre icebergs y aprende sobre ecosistemas.', 'Activa'),
+('app-8', 'Spatial', 'Spatial Systems', '1.0', 'Experiencia VR', 'Meta Quest + PC', 'Todas las edades', '🥽', '/images/apps/spatial.png', 'Plataforma de colaboración y exhibiciones en VR. Usada para presentaciones de proyectos y galerías virtuales en PLAi.', 'Activa'),
+('app-9', 'Richie''s Plank Experience', 'Toast VR', '1.0', 'Experiencia VR', 'Meta Quest', '10+', '🥽', '/images/apps/richies-plank.png', 'Experiencia de altura extrema en VR. Ideal para demostraciones del efecto de presencia en realidad virtual.', 'Activa'),
+('app-10', 'Pistol Whip', 'Cloudhead Games', '1.0', 'Juego Interactivo', 'Meta Quest', '12+', '⚡', '/images/apps/pistol-whip.png', 'Juego de acción rítmica al estilo John Wick. Muévete y dispara al ritmo de la música.', 'Activa'),
+('app-11', 'The Room VR', 'Fireproof Games', '1.0', 'Juego Educativo', 'Meta Quest', '10+', '🎓', '/images/apps/the-room-vr.png', 'Juego de escape room con acertijos y puzzles en VR. Desarrolla pensamiento lógico y resolución de problemas.', 'Activa'),
+('app-12', 'Minecraft Education Edition', 'Microsoft', '1.0', 'Juego Educativo', 'PC', '6+', '🎓', '/images/apps/minecraft-education.png', 'Versión educativa de Minecraft con lecciones de matemáticas, ciencias, historia y código.', 'Activa'),
+('app-13', 'Star Chart', 'Escape Velocity Limited', '1.0', 'Ciencia y Naturaleza', 'Meta Quest', 'Todas las edades', '🌊', '/images/apps/star-chart.png', 'Planetario virtual interactivo. Explora constelaciones, planetas y galaxias. Perfecto para talleres de astronomía.', 'Activa'),
+('app-14', 'Fruit Ninja VR 2', 'Halfbrick Studios', '1.0', 'Juego Interactivo', 'Meta Quest', 'Todas las edades', '⚡', '/images/apps/fruit-ninja-2.png', 'Corta frutas volando con katanas en realidad virtual. Primera experiencia VR perfecta para niños pequeños.', 'Activa'),
+('app-15', 'Superhot VR', 'Superhot Team', '1.0', 'Juego Interactivo', 'Meta Quest', '12+', '⚡', '/images/apps/superhot.png', 'El tiempo solo avanza cuando te mueves. Juego de acción innovador que demuestra las capacidades únicas del VR.', 'Activa');
 
 -- --- 5. RELACIÓN EQUIPOS - APLICACIONES ---
 INSERT INTO `equipos_aplicaciones` (`equipo_id`, `aplicacion_id`) VALUES

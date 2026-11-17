@@ -123,6 +123,38 @@
     "imageUrl": "/images/equipos/meta-quest-2.png"
   },
   {
+    "id": "vr-05",
+    "name": "HTC Vive Pro 2 Kit Completo",
+    "category": "Realidad Virtual",
+    "brand": "HTC",
+    "model": "Vive Pro 2",
+    "inventoryNumber": "5151000015-1",
+    "serialNumber": "HTC-VP2-2023-001",
+    "storage": "N/A (PC-VR)",
+    "status": "Disponible",
+    "location": "Área de Realidad Virtual (Laboratorio)",
+    "responsible": "Laboratorio de Tecnologías Inmersivas",
+    "dateAdded": "2023-08-20",
+    "specs": [
+      "Resolución 5K (4896×2448)",
+      "Frecuencia de actualización hasta 120 Hz",
+      "Campo de visión de 120 grados (FOV)",
+      "Tracking SteamVR 2.0 con estaciones base"
+    ],
+    "apps": [
+      "Tilt Brush",
+      "Superhot VR",
+      "The Room VR"
+    ],
+    "accessories": [
+      "2 Estaciones base SteamVR 2.0",
+      "2 Controladores HTC Vive Wand",
+      "Cables de enlace y Link Box"
+    ],
+    "imageEmoji": "🥽",
+    "imageUrl": "/images/equipos/htc-vive-pro-2.png"
+  },
+  {
     "id": "rob-01",
     "name": "Brazo Robótico DOBOT Magician",
     "category": "Robótica",
@@ -201,7 +233,8 @@
       "Base de soporte",
       "Cable de conexión USB"
     ],
-    "imageEmoji": "🗣️"
+    "imageEmoji": "🗣️",
+    "imageUrl": "/images/equipos/dobot-magician.png"
   },
   {
     "id": "rob-04",
@@ -226,7 +259,8 @@
       "Cables de conexión tipo jumper",
       "Placa Arduino"
     ],
-    "imageEmoji": "🖐️"
+    "imageEmoji": "🖐️",
+    "imageUrl": "/images/equipos/arduino-mega.png"
   },
   {
     "id": "rob-05",
@@ -251,7 +285,8 @@
       "Batería LiPo",
       "Shield de conexiones"
     ],
-    "imageEmoji": "🕷️"
+    "imageEmoji": "🕷️",
+    "imageUrl": "/images/equipos/arduino-mega.png"
   },
   {
     "id": "rob-06",
@@ -275,7 +310,8 @@
       "Controlador de servomotores",
       "Portapilas"
     ],
-    "imageEmoji": "🐾"
+    "imageEmoji": "🐾",
+    "imageUrl": "/images/equipos/arduino-mega.png"
   },
   {
     "id": "rob-07",
@@ -300,7 +336,8 @@
       "Batería y cargador",
       "Manual de programación"
     ],
-    "imageEmoji": "🤖"
+    "imageEmoji": "🤖",
+    "imageUrl": "/images/equipos/dobot-magician.png"
   },
   {
     "id": "rob-08",
@@ -324,7 +361,8 @@
       "Caja de almacenamiento",
       "Sensores y motores modulares"
     ],
-    "imageEmoji": "⚙️"
+    "imageEmoji": "⚙️",
+    "imageUrl": "/images/equipos/arduino-mega.png"
   },
   {
     "id": "fab-01",
@@ -434,7 +472,8 @@
       "Juego de buriles de corte",
       "Centro giratorio"
     ],
-    "imageEmoji": "🔩"
+    "imageEmoji": "🔩",
+    "imageUrl": "/images/equipos/prusa-i3.png"
   },
   {
     "id": "fab-05",
@@ -459,7 +498,8 @@
       "Prensa de sujeción",
       "Juego de brocas milimétricas"
     ],
-    "imageEmoji": "🔧"
+    "imageEmoji": "🔧",
+    "imageUrl": "/images/equipos/prusa-i3.png"
   },
   {
     "id": "fab-06",
@@ -484,7 +524,8 @@
       "Gafas de seguridad certificadas para láser",
       "Materiales de muestra"
     ],
-    "imageEmoji": "⚡"
+    "imageEmoji": "⚡",
+    "imageUrl": "/images/equipos/bambu-lab-x1c.png"
   },
   {
     "id": "dr-01",
@@ -565,7 +606,8 @@
       "Baterías adicionales de reemplazo",
       "Cargador de baterías"
     ],
-    "imageEmoji": "🚁"
+    "imageEmoji": "🚁",
+    "imageUrl": "/images/equipos/dji-mini-3-pro.png"
   },
   {
     "id": "dr-04",
@@ -591,7 +633,8 @@
       "Cables de alimentación",
       "Adaptador AC de alta potencia"
     ],
-    "imageEmoji": "🔋"
+    "imageEmoji": "🔋",
+    "imageUrl": "/images/equipos/dji-mini-3-pro.png"
   },
   {
     "id": "comp-01",
@@ -617,7 +660,8 @@
       "Cables con terminales banana y pinzas caimán",
       "Cable de corriente AC"
     ],
-    "imageEmoji": "🔌"
+    "imageEmoji": "🔌",
+    "imageUrl": "/images/equipos/raspberry-pi-4.png"
   },
   {
     "id": "comp-02",
@@ -643,7 +687,8 @@
       "Cables dupont",
       "Sensor kit completo"
     ],
-    "imageEmoji": "🏠"
+    "imageEmoji": "🏠",
+    "imageUrl": "/images/equipos/raspberry-pi-4.png"
   },
   {
     "id": "comp-03",

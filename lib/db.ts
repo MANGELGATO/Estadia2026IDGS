@@ -292,6 +292,7 @@ export async function getAplicacionesFromDB(): Promise<AppItem[]> {
         ageRating: r.clasificacion_edad,
         description: r.descripcion,
         imageUrl: r.imagen_url || undefined,
+        iconUrl: r.imagen_url || undefined,
         devicesInstalled: Number(r.equipos_instalados || 1),
         status: r.estado,
       }));

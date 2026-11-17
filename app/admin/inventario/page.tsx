@@ -23,7 +23,9 @@ import {
   RiCalendarCheckLine,
   RiCheckboxCircleLine,
   RiAlertLine,
-  RiFileList3Line
+  RiFileList3Line,
+  RiUploadCloud2Line,
+  RiImageLine
 } from 'react-icons/ri';
 
 function useIsMounted() {
@@ -65,6 +67,7 @@ export default function InventarioPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<DeviceItem | null>(null);
   const [deletingEquipment, setDeletingEquipment] = useState<DeviceItem | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
 
   // Historial de uso y bitácora institucional
   const [historyList, setHistoryList] = useState<UsageHistoryItem[]>(mockUsageHistory);
@@ -214,16 +217,29 @@ export default function InventarioPage() {
 
   const handleAdd = () => {
     setEditingItem(null);
+    setImagePreview('');
     setIsModalOpen(true);
   };
 
   const handleEdit = (item: DeviceItem) => {
     setEditingItem(item);
+    setImagePreview(item.imageUrl || '');
     setIsModalOpen(true);
   };
 
   const handleDelete = (item: DeviceItem) => {
     setDeletingEquipment(item);
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -256,6 +272,7 @@ export default function InventarioPage() {
       responsible: (formData.get('responsible') as string).trim() || 'Coordinación de Tecnologías PLAi',
       status: formData.get('status') as DeviceItem['status'],
       imageEmoji: (formData.get('imageEmoji') as string) || '📦',
+      imageUrl: imagePreview.trim() || (formData.get('imageUrl') as string)?.trim() || editingItem?.imageUrl || undefined,
       specs: specsArray.length > 0 ? specsArray : ['Equipo registrado en inventario PLAi'],
       accessories: accessoriesArray.length > 0 ? accessoriesArray : ['Equipo estándar'],
       observations: (formData.get('observations') as string).trim() || undefined,
@@ -358,6 +375,40 @@ export default function InventarioPage() {
                     <option key={em} value={em}>{em}</option>
                   ))}
                 </select>
+              </div>
+
+              {/* Imagen oficial del equipo */}
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-xs font-bold text-navy">
+                  Fotografía / Imagen Oficial del Equipo
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    name="imageUrl"
+                    placeholder="URL o ruta de imagen (ej. /images/equipos/meta-quest-3.png)"
+                    value={imagePreview}
+                    onChange={e => setImagePreview(e.target.value)}
+                    className="w-full flex-1 rounded-lg border border-gray-300 px-3 py-2 text-xs sm:text-sm text-gray-800 focus:border-plai focus:outline-none focus:ring-1 focus:ring-plai"
+                  />
+                  <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-plai/30 bg-plai/10 px-3 py-2 text-xs font-bold text-plai hover:bg-plai hover:text-white transition-all whitespace-nowrap">
+                    <RiUploadCloud2Line className="text-sm" /> Subir archivo
+                    <input type="file" accept="image/*" onChange={handleImageFileChange} className="hidden" />
+                  </label>
+                </div>
+                {imagePreview && (
+                  <div className="mt-2 flex items-center gap-3 rounded-lg border border-black/[0.06] bg-gray-50 p-2">
+                    <img src={imagePreview} alt="Preview" className="size-12 rounded-lg object-contain bg-white border border-gray-200 p-1" />
+                    <span className="text-xs text-plai-muted">Vista previa de imagen asignada</span>
+                    <button 
+                      type="button" 
+                      onClick={() => setImagePreview('')} 
+                      className="ml-auto text-xs text-rose-500 hover:underline"
+                    >
+                      Quitar imagen
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
