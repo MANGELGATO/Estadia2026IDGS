@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import { 
   RiFileListLine, 
   RiAddCircleLine, 
@@ -9,15 +10,18 @@ import {
   RiSearchLine, 
   RiCloseLine,
   RiCheckLine,
-  RiTimeLine
+  RiTimeLine,
+  RiUser3Line
 } from 'react-icons/ri';
 import { ReservacionItem } from '../../../lib/db';
 
 export default function PrestamosPage() {
+  const { data: session } = useSession();
   const [reservaciones, setReservaciones] = useState<ReservacionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todas');
+  const [onlyMine, setOnlyMine] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ReservacionItem | null>(null);
 
   useEffect(() => {
@@ -32,12 +36,18 @@ export default function PrestamosPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const userEmail = session?.user?.email?.toLowerCase();
+
   const filtered = reservaciones.filter(r => {
+    if (onlyMine && userEmail) {
+      if (r.usuarioEmail?.toLowerCase() !== userEmail) return false;
+    }
     const matchStatus = statusFilter === 'Todas' || r.estado === statusFilter;
     const matchSearch = 
       r.folio?.toLowerCase().includes(search.toLowerCase()) ||
       r.actividad?.toLowerCase().includes(search.toLowerCase()) ||
       r.categoriaId?.toLowerCase().includes(search.toLowerCase()) ||
+      (r.usuarioNombre && r.usuarioNombre.toLowerCase().includes(search.toLowerCase())) ||
       (r.codigoPlaiAsignado && r.codigoPlaiAsignado.toLowerCase().includes(search.toLowerCase()));
     return matchStatus && matchSearch;
   });
@@ -63,6 +73,19 @@ export default function PrestamosPage() {
       {/* Filter and Search Bar */}
       <div className="flex flex-col gap-3 rounded-2xl border border-black/[0.06] bg-white p-4 shadow-plai-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
+          {session?.user?.email && (
+            <button
+              onClick={() => setOnlyMine(!onlyMine)}
+              className={`rounded-full px-3.5 py-1 text-xs font-bold transition-all inline-flex items-center gap-1.5 ${
+                onlyMine
+                  ? 'bg-navy text-white shadow-sm ring-2 ring-plai'
+                  : 'border border-plai/30 bg-plai/10 text-plai hover:bg-plai hover:text-white'
+              }`}
+            >
+              <RiUser3Line />
+              {onlyMine ? 'Mis Solicitudes Activas' : 'Ver Solo Mis Solicitudes'}
+            </button>
+          )}
           {['Todas', 'Aprobada', 'Pendiente', 'En uso', 'Completada', 'Rechazada'].map(s => (
             <button
               key={s}

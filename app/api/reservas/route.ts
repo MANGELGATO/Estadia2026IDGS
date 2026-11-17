@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { reservationSchema } from '../../../lib/validations/schemas';
 import { logger } from '../../../lib/logger';
+import { getEquiposFromDB, insertReservacionInDB, ReservacionItem } from '../../../lib/db';
 import {
   checkRateLimit,
   getClientIp,
@@ -49,12 +50,51 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    logger.info('Solicitud de reservación validada y procesada', {
+    const allEquipos = await getEquiposFromDB();
+    const device = allEquipos.find(e => e.id === String(parsed.data.deviceId));
+
+    const categorySlugMap: Record<string, string> = {
+      'Realidad Virtual': 'realidad-virtual',
+      'Robótica': 'robotica',
+      'Cómputo': 'computo-multimedia',
+      'Drones': 'drones',
+      'Fabricación digital': 'fabricacion-digital',
+    };
+    const catSlug = device ? (categorySlugMap[device.category] || 'realidad-virtual') : 'realidad-virtual';
+
+    const timestamp = Date.now();
+    const id = `res-${timestamp}`;
+    const folio = `RES-${timestamp.toString().slice(-4)}`;
+
+    const newReserva: ReservacionItem = {
+      id,
+      folio,
+      categoriaId: catSlug,
+      equipoId: String(parsed.data.deviceId),
+      usuarioId: body.userId || 'usr-standard-01',
+      usuarioNombre: parsed.data.userName,
+      usuarioEmail: parsed.data.userEmail || body.userEmail || (parsed.data.userName.includes('@') ? parsed.data.userName : 'user@plai.edu.mx'),
+      usuarioInstitucion: parsed.data.userInstitution || body.userInstitution || 'Comunidad PLAi',
+      fechaUso: parsed.data.date,
+      horaInicio: parsed.data.startTime,
+      horaFin: parsed.data.endTime,
+      actividad: parsed.data.activity,
+      estado: 'Pendiente',
+      accesoriosIncluidos: device?.accessories ? device.accessories.slice(0, 2).join(', ') : 'Equipo base con accesorios originales',
+      condicionSalida: 'Excelente',
+      observacionesAdmin: parsed.data.notes || `Solicitud para ${device ? device.name : 'equipo'} enviada desde el portal institucional.`,
+    };
+
+    await insertReservacionInDB(newReserva);
+
+    logger.info('Solicitud de reservación validada y persistida en base de datos', {
       reqId,
       path: '/api/reservas',
       status: 201,
+      folio: newReserva.folio,
       deviceId: String(parsed.data.deviceId),
       userName: parsed.data.userName,
+      userEmail: newReserva.usuarioEmail,
       date: parsed.data.date,
     });
 
@@ -63,9 +103,10 @@ export async function POST(req: NextRequest) {
         success: true,
         message: 'Reservación procesada exitosamente conforme a los lineamientos institucionales.',
         data: {
-          id: `RES-${Date.now()}`,
+          id: folio,
           ...parsed.data,
           status: 'Pendiente',
+          reserva: newReserva,
         },
       },
       { status: 201 }

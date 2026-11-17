@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { DeviceItem, mockDevices } from '../../lib/mockData';
 import EquipmentCard from './EquipmentCard';
+import ReservationForm from './ReservationForm';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -18,6 +19,7 @@ export default function EquipmentFilterGrid({ activeFilter, onFilterChange }: Pr
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos los estados');
   const [internalFilter, setInternalFilter] = useState('Todos');
+  const [selectedReserveId, setSelectedReserveId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/equipos')
@@ -134,10 +136,19 @@ export default function EquipmentFilterGrid({ activeFilter, onFilterChange }: Pr
                 key={device.id}
                 device={device}
                 onViewDetails={() => router.push(`/categoria/${slug}`)}
+                onReserve={id => setSelectedReserveId(id)}
               />
             );
           })}
         </div>
+
+        {/* Modal de reservación asistida */}
+        {selectedReserveId && devices.find(d => d.id === selectedReserveId) && (
+          <ReservationForm
+            device={devices.find(d => d.id === selectedReserveId)!}
+            onClose={() => setSelectedReserveId(null)}
+          />
+        )}
 
         {filtered.length === 0 && (
           <div className="flex flex-col items-center gap-3 rounded-2xl border-[1.5px] border-dashed border-black/[0.08] bg-white px-8 py-16 text-center">

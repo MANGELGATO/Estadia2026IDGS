@@ -17,6 +17,8 @@ export const reservationSchema = z
       .trim()
       .min(3, 'El nombre debe contener al menos 3 caracteres')
       .max(100, 'El nombre no puede exceder 100 caracteres'),
+    userEmail: z.string().trim().email('Formato de correo electrónico inválido').optional(),
+    userInstitution: z.string().trim().max(150).optional(),
     date: z.string().regex(DATE_REGEX, 'La fecha debe tener formato YYYY-MM-DD'),
     startTime: z.string().regex(TIME_REGEX, 'La hora de inicio debe tener formato HH:MM'),
     endTime: z.string().regex(TIME_REGEX, 'La hora de fin debe tener formato HH:MM'),

@@ -599,6 +599,7 @@ export interface ReservacionItem {
   categoriaId: string;
   equipoId?: string;
   codigoPlaiAsignado?: string;
+  usuarioId?: string;
   usuarioNombre: string;
   usuarioEmail: string;
   usuarioTelefono?: string;
@@ -741,6 +742,55 @@ export async function updateReservacionInDB(
     Object.assign(item, update);
     writeDataFile('reservaciones.json', items);
   }
+  return true;
+}
+
+export async function insertReservacionInDB(item: ReservacionItem): Promise<boolean> {
+  try {
+    const pool = getPool();
+    const query = `
+      INSERT INTO reservaciones (
+        id, recurso_id, usuario_id, nombre_solicitante, email_solicitante,
+        fecha, hora_inicio, hora_fin, actividad, notas, estado, acepto_privacidad
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+      ON DUPLICATE KEY UPDATE
+        nombre_solicitante = VALUES(nombre_solicitante),
+        email_solicitante = VALUES(email_solicitante),
+        fecha = VALUES(fecha),
+        hora_inicio = VALUES(hora_inicio),
+        hora_fin = VALUES(hora_fin),
+        actividad = VALUES(actividad),
+        notas = VALUES(notas),
+        estado = VALUES(estado)
+    `;
+
+    const values = [
+      item.id || item.folio || `RES-${Date.now()}`,
+      item.equipoId || 'vr-01',
+      item.usuarioId || 'usr-standard-01',
+      item.usuarioNombre || 'Usuario Institucional',
+      item.usuarioEmail || 'user@plai.edu.mx',
+      item.fechaUso || new Date().toISOString().split('T')[0],
+      item.horaInicio || '10:00:00',
+      item.horaFin || '12:00:00',
+      item.actividad || 'Uso de laboratorio',
+      item.observacionesAdmin || item.actividad || '',
+      item.estado || 'Pendiente',
+    ];
+
+    await pool.execute(query, values);
+  } catch (error) {
+    logger.warn('Error al guardar reservación en MySQL', { error: String(error) });
+  }
+
+  const items = ensureDataFile<ReservacionItem[]>('reservaciones.json', initialReservaciones);
+  const idx = items.findIndex(r => r.id === item.id);
+  if (idx >= 0) {
+    items[idx] = item;
+  } else {
+    items.unshift(item);
+  }
+  writeDataFile('reservaciones.json', items);
   return true;
 }
 

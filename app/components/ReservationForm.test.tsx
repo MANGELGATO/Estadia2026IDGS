@@ -1,15 +1,46 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import ReservationForm from './ReservationForm';
 import { mockDevices } from '../../lib/mockData';
 
-afterEach(() => {
-  cleanup();
-  vi.restoreAllMocks();
-});
+let mockSessionStatus: 'authenticated' | 'unauthenticated' | 'loading' = 'authenticated';
+const mockSession = {
+  user: {
+    name: 'Investigador / Alumno PLAi',
+    email: 'user@plai.edu.mx',
+    role: 'user',
+  },
+};
+
+vi.mock('next-auth/react', () => ({
+  useSession: () => ({
+    data: mockSessionStatus === 'authenticated' ? mockSession : null,
+    status: mockSessionStatus,
+  }),
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+  usePathname: () => '/equipos',
+}));
 
 describe('ReservationForm', () => {
   const device = mockDevices[0];
+
+  beforeEach(() => {
+    mockSessionStatus = 'authenticated';
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
 
   it('deshabilita la hora de fin hasta elegir la de inicio', () => {
     render(<ReservationForm device={device} onClose={() => {}} />);
@@ -43,5 +74,13 @@ describe('ReservationForm', () => {
     expect(screen.getByRole('heading', { name: device.name })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('solicita inicio de sesión institucional si el usuario no está autenticado', () => {
+    mockSessionStatus = 'unauthenticated';
+    const onClose = vi.fn();
+    render(<ReservationForm device={device} onClose={onClose} />);
+    expect(screen.getByText(/Acceso Institucional Requerido/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Iniciar Sesión/i })).toBeInTheDocument();
   });
 });
