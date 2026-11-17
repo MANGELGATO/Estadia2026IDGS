@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Layers, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Layers, CheckCircle2 } from 'lucide-react';
+import { getEquiposFromDB } from '../../lib/db';
+import { getAllCategoriesConfig } from '../../lib/categoriesConfig';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Categorías Tecnológicas | PLAi',
@@ -10,6 +14,7 @@ export const metadata: Metadata = {
 const CATEGORIES_DATA = [
   {
     id: 'realidad-virtual',
+    filterKey: 'Realidad Virtual',
     name: 'Realidad Virtual y Mixta',
     image: '/images/categorias/realidad-virtual.png',
     color: '#1e5ca7',
@@ -20,6 +25,7 @@ const CATEGORIES_DATA = [
   },
   {
     id: 'robotica',
+    filterKey: 'Robótica',
     name: 'Robótica y Automatización',
     image: '/images/categorias/robotica.png',
     color: '#0ea5e9',
@@ -30,6 +36,7 @@ const CATEGORIES_DATA = [
   },
   {
     id: 'fabricacion-digital',
+    filterKey: 'Fabricación digital',
     name: 'Fabricación Digital y 3D',
     image: '/images/categorias/fabricacion-digital.png',
     color: '#ed8d1b',
@@ -40,6 +47,7 @@ const CATEGORIES_DATA = [
   },
   {
     id: 'drones',
+    filterKey: 'Drones',
     name: 'Drones y Captura Aérea',
     image: '/images/categorias/drones.png',
     color: '#10b981',
@@ -50,6 +58,7 @@ const CATEGORIES_DATA = [
   },
   {
     id: 'computo-multimedia',
+    filterKey: 'Cómputo',
     name: 'Cómputo de Alto Rendimiento',
     image: '/images/categorias/computo.png',
     color: '#0086ff',
@@ -60,7 +69,23 @@ const CATEGORIES_DATA = [
   },
 ];
 
-export default function CategoriasPage() {
+export default async function CategoriasPage() {
+  const equipos = await getEquiposFromDB();
+  const configs = await getAllCategoriesConfig();
+
+  const liveCategories = CATEGORIES_DATA.map(cat => {
+    const catEquipos = equipos.filter(e => e.category.toLowerCase() === cat.filterKey.toLowerCase());
+    const cfg = configs[cat.id];
+    const highlights: string[] = cfg?.benefits && cfg.benefits.length > 0 ? cfg.benefits : cat.highlights;
+    return {
+      ...cat,
+      name: cfg?.name || cat.name,
+      description: cfg?.description || cat.description,
+      highlights,
+      count: catEquipos.length,
+      availableCount: catEquipos.filter(e => e.status === 'Disponible').length,
+    };
+  });
   return (
     <div className="min-h-screen bg-[#F4F6F9]">
       {/* Hero */}
@@ -92,7 +117,7 @@ export default function CategoriasPage() {
       {/* Grid de Categorías con Íconos Oficiales */}
       <div className="mx-auto max-w-[1200px] px-6 py-14">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-          {CATEGORIES_DATA.map((cat) => (
+          {liveCategories.map((cat) => (
             <div
               key={cat.id}
               className="flex flex-col overflow-hidden rounded-3xl border border-black/[0.08] bg-white shadow-plai-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-plai-md"
@@ -116,7 +141,7 @@ export default function CategoriasPage() {
                     {cat.badge}
                   </span>
                   <span className="font-mono text-xs font-semibold text-plai-muted">
-                    {cat.count} equipos
+                    {cat.availableCount} disponibles / {cat.count} equipos
                   </span>
                 </div>
               </div>

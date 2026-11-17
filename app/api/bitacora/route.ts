@@ -66,8 +66,8 @@ export async function POST(req: NextRequest) {
       adminEntrega: body.adminEntrega || 'Administrador PLAi',
     };
 
-    await insertBitacoraEntregaInDB(item);
-    logger.info('Entrega de equipo registrada en bitácora', { id: item.id, codigo: item.codigoPlai });
+    await insertBitacoraEntregaInDB(item, body.reservaId ? String(body.reservaId) : undefined);
+    logger.info('Entrega de equipo registrada en bitácora', { id: item.id, codigo: item.codigoPlai, reservaId: body.reservaId });
 
     return NextResponse.json({
       success: true,

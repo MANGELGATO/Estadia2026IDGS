@@ -1,6 +1,9 @@
 'use client';
 import { useState } from 'react';
-import { Users, Calendar, Building, ShieldCheck, CheckCircle2, Clock } from 'lucide-react';
+import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { Users, Calendar, Building, ShieldCheck, CheckCircle2, Clock, User } from 'lucide-react';
 import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
 
 const espaciosMock = [
@@ -39,21 +42,63 @@ const espaciosMock = [
 ];
 
 export default function EspaciosPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [selectedEspacio, setSelectedEspacio] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [folio, setFolio] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const activeEspacio = espaciosMock.find(e => e.id === selectedEspacio);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSubmitted(true);
+    if (!activeEspacio) return;
+    setErrorMsg(null);
+    setIsSubmitting(true);
+
+    const fd = new FormData(e.currentTarget);
+    const payload = {
+      espacioId: activeEspacio.id,
+      nombreSolicitante: (fd.get('nombreSolicitante') as string)?.trim() || session?.user?.name || 'Solicitante PLAi',
+      email: (fd.get('correo') as string)?.trim() || session?.user?.email || 'user@plai.edu.mx',
+      telefono: (fd.get('telefono') as string)?.trim() || '33 1410 1620',
+      fecha: fd.get('fecha') as string,
+      hora: fd.get('horaInicio') as string,
+      proposito: (fd.get('proposito') as string)?.trim(),
+      acceptPrivacy: true,
+    };
+
+    try {
+      const res = await fetch('/api/solicitudes-espacios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        const firstErr = json.errors ? Object.values(json.errors).flat()[0] : null;
+        setErrorMsg((firstErr as string) || json.message || 'No se pudo procesar la solicitud.');
+        setIsSubmitting(false);
+        return;
+      }
+      setFolio(json.data?.id || '');
+      setSubmitted(true);
+    } catch {
+      setErrorMsg('Error de conexión con el servidor.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const closeReserve = () => {
     setSelectedEspacio(null);
     setSubmitted(false);
+    setFolio('');
+    setErrorMsg(null);
   };
-
-  const activeEspacio = espaciosMock.find(e => e.id === selectedEspacio);
 
   return (
     <div className="min-h-screen bg-[#F4F6F9] pb-20">
@@ -109,58 +154,113 @@ export default function EspaciosPage() {
         </div>
       </div>
 
-      {activeEspacio && (
+      {activeEspacio && status === 'unauthenticated' && (
+        <div className="fixed inset-0 z-[1000] flex animate-pop-in items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={closeReserve}>
+          <div className="relative w-full max-w-[460px] rounded-3xl bg-white p-7 text-center shadow-2xl border border-black/[0.08]" onClick={e => e.stopPropagation()}>
+            <button className="absolute right-5 top-5 cursor-pointer text-xl text-plai-gray hover:text-navy" onClick={closeReserve}>&times;</button>
+            <div className="mx-auto mb-3 flex size-14 items-center justify-center rounded-2xl bg-plai/10 text-plai">
+              <User size={30} />
+            </div>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-plai">Acceso Institucional Requerido</span>
+            <h2 className="mt-1 font-heading text-xl font-extrabold text-navy">Inicia Sesión para Reservar Espacio</h2>
+            <p className="mt-2 text-xs sm:text-sm text-plai-gray leading-relaxed">
+              Para solicitar el uso de <strong>{activeEspacio.name}</strong>, inicia sesión con tu cuenta institucional. Tus datos se autocompletarán y la solicitud quedará vinculada a tu portal y al panel administrativo.
+            </p>
+            <div className="my-4 rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-left text-xs text-blue-900">
+              <p className="font-bold mb-1">Cuenta de demostración:</p>
+              <p className="font-mono text-[11px] text-blue-800">user@plai.edu.mx · Contraseña: 123user</p>
+            </div>
+            <div className="mt-3 flex gap-2.5">
+              <button type="button" onClick={closeReserve} className="w-full rounded-full border border-gray-200 py-2.5 font-heading text-xs font-bold text-gray-600 hover:bg-gray-100">
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/login?callbackUrl=/espacios')}
+                className="w-full rounded-full bg-plai py-2.5 font-heading text-xs font-bold text-white shadow-md hover:bg-navy"
+              >
+                Iniciar Sesión
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeEspacio && status !== 'unauthenticated' && (
         <div className="fixed inset-0 z-[1000] flex animate-pop-in items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={closeReserve}>
           <div className="relative max-h-[90vh] w-full max-w-[600px] overflow-y-auto rounded-2xl bg-white p-8 shadow-[0_20px_40px_rgba(0,0,0,0.2)]" onClick={e => e.stopPropagation()}>
             <button className="absolute right-6 top-6 cursor-pointer text-2xl text-plai-gray transition-colors hover:text-navy" onClick={closeReserve}>&times;</button>
             
             {submitted ? (
               <div className="py-8 text-center">
-                <CheckCircle2 size={60} color={activeEspacio.color} className="mx-auto mb-6" />
-                <h2 className="mb-4 font-heading text-2xl font-bold text-navy">¡Solicitud Enviada!</h2>
-                <p className="mb-8 text-[0.95rem] leading-[1.5] text-plai-gray">Tu solicitud para reservar el <strong>{activeEspacio.name}</strong> ha sido recibida. El equipo de PLAi se comunicará contigo a la brevedad para confirmar la disponibilidad.</p>
-                <button className="cursor-pointer rounded-xl px-8 py-3 font-heading font-semibold text-white transition-opacity hover:opacity-90" onClick={closeReserve} style={{ backgroundColor: activeEspacio.color }}>
-                  Cerrar
-                </button>
+                <CheckCircle2 size={60} color={activeEspacio.color} className="mx-auto mb-4" />
+                <h2 className="mb-2 font-heading text-2xl font-bold text-navy">¡Solicitud Registrada!</h2>
+                {folio && (
+                  <p className="mb-4 font-mono text-xs font-bold text-plai">Folio Oficial: {folio}</p>
+                )}
+                <p className="mb-8 text-[0.95rem] leading-[1.5] text-plai-gray">
+                  Tu solicitud para reservar el <strong>{activeEspacio.name}</strong> quedó registrada en el sistema administrativo de PLAi y en tu expediente de usuario.
+                </p>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Link
+                    href="/usuario/prestamos"
+                    className="rounded-xl px-6 py-3 font-heading text-sm font-bold text-white transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: activeEspacio.color }}
+                  >
+                    Ver en Mis Solicitudes
+                  </Link>
+                  <button
+                    className="cursor-pointer rounded-xl border border-gray-200 px-6 py-3 font-heading text-sm font-semibold text-navy hover:bg-gray-50"
+                    onClick={closeReserve}
+                  >
+                    Cerrar
+                  </button>
+                </div>
               </div>
             ) : (
               <>
                 <div className="mb-6 border-l-4 pl-4" style={{ borderColor: activeEspacio.color }}>
                   <h2 className="mb-1 font-heading text-2xl font-bold text-navy">Reservar: {activeEspacio.name}</h2>
-                  <p className="text-[0.9rem] text-plai-gray">Completa el formulario para solicitar el uso de este espacio.</p>
+                  <p className="text-[0.9rem] text-plai-gray">Completa el formulario para solicitar el uso de este espacio institucional.</p>
                 </div>
+
+                {errorMsg && (
+                  <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">
+                    {errorMsg}
+                  </div>
+                )}
                 
                 <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
                   <div className="flex flex-col gap-1">
                     <label className="font-heading text-[0.85rem] font-semibold text-navy">Nombre del solicitante o institución</label>
-                    <input type="text" className="w-full rounded-xl border border-black/[0.08] bg-[#F4F6F9] px-4 py-3 text-[0.9rem] outline-none transition-all focus:border-plai focus:ring-2 focus:ring-plai/10" required placeholder="Ej. Universidad XYZ" />
+                    <input name="nombreSolicitante" type="text" defaultValue={session?.user?.name || ''} className="w-full rounded-xl border border-black/[0.08] bg-[#F4F6F9] px-4 py-3 text-[0.9rem] outline-none transition-all focus:border-plai focus:ring-2 focus:ring-plai/10" required placeholder="Ej. Universidad de Guadalajara" />
                   </div>
                   
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="flex flex-col gap-1">
                       <label className="font-heading text-[0.85rem] font-semibold text-navy">Correo Electrónico</label>
-                      <input type="email" className="w-full rounded-xl border border-black/[0.08] bg-[#F4F6F9] px-4 py-3 text-[0.9rem] outline-none transition-all focus:border-plai focus:ring-2 focus:ring-plai/10" required placeholder="correo@ejemplo.com" />
+                      <input name="correo" type="email" defaultValue={session?.user?.email || ''} className="w-full rounded-xl border border-black/[0.08] bg-[#F4F6F9] px-4 py-3 text-[0.9rem] outline-none transition-all focus:border-plai focus:ring-2 focus:ring-plai/10" required placeholder="correo@ejemplo.com" />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className="font-heading text-[0.85rem] font-semibold text-navy">Teléfono</label>
-                      <input type="tel" className="w-full rounded-xl border border-black/[0.08] bg-[#F4F6F9] px-4 py-3 text-[0.9rem] outline-none transition-all focus:border-plai focus:ring-2 focus:ring-plai/10" required placeholder="123 456 7890" />
+                      <label className="font-heading text-[0.85rem] font-semibold text-navy">Teléfono (10 dígitos)</label>
+                      <input name="telefono" type="tel" defaultValue="3314101620" className="w-full rounded-xl border border-black/[0.08] bg-[#F4F6F9] px-4 py-3 text-[0.9rem] outline-none transition-all focus:border-plai focus:ring-2 focus:ring-plai/10" required placeholder="33 1410 1620" />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="flex flex-col gap-1">
                       <label className="flex items-center gap-1 font-heading text-[0.85rem] font-semibold text-navy"><Calendar size={14}/> Fecha deseada</label>
-                      <input type="date" className="w-full rounded-xl border border-black/[0.08] bg-[#F4F6F9] px-4 py-3 text-[0.9rem] outline-none transition-all focus:border-plai focus:ring-2 focus:ring-plai/10" required />
+                      <input name="fecha" type="date" min={new Date().toISOString().split('T')[0]} className="w-full rounded-xl border border-black/[0.08] bg-[#F4F6F9] px-4 py-3 text-[0.9rem] outline-none transition-all focus:border-plai focus:ring-2 focus:ring-plai/10" required />
                     </div>
                     <div className="flex flex-col gap-1">
                       <label className="flex items-center gap-1 font-heading text-[0.85rem] font-semibold text-navy"><Clock size={14}/> Hora de inicio</label>
-                      <input type="time" className="w-full rounded-xl border border-black/[0.08] bg-[#F4F6F9] px-4 py-3 text-[0.9rem] outline-none transition-all focus:border-plai focus:ring-2 focus:ring-plai/10" required />
+                      <input name="horaInicio" type="time" defaultValue="10:00" className="w-full rounded-xl border border-black/[0.08] bg-[#F4F6F9] px-4 py-3 text-[0.9rem] outline-none transition-all focus:border-plai focus:ring-2 focus:ring-plai/10" required />
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className="font-heading text-[0.85rem] font-semibold text-navy">Propósito del evento</label>
-                    <textarea className="w-full rounded-xl border border-black/[0.08] bg-[#F4F6F9] px-4 py-3 text-[0.9rem] outline-none transition-all focus:border-plai focus:ring-2 focus:ring-plai/10" rows={3} required placeholder="Describe brevemente el tipo de evento, asistentes y requerimientos especiales..."></textarea>
+                    <label className="font-heading text-[0.85rem] font-semibold text-navy">Propósito del evento (mín. 10 caracteres)</label>
+                    <textarea name="proposito" minLength={10} className="w-full rounded-xl border border-black/[0.08] bg-[#F4F6F9] px-4 py-3 text-[0.9rem] outline-none transition-all focus:border-plai focus:ring-2 focus:ring-plai/10" rows={3} required placeholder="Describe brevemente el tipo de evento, asistentes y requerimientos especiales..."></textarea>
                   </div>
                   
                   <div className="flex items-center gap-2 rounded-xl bg-[#F4F6F9] p-3">
@@ -178,8 +278,8 @@ export default function EspaciosPage() {
                     </label>
                   </div>
 
-                  <button type="submit" className="mt-4 cursor-pointer rounded-xl p-4 font-heading text-base font-bold text-white transition-opacity hover:opacity-90" style={{ backgroundColor: activeEspacio.color }}>
-                    Enviar Solicitud
+                  <button type="submit" disabled={isSubmitting} className="mt-4 cursor-pointer rounded-xl p-4 font-heading text-base font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: activeEspacio.color }}>
+                    {isSubmitting ? 'Registrando solicitud...' : 'Enviar Solicitud'}
                   </button>
                 </form>
               </>

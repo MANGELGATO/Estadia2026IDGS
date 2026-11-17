@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Cpu, HardDrive, MapPin } from 'lucide-react';
+import { ArrowRight, Cpu, HardDrive, MapPin, Calendar } from 'lucide-react';
 import { DeviceItem, mockDevices } from '../../lib/mockData';
+import ReservationForm from './ReservationForm';
 
 const PREVIEW_COUNT = 8;
 
@@ -34,6 +35,7 @@ const statusClasses: Record<string, string> = {
 
 export default function EquipmentCarousel() {
   const [devices, setDevices] = useState<DeviceItem[]>(mockDevices);
+  const [selectedReserveId, setSelectedReserveId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/equipos')
@@ -130,12 +132,23 @@ export default function EquipmentCarousel() {
                     <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[0.7rem] font-bold uppercase tracking-wide ${statusBadge}`}>
                       {device.status}
                     </span>
-                    <Link
-                      href={`/categoria/${catSlug}`}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-plai hover:text-navy transition-colors"
-                    >
-                      Detalles <ArrowRight size={13} />
-                    </Link>
+                    <div className="flex items-center gap-2.5">
+                      {device.status === 'Disponible' && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedReserveId(device.id)}
+                          className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-plai px-2.5 py-1 text-[0.7rem] font-bold text-white hover:bg-navy transition-colors"
+                        >
+                          <Calendar size={11} /> Reservar
+                        </button>
+                      )}
+                      <Link
+                        href={`/categoria/${catSlug}`}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-plai hover:text-navy transition-colors"
+                      >
+                        Detalles <ArrowRight size={13} />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -151,6 +164,13 @@ export default function EquipmentCarousel() {
             Explorar todos los equipos disponibles ({devices.length}) <ArrowRight size={14} />
           </Link>
         </div>
+
+        {selectedReserveId && devices.find(d => d.id === selectedReserveId) && (
+          <ReservationForm
+            device={devices.find(d => d.id === selectedReserveId)!}
+            onClose={() => setSelectedReserveId(null)}
+          />
+        )}
       </div>
     </div>
   );

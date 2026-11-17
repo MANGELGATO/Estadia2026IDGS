@@ -1,5 +1,7 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import fs from 'fs';
+import path from 'path';
 import { env } from './env';
 
 // Usuarios autorizados de demostración y desarrollo alineados con los roles de PLAi
@@ -59,7 +61,30 @@ export const authOptions: NextAuthOptions = {
         }
 
         const normalizedEmail = credentials.email.trim().toLowerCase();
-        const found = DEMO_USERS.find((u) => u.email.toLowerCase() === normalizedEmail);
+        let found = DEMO_USERS.find((u) => u.email.toLowerCase() === normalizedEmail);
+
+        if (!found) {
+          try {
+            const usersPath = path.join(process.cwd(), 'data', 'usuarios.json');
+            if (fs.existsSync(usersPath)) {
+              const rawUsers = JSON.parse(fs.readFileSync(usersPath, 'utf8'));
+              if (Array.isArray(rawUsers)) {
+                const dbUser = rawUsers.find(
+                  (u: any) => u.email?.toLowerCase() === normalizedEmail && u.status !== 'Inactivo'
+                );
+                if (dbUser) {
+                  found = {
+                    id: String(dbUser.id),
+                    name: String(dbUser.name),
+                    email: String(dbUser.email),
+                    password: String(dbUser.password || '123user'),
+                    role: dbUser.role === 'Administrador' ? 'admin' : 'usuario',
+                  };
+                }
+              }
+            }
+          } catch {}
+        }
 
         if (!found) {
           return null;

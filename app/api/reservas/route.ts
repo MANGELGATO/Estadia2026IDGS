@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
       folio,
       categoriaId: catSlug,
       equipoId: String(parsed.data.deviceId),
+      codigoPlaiAsignado: device?.inventoryNumber,
       usuarioId: body.userId || 'usr-standard-01',
       usuarioNombre: parsed.data.userName,
       usuarioEmail: parsed.data.userEmail || body.userEmail || (parsed.data.userName.includes('@') ? parsed.data.userName : 'user@plai.edu.mx'),
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
       estado: 'Pendiente',
       accesoriosIncluidos: device?.accessories ? device.accessories.slice(0, 2).join(', ') : 'Equipo base con accesorios originales',
       condicionSalida: 'Excelente',
-      observacionesAdmin: parsed.data.notes || `Solicitud para ${device ? device.name : 'equipo'} enviada desde el portal institucional.`,
+      observacionesAdmin: parsed.data.notes || `Solicitud para ${device ? `${device.name} (${device.inventoryNumber})` : 'equipo'} enviada desde el portal institucional.`,
     };
 
     await insertReservacionInDB(newReserva);

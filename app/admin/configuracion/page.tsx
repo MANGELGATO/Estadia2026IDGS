@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { RiSaveLine, RiAddLine, RiDeleteBinLine } from 'react-icons/ri';
 
 type Config = {
@@ -16,7 +16,7 @@ type Config = {
 
 const defaultCategorias = [
   'Realidad Virtual', 'Robótica', 'Fabricación Digital',
-  'Drones', 'Cómputo', 'Escaneo 3D', 'Electrónica',
+  'Drones', 'Cómputo',
 ];
 
 const defaultEstados = [
@@ -30,23 +30,49 @@ const defaultEstados = [
 
 export default function ConfiguracionPage() {
   const [config, setConfig] = useState<Config>({
-    labName: 'PLAI — Laboratorio de Innovación, Robótica y Tecnologías Inmersivas',
-    labLocation: 'Edificio A, Planta Baja',
+    labName: 'PLAi — Laboratorio de Innovación, Robótica y Tecnologías Inmersivas',
+    labLocation: 'Torre C, Ciudad Creativa Digital, Guadalajara, Jalisco',
     adminEmail: 'admin@plai.edu.mx',
     maintenanceAlertDays: 30,
     allowPublicView: true,
     requireApproval: true,
-    maxReservationHours: 4,
+    maxReservationHours: 2,
     maxAdvanceDays: 14,
   });
   const [categorias, setCategorias] = useState<string[]>(defaultCategorias);
   const [newCategoria, setNewCategoria] = useState('');
   const [savedMsg, setSavedMsg] = useState('');
 
-  const handleSave = (e: React.FormEvent) => {
+  useEffect(() => {
+    fetch('/api/configuracion')
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && json.data) {
+          const { categorias: savedCats, ...rest } = json.data;
+          setConfig(prev => ({ ...prev, ...rest }));
+          if (Array.isArray(savedCats) && savedCats.length > 0) {
+            setCategorias(savedCats);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSavedMsg('✅ Configuración guardada correctamente');
-    setTimeout(() => setSavedMsg(''), 3000);
+    try {
+      const res = await fetch('/api/configuracion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...config, categorias }),
+      });
+      if (res.ok) {
+        setSavedMsg('✅ Configuración guardada y sincronizada en el servidor');
+        setTimeout(() => setSavedMsg(''), 3500);
+      }
+    } catch {
+      setSavedMsg('❌ Error al guardar configuración');
+    }
   };
 
   const addCategoria = () => {

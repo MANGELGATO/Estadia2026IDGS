@@ -28,11 +28,11 @@ export default function HeroSection() {
             Cursos virtuales y presenciales adaptados a la demanda del mercado laboral actual.
           </p>
           <Link
-            href="#dispositivos"
+            href="#equipos"
             id="hero-explorar"
             className="inline-flex items-center gap-[0.6rem] rounded-full bg-plai px-8 py-[0.85rem] text-base font-bold text-white transition-all duration-[250ms] hover:gap-[0.9rem] hover:bg-[#8b145d]"
           >
-            Explorar cursos <ArrowRight size={18} />
+            Explorar equipos y cursos <ArrowRight size={18} />
           </Link>
         </div>
       </div>

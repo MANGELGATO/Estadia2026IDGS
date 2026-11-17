@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   RiCalendarCheckLine, 
@@ -11,65 +11,22 @@ import {
   RiCloseLine,
   RiArrowRightLine
 } from 'react-icons/ri';
-
-type CursoItem = {
-  id: string;
-  titulo: string;
-  tipo: string;
-  fecha: string;
-  hora: string;
-  lugar: string;
-  asistentes: number;
-  estado: string;
-  icon: string;
-  instructor: string;
-  descripcion: string;
-};
+import type { CursoAgendaItem } from '../../../lib/db';
 
 export default function AgendaPage() {
-  const [selectedCurso, setSelectedCurso] = useState<CursoItem | null>(null);
+  const [selectedCurso, setSelectedCurso] = useState<CursoAgendaItem | null>(null);
+  const [cursos, setCursos] = useState<CursoAgendaItem[]>([]);
 
-  const cursos: CursoItem[] = [
-    {
-      id: "CUR-101",
-      titulo: "Taller de Fabricación Digital e Impresión 3D",
-      tipo: "Presencial · Laboratorio Maker",
-      fecha: "15 de Noviembre, 2026",
-      hora: "10:00 AM - 14:00 PM",
-      lugar: "Aula Maker · Edificio C, Ciudad Creativa Digital",
-      asistentes: 25,
-      estado: "Confirmado",
-      icon: "🖨️",
-      instructor: "Ing. Carlos Mendoza (PLAi Jalisco)",
-      descripcion: "Capacitación práctica en modelado CAD, laminado en slicer y operación de impresoras 3D Bambu Lab y Prusa."
-    },
-    {
-      id: "CUR-102",
-      titulo: "Introducción a Robótica Educativa con Dobot",
-      tipo: "Práctica Guiada",
-      fecha: "22 de Noviembre, 2026",
-      hora: "09:00 AM - 13:00 PM",
-      lugar: "Laboratorio de Robótica y STEAM",
-      asistentes: 30,
-      estado: "Confirmado",
-      icon: "🤖",
-      instructor: "Dra. Laura Morales",
-      descripcion: "Programación por bloques y Python para brazos robóticos de 4 ejes en ambientes colaborativos de prototipado."
-    },
-    {
-      id: "CUR-103",
-      titulo: "Inmersión en Realidad Virtual y Espacios Educativos",
-      tipo: "Workshop VR",
-      fecha: "29 de Noviembre, 2026",
-      hora: "11:00 AM - 13:30 PM",
-      lugar: "Sala Inmersiva Meta Quest 3",
-      asistentes: 18,
-      estado: "En proceso",
-      icon: "🥽",
-      instructor: "Mtro. Fernando Tapia",
-      descripcion: "Pruebas de passthrough, hand-tracking y aplicaciones científicas para estudiantes en Meta Quest 3."
-    }
-  ];
+  useEffect(() => {
+    fetch('/api/cursos')
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && Array.isArray(json.data)) {
+          setCursos(json.data);
+        }
+      })
+      .catch(err => console.error('Error cargando agenda:', err));
+  }, []);
 
   return (
     <div className="flex animate-pop-in flex-col gap-8">
@@ -82,7 +39,7 @@ export default function AgendaPage() {
           </p>
         </div>
         <Link
-          href="/#reservar"
+          href="/#cursos"
           className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 font-heading text-xs font-bold text-white shadow-plai-sm transition-all hover:bg-accent-hover hover:-translate-y-0.5"
         >
           <RiAddCircleLine className="text-base" /> Agendar Nueva Sesión

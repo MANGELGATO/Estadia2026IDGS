@@ -43,6 +43,7 @@ export default function ReservacionesPage() {
   const [accesoriosText, setAccesoriosText] = useState('');
   const [condicionSalida, setCondicionSalida] = useState('Excelente');
   const [observacionesAdmin, setObservacionesAdmin] = useState('');
+  const [notification, setNotification] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   const [filterStatus, setFilterStatus] = useState<string>('Todas');
 
@@ -77,29 +78,37 @@ export default function ReservacionesPage() {
 
   const filteredData = filterStatus === 'Todas' ? data : data.filter(r => r.estado === filterStatus);
 
+  // Normalizar cadena sin acentos para coincidencia exacta de categorías
+  const normalizeCat = (s?: string) =>
+    (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/-/g, ' ').trim();
+
   // Get available devices matching the category of the reservation
-  const getAvailableDevicesForCategory = (categoriaId?: string) => {
+  const getAvailableDevicesForCategory = (categoriaId?: string, currentEquipoId?: string) => {
     if (!categoriaId) return [];
-    const normCat = categoriaId.toLowerCase().replace(/-/g, ' ');
+    const normCat = normalizeCat(categoriaId);
     return equipos.filter(eq => {
-      const isSameCategory = eq.category.toLowerCase().includes(normCat) || normCat.includes(eq.category.toLowerCase());
-      return isSameCategory && eq.status === 'Disponible';
+      const eqCat = normalizeCat(eq.category);
+      const isSameCategory = eqCat.includes(normCat) || (normCat !== '' && normCat.includes(eqCat));
+      const isAvailableOrAssigned = eq.status === 'Disponible' || (currentEquipoId && eq.id === currentEquipoId);
+      return isSameCategory && isAvailableOrAssigned;
     });
   };
 
   const handleOpenApproval = (item: ReservacionItem) => {
     setSelectedItem(item);
-    const available = getAvailableDevicesForCategory(item.categoriaId);
+    const available = getAvailableDevicesForCategory(item.categoriaId, item.equipoId);
     if (available.length > 0) {
-      const first = available[0];
-      setAssigningDevice(first);
-      setAccesoriosText(first.accessories?.join(', ') || 'Equipo completo con cargador y cables');
+      const preferred =
+        available.find(eq => eq.id === item.equipoId || eq.inventoryNumber === item.codigoPlaiAsignado) ||
+        available[0];
+      setAssigningDevice(preferred);
+      setAccesoriosText(preferred.accessories?.join(', ') || 'Equipo completo con cargador y cables');
     } else {
       setAssigningDevice(null);
-      setAccesoriosText('Equipo base con cables');
+      setAccesoriosText(item.accesoriosIncluidos || 'Equipo base con cables');
     }
     setCondicionSalida('Excelente');
-    setObservacionesAdmin('Aprobado para uso académico en las instalaciones de PLAi.');
+    setObservacionesAdmin(item.observacionesAdmin || 'Aprobado para uso académico en las instalaciones de PLAi.');
     setIsApprovalOpen(true);
   };
 
@@ -109,9 +118,9 @@ export default function ReservacionesPage() {
 
     const payload = {
       id: selectedItem.id,
-      estado: 'Aprobada',
-      equipoId: assigningDevice?.id,
-      codigoPlaiAsignado: assigningDevice?.inventoryNumber || 'PLAI-AUTO-01',
+      estado: 'Aprobada' as const,
+      equipoId: assigningDevice?.id || selectedItem.equipoId,
+      codigoPlaiAsignado: assigningDevice?.inventoryNumber || selectedItem.codigoPlaiAsignado || 'PLAI-AUTO-01',
       accesoriosIncluidos: accesoriosText,
       condicionSalida: condicionSalida,
       observacionesAdmin: observacionesAdmin,
@@ -128,12 +137,39 @@ export default function ReservacionesPage() {
       if (res.ok) {
         setData(prev => prev.map(r => r.id === selectedItem.id ? { ...r, ...payload, estado: 'Aprobada' } : r));
         setIsApprovalOpen(false);
+        setNotification({
+          text: `Reservación ${selectedItem.folio} aprobada. El dispositivo ${payload.codigoPlaiAsignado} quedó asignado y marcado como Reservado en Inventario.`,
+          type: 'success',
+        });
         fetchData();
       } else {
-        alert('Error al aprobar y asignar dispositivo');
+        setNotification({ text: 'Error al aprobar y asignar dispositivo', type: 'error' });
       }
     } catch (err) {
       console.error('Error al aprobar reservación:', err);
+    }
+  };
+
+  const handleRegistrarSalida = async (item: ReservacionItem) => {
+    try {
+      const res = await fetch('/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: item.id,
+          estado: 'En uso',
+          registrarEntregaEnBitacora: true,
+        }),
+      });
+      if (res.ok) {
+        setNotification({
+          text: `Salida registrada en Bitácora de Uso para ${item.folio} (${item.codigoPlaiAsignado || 'Equipo'}). Estado actualizado a "En uso".`,
+          type: 'success',
+        });
+        fetchData();
+      }
+    } catch (err) {
+      console.error('Error al registrar salida:', err);
     }
   };
 
@@ -170,8 +206,10 @@ export default function ReservacionesPage() {
       if (res.ok) {
         setData(prev => prev.map(r => r.id === selectedItem.id ? { ...r, ...updated } : r));
         setIsEditOpen(false);
+        setNotification({ text: `Cambios guardados en reservación ${selectedItem.folio}.`, type: 'success' });
+        fetchData();
       } else {
-        alert('Error al guardar cambios');
+        setNotification({ text: 'Error al guardar cambios', type: 'error' });
       }
     } catch (err) {
       console.error('Error al editar reservación:', err);
@@ -179,8 +217,6 @@ export default function ReservacionesPage() {
   };
 
   const handleReject = async (item: ReservacionItem) => {
-    if (!confirm(`¿Rechazar la solicitud de reservación de ${item.usuarioNombre}?`)) return;
-
     try {
       const res = await fetch('/api/reservaciones', {
         method: 'PUT',
@@ -194,6 +230,8 @@ export default function ReservacionesPage() {
 
       if (res.ok) {
         setData(prev => prev.map(r => r.id === item.id ? { ...r, estado: 'Rechazada' } : r));
+        setNotification({ text: `Solicitud ${item.folio} marcada como Rechazada.`, type: 'success' });
+        fetchData();
       }
     } catch (err) {
       console.error('Error al rechazar:', err);
@@ -265,17 +303,27 @@ export default function ReservacionesPage() {
           {item.estado === 'Pendiente' ? (
             <button
               onClick={() => handleOpenApproval(item)}
-              className="flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700"
+              className="flex cursor-pointer items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700"
               title="Aprobar y asignar dispositivo disponible"
             >
               <RiCheckLine /> Asignar
             </button>
           ) : null}
 
+          {item.estado === 'Aprobada' ? (
+            <button
+              onClick={() => handleRegistrarSalida(item)}
+              className="flex cursor-pointer items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm transition-all hover:bg-indigo-700"
+              title="Entregar dispositivo y abrir registro en Bitácora de Uso"
+            >
+              <RiCheckLine /> Entregar
+            </button>
+          ) : null}
+
           {item.estado === 'Pendiente' ? (
             <button
               onClick={() => handleReject(item)}
-              className="flex items-center gap-1 rounded-md bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100"
+              className="flex cursor-pointer items-center gap-1 rounded-md bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100"
               title="Rechazar solicitud"
             >
               <RiCloseLine />
@@ -287,7 +335,7 @@ export default function ReservacionesPage() {
               setSelectedItem(item);
               setIsDetailOpen(true);
             }}
-            className="flex items-center gap-1 rounded-md bg-plai/10 px-2.5 py-1 text-xs font-semibold text-plai hover:bg-plai hover:text-white"
+            className="flex cursor-pointer items-center gap-1 rounded-md bg-plai/10 px-2.5 py-1 text-xs font-semibold text-plai hover:bg-plai hover:text-white"
           >
             <RiEyeLine /> Ver
           </button>
@@ -302,10 +350,23 @@ export default function ReservacionesPage() {
         <div>
           <h1 className="mb-1 font-heading text-3xl font-extrabold text-navy">Reservaciones</h1>
           <p className="text-sm text-plai-muted md:text-base">
-            Aprobación inteligente con asignación automática de equipos y control de accesorios
+            Aprobación inteligente con asignación automática de equipos, sincronización con Inventario y Bitácora
           </p>
         </div>
       </div>
+
+      {notification && (
+        <div className={`flex items-center justify-between rounded-xl border p-4 text-sm font-semibold animate-pop-in ${
+          notification.type === 'success'
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+            : 'border-rose-200 bg-rose-50 text-rose-800'
+        }`}>
+          <span>{notification.text}</span>
+          <button onClick={() => setNotification(null)} className="cursor-pointer text-gray-500 hover:text-black">
+            <RiCloseLine size={18} />
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Pendientes" value={pendientes} icon={<RiTimeLine />} variant="warning" />
@@ -373,7 +434,7 @@ export default function ReservacionesPage() {
                 <label className="text-xs font-bold uppercase tracking-wider text-navy">
                   Dispositivo asignado (Detectados disponibles para el día y hora)
                 </label>
-                {getAvailableDevicesForCategory(selectedItem.categoriaId).length > 0 ? (
+                {getAvailableDevicesForCategory(selectedItem.categoriaId, selectedItem.equipoId).length > 0 ? (
                   <select
                     className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20"
                     value={assigningDevice?.id || ''}
@@ -386,7 +447,7 @@ export default function ReservacionesPage() {
                     }}
                     required
                   >
-                    {getAvailableDevicesForCategory(selectedItem.categoriaId).map(eq => (
+                    {getAvailableDevicesForCategory(selectedItem.categoriaId, selectedItem.equipoId).map(eq => (
                       <option key={eq.id} value={eq.id}>
                         {eq.name} (Código: {eq.inventoryNumber}) - {eq.brand} {eq.model}
                       </option>

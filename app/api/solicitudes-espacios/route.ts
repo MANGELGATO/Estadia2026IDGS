@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { spaceRequestSchema } from '../../../lib/validations/schemas';
 import { logger } from '../../../lib/logger';
+import { insertReservacionInDB, ReservacionItem } from '../../../lib/db';
 import {
   checkRateLimit,
   getClientIp,
@@ -9,6 +10,13 @@ import {
 } from '../../../lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
+
+const ESPACIO_NAMES: Record<string, string> = {
+  'auditorio': 'Auditorio Principal (150 personas)',
+  'aula-robotica': 'Aula de Robótica y Automatización',
+  'workshop-vr': 'Workshop de Realidad Virtual',
+  'sala-juntas': 'Sala de Juntas Creativa',
+};
 
 export async function POST(req: NextRequest) {
   const reqId = req.headers.get('x-request-id') || `req-${Date.now()}`;
@@ -48,10 +56,46 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    logger.info('Solicitud de espacio validada y registrada', {
+    const timestamp = Date.now();
+    const folio = `ESP-${timestamp.toString().slice(-4)}`;
+    const espacioNombre = ESPACIO_NAMES[parsed.data.espacioId] || parsed.data.espacioId;
+    const catSlug = parsed.data.espacioId.includes('robot')
+      ? 'robotica'
+      : parsed.data.espacioId.includes('vr')
+      ? 'realidad-virtual'
+      : 'computo-multimedia';
+
+    // Calcular hora fin estimada (+2 horas)
+    const [h, m] = parsed.data.hora.split(':').map(Number);
+    const endH = Math.min((h || 10) + 2, 20);
+    const horaFin = `${String(endH).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
+
+    const nuevaReservaEspacio: ReservacionItem = {
+      id: `esp-${timestamp}`,
+      folio,
+      categoriaId: catSlug,
+      codigoPlaiAsignado: `ESPACIO-${parsed.data.espacioId.toUpperCase()}`,
+      usuarioNombre: parsed.data.nombreSolicitante,
+      usuarioEmail: parsed.data.email,
+      usuarioTelefono: body.telefono ? String(body.telefono) : undefined,
+      usuarioInstitucion: body.institucion || parsed.data.nombreSolicitante,
+      fechaUso: parsed.data.fecha,
+      horaInicio: parsed.data.hora,
+      horaFin,
+      actividad: `[ESPACIO: ${espacioNombre}] ${parsed.data.proposito}`,
+      estado: 'Pendiente',
+      accesoriosIncluidos: 'Proyector 4K, Audio, Conectividad Wi-Fi Dedicada',
+      condicionSalida: 'Excelente',
+      observacionesAdmin: `Solicitud de espacio físico (${espacioNombre}). Contacto: ${body.telefono || parsed.data.email}.`,
+    };
+
+    await insertReservacionInDB(nuevaReservaEspacio);
+
+    logger.info('Solicitud de espacio validada y persistida en base de datos', {
       reqId,
       path: '/api/solicitudes-espacios',
       status: 201,
+      folio,
       espacioId: parsed.data.espacioId,
       solicitante: parsed.data.nombreSolicitante,
     });
@@ -61,8 +105,9 @@ export async function POST(req: NextRequest) {
         success: true,
         message: 'Solicitud de espacio registrada exitosamente.',
         data: {
-          id: `ESP-${Date.now()}`,
+          id: folio,
           ...parsed.data,
+          reserva: nuevaReservaEspacio,
         },
       },
       { status: 201 }

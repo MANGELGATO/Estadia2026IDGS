@@ -13,24 +13,29 @@ import {
   RiShieldCheckLine,
   RiComputerLine
 } from 'react-icons/ri';
-import { ReservacionItem } from '../../lib/db';
+import { ReservacionItem, CursoAgendaItem } from '../../lib/db';
 
 export default function UserDashboard() {
   const { data: session } = useSession();
   const userName = session?.user?.name || "Usuario Institucional";
 
   const [reservaciones, setReservaciones] = useState<ReservacionItem[]>([]);
+  const [cursos, setCursos] = useState<CursoAgendaItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/reservaciones')
-      .then(res => res.json())
-      .then(json => {
-        if (json.data && Array.isArray(json.data)) {
-          setReservaciones(json.data);
+    Promise.all([
+      fetch('/api/reservaciones').then(r => r.json()).catch(() => ({ data: [] })),
+      fetch('/api/cursos').then(r => r.json()).catch(() => ({ data: [] })),
+    ])
+      .then(([resJson, curJson]) => {
+        if (resJson.data && Array.isArray(resJson.data)) {
+          setReservaciones(resJson.data);
+        }
+        if (curJson.data && Array.isArray(curJson.data)) {
+          setCursos(curJson.data);
         }
       })
-      .catch(err => console.error('Error cargando reservaciones:', err))
       .finally(() => setLoading(false));
   }, []);
 
@@ -60,7 +65,7 @@ export default function UserDashboard() {
 
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/#reservar"
+              href="/equipos"
               className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 font-heading text-xs font-bold text-white shadow-lg transition-all hover:bg-accent-hover hover:-translate-y-0.5"
             >
               <RiAddCircleLine className="text-base" /> Solicitar Préstamo
@@ -87,7 +92,7 @@ export default function UserDashboard() {
             </div>
             <div>
               <span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Préstamos Aprobados</span>
-              <p className="font-heading text-2xl font-black text-navy">{totalActivas || 2}</p>
+              <p className="font-heading text-2xl font-black text-navy">{loading ? '...' : totalActivas}</p>
             </div>
           </div>
         </Link>
@@ -99,7 +104,7 @@ export default function UserDashboard() {
             </div>
             <div>
               <span className="text-xs font-bold uppercase tracking-wider text-plai-muted">En Revisión</span>
-              <p className="font-heading text-2xl font-black text-navy">{totalPendientes || 1}</p>
+              <p className="font-heading text-2xl font-black text-navy">{loading ? '...' : totalPendientes}</p>
             </div>
           </div>
         </Link>
@@ -111,7 +116,7 @@ export default function UserDashboard() {
             </div>
             <div>
               <span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Cursos Agendados</span>
-              <p className="font-heading text-2xl font-black text-navy">2</p>
+              <p className="font-heading text-2xl font-black text-navy">{loading ? '...' : cursos.length}</p>
             </div>
           </div>
         </Link>
@@ -122,7 +127,7 @@ export default function UserDashboard() {
           </div>
           <div>
             <span className="text-xs font-bold uppercase tracking-wider text-plai-muted">Historial Total</span>
-            <p className="font-heading text-2xl font-black text-navy">{reservaciones.length || 5}</p>
+            <p className="font-heading text-2xl font-black text-navy">{loading ? '...' : reservaciones.length + totalCompletadas}</p>
           </div>
         </div>
       </div>
@@ -172,7 +177,7 @@ export default function UserDashboard() {
                         <span className="font-mono text-[10px] text-plai-muted">({reserva.folio})</span>
                       </div>
                       <p className="text-xs text-plai-muted">
-                        Fecha: <span className="font-semibold text-gray-700">{reserva.fechaUso}</span> ({reserva.horaInicio} - {reserva.horaFin}) · Categoría: <span className="capitalize">{reserva.categoriaId?.replace('-', ' ')}</span>
+                        Fecha: <span className="font-semibold text-gray-700">{reserva.fechaUso}</span> ({reserva.horaInicio} - {reserva.horaFin}) · Categoría: <span className="capitalize">{(reserva.categoriaId || 'General').replace(/-/g, ' ')}</span>
                       </p>
                     </div>
                   </div>

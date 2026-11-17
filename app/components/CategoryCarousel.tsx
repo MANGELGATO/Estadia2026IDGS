@@ -1,8 +1,9 @@
 'use client';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Headset, Bot, Monitor, Plane, Printer, ArrowRight } from 'lucide-react';
 
-const categories = [
+const initialCategories = [
   {
     id: 'realidad-virtual',
     filterKey: 'Realidad Virtual',
@@ -56,6 +57,33 @@ const categories = [
 ];
 
 export default function CategoryCarousel() {
+  const [categories, setCategories] = useState(initialCategories);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/equipos').then(r => r.json()).catch(() => ({ data: [] })),
+      fetch('/api/categorias').then(r => r.json()).catch(() => ({ categories: {} })),
+    ]).then(([eqJson, catJson]) => {
+      const eqList = Array.isArray(eqJson.data) ? eqJson.data : [];
+      const catMap = catJson.categories || {};
+      if (eqList.length > 0 || Object.keys(catMap).length > 0) {
+        setCategories(prev =>
+          prev.map(c => {
+            const count = eqList.length > 0
+              ? eqList.filter((e: any) => e.category?.toLowerCase() === c.filterKey.toLowerCase()).length
+              : c.count;
+            const cfg = catMap[c.id];
+            return {
+              ...c,
+              count,
+              name: cfg?.name || c.name,
+              description: cfg?.description || c.description,
+            };
+          })
+        );
+      }
+    });
+  }, []);
   return (
     <div className="border-b border-black/[0.08] bg-white pb-8 pt-10">
       <div className="mx-auto max-w-[1200px] px-6">

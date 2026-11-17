@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { mockDevices, DeviceItem } from '../../../lib/mockData';
 import { ArrowLeft, Lightbulb, Target, CheckCircle2, Box, Layers, Printer, Sparkles, AlertCircle } from 'lucide-react';
 import EquipmentCard from '../../components/EquipmentCard';
@@ -74,6 +76,8 @@ const categoryToDeviceCategory: Record<string, string> = {
 };
 
 export default function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const resolvedParams = use(params);
   const fallbackMeta = categoryMeta[resolvedParams.slug];
   const deviceCategory = categoryToDeviceCategory[resolvedParams.slug];
@@ -99,6 +103,8 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
   const [videoUrl, setVideoUrl] = useState<string>('https://www.youtube.com/embed/dQw4w9WgXcQ');
   const [isLoaded, setIsLoaded] = useState(false);
   const [quoteSubmitted, setQuoteSubmitted] = useState(false);
+  const [printFolio, setPrintFolio] = useState('');
+  const [isSubmittingPrint, setIsSubmittingPrint] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -373,23 +379,74 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
                   </div>
 
                   {quoteSubmitted ? (
-                    <div role="alert" className="flex items-center gap-4 rounded-xl border border-emerald-200 bg-emerald-50 p-6 text-emerald-800 animate-pop-in">
-                      <CheckCircle2 size={32} className="shrink-0 text-emerald-600" />
-                      <div>
-                        <h3 className="font-heading font-bold text-emerald-900">¡Solicitud de impresión registrada con éxito!</h3>
-                        <p className="mt-1 text-sm text-emerald-700">El equipo técnico de manufactura aditiva de PLAi revisará la geometría de tu archivo y los parámetros de impresión. Te notificaremos por correo electrónico para confirmar la fecha y hora en la que podrás acudir al laboratorio con tu bobina de filamento de 1.75 mm.</p>
+                    <div role="alert" className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50 p-6 text-emerald-800 animate-pop-in">
+                      <div className="flex items-start gap-4">
+                        <CheckCircle2 size={32} className="shrink-0 text-emerald-600" />
+                        <div>
+                          <h3 className="font-heading font-bold text-emerald-900">
+                            ¡Solicitud de impresión registrada con éxito! {printFolio ? `(${printFolio})` : ''}
+                          </h3>
+                          <p className="mt-1 text-sm text-emerald-700">
+                            Tu solicitud quedó vinculada al panel administrativo y a tu cuenta institucional. El equipo técnico de manufactura aditiva de PLAi revisará la geometría de tu archivo y confirmará tu horario.
+                          </p>
+                        </div>
                       </div>
+                      <Link
+                        href="/usuario/prestamos"
+                        className="shrink-0 rounded-full bg-emerald-700 px-5 py-2.5 font-heading text-xs font-bold text-white shadow-sm hover:bg-emerald-800"
+                      >
+                        Ver en Mis Solicitudes
+                      </Link>
                     </div>
                   ) : (
-                    <form className="flex flex-col gap-5 rounded-xl bg-[#F4F6F9] p-6" onSubmit={(e) => { e.preventDefault(); setQuoteSubmitted(true); }}>
+                    <form
+                      className="flex flex-col gap-5 rounded-xl bg-[#F4F6F9] p-6"
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (status === 'unauthenticated') {
+                          router.push('/login?callbackUrl=/categoria/fabricacion-digital');
+                          return;
+                        }
+                        setIsSubmittingPrint(true);
+                        const fd = new FormData(e.currentTarget);
+                        const filamento = fd.get('filamento') as string;
+                        const marcaColor = fd.get('marcaColor') as string;
+                        const notas = fd.get('notas') as string;
+                        const printerDevice = devices[0] || { id: 'eq-fab-001' };
+                        const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+
+                        try {
+                          const res = await fetch('/api/reservas', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              deviceId: printerDevice.id,
+                              userName: session?.user?.name || 'Investigador / Alumno PLAi',
+                              userEmail: session?.user?.email || 'user@plai.edu.mx',
+                              userInstitution: 'Comunidad Maker PLAi',
+                              date: tomorrow,
+                              startTime: '10:00',
+                              endTime: '12:00',
+                              activity: `[IMPRESIÓN 3D - TRAE TU FILAMENTO] Material: ${filamento} (${marcaColor})`,
+                              notes: notas || `Impresión 3D con filamento ${filamento} (${marcaColor})`,
+                              acceptedPrivacy: true,
+                            }),
+                          });
+                          const json = await res.json();
+                          if (json.data?.id) setPrintFolio(json.data.id);
+                        } catch {}
+                        setIsSubmittingPrint(false);
+                        setQuoteSubmitted(true);
+                      }}
+                    >
                       <div className="flex flex-col gap-2">
                         <label className="font-heading text-[0.9rem] font-bold text-navy">Archivo 3D (.stl, .obj, .3mf) *</label>
-                        <input type="file" accept=".stl,.obj,.3mf" className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] file:mr-4 file:rounded-full file:border-0 file:bg-plai/10 file:px-4 file:py-2 file:font-heading file:font-semibold file:text-plai" required />
+                        <input name="archivo3d" type="file" accept=".stl,.obj,.3mf" className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] file:mr-4 file:rounded-full file:border-0 file:bg-plai/10 file:px-4 file:py-2 file:font-heading file:font-semibold file:text-plai" required />
                       </div>
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="flex flex-col gap-2">
                           <label className="font-heading text-[0.9rem] font-bold text-navy">Filamento que traerás *</label>
-                          <select className="w-full cursor-pointer rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] text-navy outline-none focus:border-plai">
+                          <select name="filamento" className="w-full cursor-pointer rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] text-navy outline-none focus:border-plai">
                             <option>PLA (1.75 mm)</option>
                             <option>PLA+ (1.75 mm)</option>
                             <option>PETG (1.75 mm)</option>
@@ -399,15 +456,15 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
                         </div>
                         <div className="flex flex-col gap-2">
                           <label className="font-heading text-[0.9rem] font-bold text-navy">Marca y Color del filamento *</label>
-                          <input type="text" placeholder="Ej. eSUN PLA+ Blanco, Polymaker PETG Gris..." className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] text-navy outline-none focus:border-plai" required />
+                          <input name="marcaColor" type="text" placeholder="Ej. eSUN PLA+ Blanco, Polymaker PETG Gris..." className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] text-navy outline-none focus:border-plai" required />
                         </div>
                       </div>
                       <div className="flex flex-col gap-2">
                         <label className="font-heading text-[0.9rem] font-bold text-navy">Parámetros de impresión sugeridos o notas</label>
-                        <textarea className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] outline-none focus:border-plai" placeholder="Ej. Relleno al 20% giroidal, 4 paredes para resistencia, orientación vertical..." rows={3}></textarea>
+                        <textarea name="notas" className="w-full rounded-xl border border-black/[0.08] bg-white px-4 py-3 font-body text-[0.9rem] outline-none focus:border-plai" placeholder="Ej. Relleno al 20% giroidal, 4 paredes para resistencia, orientación vertical..." rows={3}></textarea>
                       </div>
-                      <button type="submit" className="mt-2 cursor-pointer self-start rounded-xl px-6 py-3 font-heading text-base font-bold text-white transition-all hover:-translate-y-0.5 hover:opacity-90 shadow-md" style={{ backgroundColor: meta.color }}>
-                        Enviar Solicitud de Impresión (Trae tu Filamento)
+                      <button type="submit" disabled={isSubmittingPrint} className="mt-2 cursor-pointer self-start rounded-xl px-6 py-3 font-heading text-base font-bold text-white transition-all hover:-translate-y-0.5 hover:opacity-90 shadow-md disabled:opacity-60" style={{ backgroundColor: meta.color }}>
+                        {isSubmittingPrint ? 'Registrando solicitud...' : 'Enviar Solicitud de Impresión (Trae tu Filamento)'}
                       </button>
                     </form>
                   )}

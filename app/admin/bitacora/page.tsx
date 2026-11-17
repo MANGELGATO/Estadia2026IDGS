@@ -17,11 +17,12 @@ import {
   RiToolsLine
 } from 'react-icons/ri';
 import StatCard from '../../components/admin/StatCard';
-import type { BitacoraItem, DeviceItem } from '../../../lib/db';
+import type { BitacoraItem, DeviceItem, ReservacionItem } from '../../../lib/db';
 
 export default function BitacoraPage() {
   const [logs, setLogs] = useState<BitacoraItem[]>([]);
   const [equipos, setEquipos] = useState<DeviceItem[]>([]);
+  const [reservaciones, setReservaciones] = useState<ReservacionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
@@ -32,6 +33,7 @@ export default function BitacoraPage() {
   const [selectedLogForReturn, setSelectedLogForReturn] = useState<BitacoraItem | null>(null);
 
   // Formulario Entrega
+  const [entregaReservaId, setEntregaReservaId] = useState('');
   const [entregaCodigoPlai, setEntregaCodigoPlai] = useState('');
   const [entregaUsuarioNombre, setEntregaUsuarioNombre] = useState('');
   const [entregaUsuarioEmail, setEntregaUsuarioEmail] = useState('');
@@ -61,13 +63,15 @@ export default function BitacoraPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [bitRes, eqRes] = await Promise.all([
+      const [bitRes, eqRes, resRes] = await Promise.all([
         fetch('/api/bitacora').then(r => r.json()),
         fetch('/api/equipos').then(r => r.json()),
+        fetch('/api/reservaciones').then(r => r.json()).catch(() => ({ data: [] })),
       ]);
 
       if (bitRes.data) setLogs(bitRes.data);
       if (eqRes.data) setEquipos(eqRes.data);
+      if (resRes.data) setReservaciones(resRes.data);
     } catch {
       setNotification({ text: 'Error al cargar registros de la bitácora', type: 'error' });
     } finally {
@@ -78,7 +82,7 @@ export default function BitacoraPage() {
   const handleEntregaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!entregaCodigoPlai || !entregaUsuarioNombre || !entregaFecha || !entregaFechaEstimada) {
-      alert('Por favor completa los campos obligatorios');
+      setNotification({ text: 'Por favor completa los campos obligatorios de entrega.', type: 'error' });
       return;
     }
 
@@ -87,6 +91,7 @@ export default function BitacoraPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          reservaId: entregaReservaId || undefined,
           codigoPlai: entregaCodigoPlai,
           usuarioNombre: entregaUsuarioNombre,
           usuarioEmail: entregaUsuarioEmail,
@@ -102,15 +107,18 @@ export default function BitacoraPage() {
 
       const json = await res.json();
       if (json.success) {
-        setNotification({ text: 'Entrega registrada exitosamente en la bitácora', type: 'success' });
+        setNotification({
+          text: 'Entrega registrada exitosamente en la bitácora. El equipo y su reservación pasaron a estado "En uso".',
+          type: 'success',
+        });
         setIsEntregaModalOpen(false);
         resetEntregaForm();
         fetchData();
       } else {
-        alert(json.message || 'Error al registrar entrega');
+        setNotification({ text: json.message || 'Error al registrar entrega', type: 'error' });
       }
     } catch {
-      alert('Error de conexión al registrar entrega');
+      setNotification({ text: 'Error de conexión al registrar entrega', type: 'error' });
     }
   };
 
@@ -138,22 +146,23 @@ export default function BitacoraPage() {
       if (json.success) {
         setNotification({ 
           text: devolucionIncidencia 
-            ? 'Devolución guardada y se generó una incidencia técnica en mantenimiento.' 
-            : 'Devolución registrada exitosamente. Equipo listo para préstamo.', 
+            ? 'Devolución guardada, reservación marcada como Completada y se generó una incidencia técnica en Mantenimiento.' 
+            : 'Devolución registrada exitosamente. Reservación completada y equipo disponible para préstamo.', 
           type: 'success' 
         });
         setIsDevolucionModalOpen(false);
         setSelectedLogForReturn(null);
         fetchData();
       } else {
-        alert(json.message || 'Error al registrar devolución');
+        setNotification({ text: json.message || 'Error al registrar devolución', type: 'error' });
       }
     } catch {
-      alert('Error de conexión al registrar devolución');
+      setNotification({ text: 'Error de conexión al registrar devolución', type: 'error' });
     }
   };
 
   const resetEntregaForm = () => {
+    setEntregaReservaId('');
     setEntregaCodigoPlai('');
     setEntregaUsuarioNombre('');
     setEntregaUsuarioEmail('');
@@ -386,6 +395,40 @@ export default function BitacoraPage() {
             </div>
 
             <form onSubmit={handleEntregaSubmit} className="flex flex-col gap-4">
+              {reservaciones.filter(r => r.estado === 'Aprobada' || r.estado === 'Pendiente').length > 0 && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3.5">
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-blue-900">
+                    Vincular con Reservación Aprobada / Pendiente (Opcional - Autocompleta datos)
+                  </label>
+                  <select
+                    value={entregaReservaId}
+                    onChange={(e) => {
+                      const resId = e.target.value;
+                      setEntregaReservaId(resId);
+                      const r = reservaciones.find(x => x.id === resId);
+                      if (r) {
+                        if (r.codigoPlaiAsignado) setEntregaCodigoPlai(r.codigoPlaiAsignado);
+                        setEntregaUsuarioNombre(r.usuarioNombre || '');
+                        setEntregaUsuarioEmail(r.usuarioEmail || '');
+                        setEntregaUsuarioDependencia(r.usuarioInstitucion || '');
+                        if (r.accesoriosIncluidos) setEntregaAccesorios(r.accesoriosIncluidos);
+                        setEntregaObservaciones(`Folio ${r.folio}: ${r.actividad}`);
+                      }
+                    }}
+                    className="w-full rounded-lg border border-blue-300 bg-white p-2 text-xs text-navy focus:border-plai focus:outline-none"
+                  >
+                    <option value="">-- Entrega directa sin reservación previa o selecciona un folio --</option>
+                    {reservaciones
+                      .filter(r => r.estado === 'Aprobada' || r.estado === 'Pendiente')
+                      .map(r => (
+                        <option key={r.id} value={r.id}>
+                          [{r.estado}] {r.folio} — {r.usuarioNombre} ({r.codigoPlaiAsignado || r.categoriaId}) · {r.fechaUso}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1 sm:col-span-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-navy">
@@ -394,7 +437,14 @@ export default function BitacoraPage() {
                   <select
                     required
                     value={entregaCodigoPlai}
-                    onChange={(e) => setEntregaCodigoPlai(e.target.value)}
+                    onChange={(e) => {
+                      const code = e.target.value;
+                      setEntregaCodigoPlai(code);
+                      const eq = equipos.find(x => x.inventoryNumber === code);
+                      if (eq && eq.accessories && eq.accessories.length > 0) {
+                        setEntregaAccesorios(eq.accessories.join(', '));
+                      }
+                    }}
                     className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:border-plai focus:outline-none"
                   >
                     <option value="">-- Elige un dispositivo de inventario --</option>

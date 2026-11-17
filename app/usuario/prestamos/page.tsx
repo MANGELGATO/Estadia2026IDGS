@@ -63,7 +63,7 @@ export default function PrestamosPage() {
           </p>
         </div>
         <Link
-          href="/#reservar"
+          href="/equipos"
           className="inline-flex items-center gap-2 rounded-xl bg-plai px-5 py-2.5 font-heading text-xs font-bold text-white shadow-plai-sm transition-all hover:bg-navy hover:-translate-y-0.5"
         >
           <RiAddCircleLine className="text-base" /> Nueva Solicitud

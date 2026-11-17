@@ -31,22 +31,29 @@ export default function ReportesPage() {
     });
   }, []);
 
-  const totalEquipos = equipos.length || 66;
-  const disponibles = equipos.filter(e => e.status === 'Disponible').length || 57;
-  const enMantenimiento = equipos.filter(e => e.status === 'En mantenimiento').length || incidencias.filter(i => i.estado !== 'Resuelta').length || 6;
-  const enUso = equipos.filter(e => e.status === 'En uso').length || bitacora.filter(b => b.estadoPrestamo === 'Activo').length || 3;
+  const totalEquipos = equipos.length;
+  const disponibles = equipos.filter(e => e.status === 'Disponible').length;
+  const enMantenimiento = equipos.filter(e => e.status === 'En mantenimiento').length;
+  const enUso = equipos.filter(e => e.status === 'En uso' || e.status === 'Reservado').length;
 
-  // Categorías calculadas dinámicamente
+  const normalizeStr = (s?: string) =>
+    (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/-/g, ' ').trim();
+
+  // Categorías calculadas dinámicamente con datos 100% reales
   const categoryNames = ['Realidad Virtual', 'Robótica', 'Fabricación digital', 'Drones', 'Cómputo'];
   const categoriasCalculadas = categoryNames.map(cat => {
-    const totalCat = equipos.filter(e => e.category?.toLowerCase() === cat.toLowerCase()).length;
-    const activosCat = equipos.filter(e => e.category?.toLowerCase() === cat.toLowerCase() && e.status === 'Disponible').length;
-    const reservs = reservaciones.filter(r => r.categoriaId?.toLowerCase().includes(cat.toLowerCase().replace(' ', '-'))).length;
+    const catNorm = normalizeStr(cat);
+    const totalCat = equipos.filter(e => normalizeStr(e.category) === catNorm).length;
+    const activosCat = equipos.filter(e => normalizeStr(e.category) === catNorm && e.status === 'Disponible').length;
+    const reservs = reservaciones.filter(r => {
+      const rNorm = normalizeStr(r.categoriaId);
+      return rNorm.includes(catNorm) || (catNorm !== '' && catNorm.includes(rNorm));
+    }).length;
     return {
       nombre: cat,
-      equipos: totalCat || 5,
-      activos: activosCat || 4,
-      reservaciones: reservs || 12,
+      equipos: totalCat,
+      activos: activosCat,
+      reservaciones: reservs,
     };
   });
 
@@ -106,7 +113,27 @@ export default function ReportesPage() {
     });
     csvContent += '\r\n';
 
-    // Sección 4: Mantenimiento e Incidencias
+    // Sección 4: Reservaciones
+    csvContent += 'HISTÓRICO DE SOLICITUDES Y RESERVACIONES\r\n';
+    csvContent += 'Folio,Solicitante,Correo,Institución,Categoría,Código Asignado,Fecha Uso,Horario,Estado,Actividad\r\n';
+    reservaciones.forEach(r => {
+      const row = [
+        `"${r.folio || r.id}"`,
+        `"${(r.usuarioNombre || '').replace(/"/g, '""')}"`,
+        `"${r.usuarioEmail || ''}"`,
+        `"${(r.usuarioInstitucion || 'Particular').replace(/"/g, '""')}"`,
+        `"${r.categoriaId || ''}"`,
+        `"${r.codigoPlaiAsignado || 'Por asignar'}"`,
+        `"${r.fechaUso || ''}"`,
+        `"${r.horaInicio || ''} - ${r.horaFin || ''}"`,
+        `"${r.estado || ''}"`,
+        `"${(r.actividad || '').replace(/"/g, '""')}"`,
+      ].join(',');
+      csvContent += row + '\r\n';
+    });
+    csvContent += '\r\n';
+
+    // Sección 5: Mantenimiento e Incidencias
     csvContent += 'HISTÓRICO DE INCIDENCIAS Y MANTENIMIENTO\r\n';
     csvContent += 'Folio,Código PLAi,Equipo,Falla,Severidad,Estado,Técnico Responsable,Fecha Reporte\r\n';
     incidencias.forEach(i => {
@@ -139,6 +166,8 @@ export default function ReportesPage() {
   const handleExportPDF = () => {
     window.print();
   };
+
+  const safeTotal = totalEquipos || 1;
 
   return (
     <div className="flex animate-pop-in flex-col gap-8 print:p-0">
@@ -177,7 +206,7 @@ export default function ReportesPage() {
         <StatCard title="Equipos Disponibles"  value={disponibles}     icon={<RiComputerLine />}      variant="success" />
         <StatCard title="En Mantenimiento"     value={enMantenimiento} icon={<RiToolsLine />}         variant="warning" />
         <StatCard title="En Uso / Préstamo"    value={enUso}           icon={<RiAppsLine />}          variant="primary" />
-        <StatCard title="Reservaciones"        value={reservaciones.length || 175} icon={<RiCalendarCheckLine />} variant="success" />
+        <StatCard title="Reservaciones"        value={reservaciones.length} icon={<RiCalendarCheckLine />} variant="success" />
         <StatCard title="Préstamos Bitácora"   value={bitacora.length}  icon={<RiUserLine />}          variant="primary" />
         <StatCard title="Incidencias Abiertas" value={incidencias.filter(i => i.estado !== 'Resuelta').length} icon={<RiAlertLine />} variant="danger" />
         <StatCard title="Solventadas"          value={incidencias.filter(i => i.estado === 'Resuelta').length} icon={<RiAlertLine />} variant="success" />
@@ -192,9 +221,9 @@ export default function ReportesPage() {
           <div className="my-4 flex justify-center">
             <div className="relative flex size-[140px] items-center justify-center rounded-full" style={{
               background: `conic-gradient(
-                #059669 0% ${(disponibles / totalEquipos) * 100}%,
-                #D97706 ${(disponibles / totalEquipos) * 100}% ${((disponibles + enMantenimiento) / totalEquipos) * 100}%,
-                #1e5ca7 ${((disponibles + enMantenimiento) / totalEquipos) * 100}% 100%
+                #059669 0% ${(disponibles / safeTotal) * 100}%,
+                #D97706 ${(disponibles / safeTotal) * 100}% ${((disponibles + enMantenimiento) / safeTotal) * 100}%,
+                #1e5ca7 ${((disponibles + enMantenimiento) / safeTotal) * 100}% 100%
               )`
             }}>
               <div className="flex size-[90px] flex-col items-center justify-center rounded-full bg-white">
