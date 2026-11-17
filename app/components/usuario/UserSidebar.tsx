@@ -8,21 +8,32 @@ import {
   RiCalendarCheckLine, 
   RiFileListLine,
   RiLogoutBoxRLine,
+  RiComputerLine,
+  RiArrowRightUpLine,
+  RiAddCircleLine,
+  RiHome4Line
 } from "react-icons/ri";
 import { useSession, signOut } from "next-auth/react";
 
 const navSections = [
   {
-    label: "General",
+    label: "Panel Principal",
     items: [
-      { name: "Resumen", href: "/usuario", icon: <RiDashboardLine /> },
+      { name: "Resumen y Métricas", href: "/usuario", icon: <RiDashboardLine /> },
     ],
   },
   {
     label: "Mis Solicitudes",
     items: [
-      { name: "Préstamos", href: "/usuario/prestamos", icon: <RiFileListLine /> },
-      { name: "Mi Agenda", href: "/usuario/agenda", icon: <RiCalendarCheckLine /> },
+      { name: "Historial de Préstamos", href: "/usuario/prestamos", icon: <RiFileListLine /> },
+      { name: "Mi Agenda y Cursos", href: "/usuario/agenda", icon: <RiCalendarCheckLine /> },
+    ],
+  },
+  {
+    label: "Explorar Recursos",
+    items: [
+      { name: "Catálogo de Equipos", href: "/equipos", icon: <RiComputerLine /> },
+      { name: "Sitio Web Público", href: "/", icon: <RiHome4Line /> },
     ],
   }
 ];
@@ -31,13 +42,26 @@ export default function UserSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
 
-  const userName = session?.user?.name || "Usuario Estándar";
+  const userName = session?.user?.name || "Usuario Institucional";
+  const userEmail = session?.user?.email || "user@plai.edu.mx";
   const userInitial = userName.charAt(0).toUpperCase();
 
+  const handleSignOut = async () => {
+    if (typeof document !== 'undefined') {
+      document.cookie = 'plai_role=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    }
+    await signOut({ callbackUrl: "/login?logout=true" });
+  };
+
   return (
-    <aside className="sticky top-[70px] flex h-auto w-full flex-col overflow-y-auto border-r border-white/5 bg-gradient-to-b from-[#162E50] to-[#1B365D] p-4 text-white shadow-[4px_0_20px_rgba(0,0,0,0.15)] [scrollbar-color:rgba(255,255,255,0.2)_transparent] [scrollbar-width:thin] md:h-[calc(100vh-70px)] md:w-[260px] md:p-6">
-      <div className="mb-4 flex items-center justify-between border-b border-white/[0.08] px-3 pb-5 pt-2">
-        <div className="rounded-lg bg-white/95 px-2 py-1 shadow-sm">
+    <aside className="sticky top-0 z-40 flex h-auto w-full flex-col overflow-y-auto border-r border-white/10 bg-[#1e5ca7] p-4 text-white shadow-xl [scrollbar-color:rgba(255,255,255,0.2)_transparent] [scrollbar-width:thin] md:h-screen md:w-[270px] md:p-6">
+      {/* Brand Header */}
+      <div className="mb-4 flex items-center justify-between border-b border-white/15 px-2 pb-5 pt-2">
+        <Link 
+          href="/" 
+          className="flex items-center gap-2 rounded-lg bg-white/95 px-2.5 py-1.5 shadow-sm transition hover:bg-white" 
+          title="Ir al inicio de PLAi"
+        >
           <Image
             src="/logotipo.png"
             alt="PLAi"
@@ -45,57 +69,73 @@ export default function UserSidebar() {
             height={36}
             className="h-7 w-auto object-contain"
           />
-        </div>
-        <span className="rounded bg-plai/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-plai">Usuario</span>
+        </Link>
+        <span className="rounded bg-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+          Usuario
+        </span>
       </div>
+
+      {/* Navigation Links */}
       <nav className="flex flex-1 flex-col gap-1">
         {navSections.map((section) => (
           <div key={section.label} className="mb-2">
-            <span className="block px-4 pb-[0.35rem] pt-3 text-[0.65rem] font-bold uppercase tracking-[0.1em] text-white/35">
+            <span className="block px-3 pb-[0.35rem] pt-2 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-white/50">
               {section.label}
             </span>
             {section.items.map((item) => {
-              const isActive =
+              const isExternal = item.href === "/" || item.href === "/equipos";
+              const isActive = !isExternal && (
                 pathname === item.href ||
-                (pathname.startsWith(item.href) && item.href !== "/usuario");
+                (pathname.startsWith(item.href) && item.href !== "/usuario")
+              );
+
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`relative flex items-center gap-3 overflow-hidden rounded-xl px-4 py-[0.7rem] font-heading text-[0.875rem] font-medium transition-all duration-200 ${
+                  className={`relative flex items-center justify-between overflow-hidden rounded-xl px-3.5 py-[0.65rem] font-heading text-[0.875rem] font-medium transition-all duration-150 ${
                     isActive
-                      ? "bg-gradient-to-br from-plai to-[#1e5ca7] text-white shadow-[0_4px_15px_rgba(0,134,255,0.35)]"
-                      : "text-white/65 hover:bg-white/[0.08] hover:text-white"
+                      ? "bg-white text-[#1e5ca7] font-bold shadow-md shadow-black/10"
+                      : "text-white/80 hover:bg-white/10 hover:text-white"
                   }`}
                 >
-                  <span className="flex shrink-0 items-center text-[1.1rem]">{item.icon}</span>
-                  {item.name}
+                  <div className="flex items-center gap-3">
+                    <span className={`flex shrink-0 items-center text-[1.15rem] ${isActive ? 'text-plai' : 'text-white/80'}`}>
+                      {item.icon}
+                    </span>
+                    <span>{item.name}</span>
+                  </div>
+                  {isExternal && <RiArrowRightUpLine className="text-white/40 text-xs" />}
                 </Link>
               );
             })}
           </div>
         ))}
       </nav>
-      <div className="mt-4 flex items-center justify-between gap-2 rounded-xl border-t border-white/[0.08] p-3 md:p-4">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-plai to-[#1e5ca7] font-heading text-base font-bold text-white shadow-sm">
+
+      {/* User Info & Sign Out Card */}
+      <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-white/15 bg-white/10 p-3.5">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white font-heading text-sm font-bold text-[#1e5ca7] shadow-sm">
             {userInitial}
           </div>
           <div className="flex min-w-0 flex-col">
-            <span className="truncate font-heading text-[0.8rem] font-semibold text-white/90">
+            <span className="truncate font-heading text-[0.82rem] font-bold text-white">
               {userName}
             </span>
-            <span className="truncate text-[0.68rem] text-white/40">
-              {session?.user?.email || "Institución / Escuela"}
+            <span className="truncate text-[0.7rem] text-white/70">
+              {userEmail}
             </span>
           </div>
         </div>
+
         <button
-          onClick={() => signOut({ callbackUrl: "/login" })}
-          title="Cerrar sesión"
-          className="rounded-lg p-2 text-white/50 transition hover:bg-white/10 hover:text-red-300"
+          onClick={handleSignOut}
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-white/15 py-2 text-xs font-bold text-white transition hover:bg-red-600 hover:text-white"
+          title="Cerrar sesión de mi cuenta"
         >
-          <RiLogoutBoxRLine size={18} />
+          <RiLogoutBoxRLine size={16} />
+          <span>Cerrar Sesión</span>
         </button>
       </div>
     </aside>

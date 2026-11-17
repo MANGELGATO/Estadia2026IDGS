@@ -73,9 +73,15 @@ export async function proxy(request: NextRequest) {
   const secret = process.env.NEXTAUTH_SECRET || 'plai-dev-secret-key-32chars-min-2026';
   let token = await getToken({ req: request, secret });
 
+  const isAdminRoute = pathname.startsWith('/admin');
+  const isUsuarioRoute = pathname.startsWith('/usuario');
+  const isLoginRoute = pathname === '/login';
+  const isLogout = isLoginRoute && request.nextUrl.searchParams.get('logout') === 'true';
+
   // Soporte para cookie de sesión rápida / evaluación de roles
+  // Solo se aplica en rutas protegidas para evitar retener al usuario cuando quiere cerrar sesión en /login
   const roleCookie = request.cookies.get('plai_role')?.value;
-  if (!token && (roleCookie === 'admin' || roleCookie === 'usuario')) {
+  if (!token && !isLoginRoute && (roleCookie === 'admin' || roleCookie === 'usuario')) {
     token = {
       id: roleCookie === 'admin' ? 'usr-admin-01' : 'usr-standard-01',
       name: roleCookie === 'admin' ? 'Administrador PLAi' : 'Usuario PLAi',
@@ -83,10 +89,6 @@ export async function proxy(request: NextRequest) {
       role: roleCookie as 'admin' | 'usuario',
     } as unknown as JWT;
   }
-
-  const isAdminRoute = pathname.startsWith('/admin');
-  const isUsuarioRoute = pathname.startsWith('/usuario');
-  const isLoginRoute = pathname === '/login';
 
   // 2. Acceso a rutas protegidas sin sesión activa
   if (!token && (isAdminRoute || isUsuarioRoute)) {
@@ -101,8 +103,17 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/usuario', request.url));
   }
 
-  // 4. Usuario ya autenticado intentando acceder a /login
-  if (token && isLoginRoute) {
+  // 4. Manejo de /login:
+  // Si el usuario solicitó cerrar sesión o no tiene sesión real, se limpia la cookie y se muestra /login
+  if (isLoginRoute) {
+    if (isLogout || !token) {
+      const response = NextResponse.next();
+      if (roleCookie) {
+        response.cookies.delete('plai_role');
+      }
+      return response;
+    }
+
     const destination = token.role === 'admin' ? '/admin' : '/usuario';
     return NextResponse.redirect(new URL(destination, request.url));
   }

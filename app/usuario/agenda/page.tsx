@@ -1,75 +1,190 @@
+"use client";
+
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { 
+  RiCalendarCheckLine, 
+  RiTimeLine, 
+  RiMapPinLine, 
+  RiGroupLine, 
+  RiAddCircleLine,
+  RiCloseLine,
+  RiArrowRightLine
+} from 'react-icons/ri';
+
+type CursoItem = {
+  id: string;
+  titulo: string;
+  tipo: string;
+  fecha: string;
+  hora: string;
+  lugar: string;
+  asistentes: number;
+  estado: string;
+  icon: string;
+  instructor: string;
+  descripcion: string;
+};
+
 export default function AgendaPage() {
-  const cursos = [
+  const [selectedCurso, setSelectedCurso] = useState<CursoItem | null>(null);
+
+  const cursos: CursoItem[] = [
     {
       id: "CUR-101",
-      titulo: "Fabricación Digital Básica",
+      titulo: "Taller de Fabricación Digital e Impresión 3D",
+      tipo: "Presencial · Laboratorio Maker",
       fecha: "15 de Noviembre, 2026",
       hora: "10:00 AM - 14:00 PM",
-      lugar: "Laboratorio PLAi Central",
+      lugar: "Aula Maker · Edificio C, Ciudad Creativa Digital",
       asistentes: 25,
       estado: "Confirmado",
-      icon: "🖨️"
+      icon: "🖨️",
+      instructor: "Ing. Carlos Mendoza (PLAi Jalisco)",
+      descripcion: "Capacitación práctica en modelado CAD, laminado en slicer y operación de impresoras 3D Bambu Lab y Prusa."
     },
     {
       id: "CUR-102",
-      titulo: "Introducción a la Robótica",
+      titulo: "Introducción a Robótica Educativa con Dobot",
+      tipo: "Práctica Guiada",
       fecha: "22 de Noviembre, 2026",
       hora: "09:00 AM - 13:00 PM",
-      lugar: "Aula Maker",
+      lugar: "Laboratorio de Robótica y STEAM",
       asistentes: 30,
       estado: "Confirmado",
-      icon: "🤖"
+      icon: "🤖",
+      instructor: "Dra. Laura Morales",
+      descripcion: "Programación por bloques y Python para brazos robóticos de 4 ejes en ambientes colaborativos de prototipado."
+    },
+    {
+      id: "CUR-103",
+      titulo: "Inmersión en Realidad Virtual y Espacios Educativos",
+      tipo: "Workshop VR",
+      fecha: "29 de Noviembre, 2026",
+      hora: "11:00 AM - 13:30 PM",
+      lugar: "Sala Inmersiva Meta Quest 3",
+      asistentes: 18,
+      estado: "En proceso",
+      icon: "🥽",
+      instructor: "Mtro. Fernando Tapia",
+      descripcion: "Pruebas de passthrough, hand-tracking y aplicaciones científicas para estudiantes en Meta Quest 3."
     }
   ];
 
   return (
     <div className="flex animate-pop-in flex-col gap-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      {/* Header */}
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <h1 className="mb-2 font-heading text-3xl font-extrabold text-navy md:text-[2.2rem]">Mi Agenda</h1>
-          <p className="text-base text-plai-muted md:text-[1.1rem]">Revisa los cursos que tienes agendados como institución.</p>
+          <h1 className="mb-1 font-heading text-3xl font-extrabold text-navy">Mi Agenda y Talleres</h1>
+          <p className="text-sm text-plai-muted md:text-base">
+            Actividades, cursos y sesiones formativas programadas en PLAi
+          </p>
         </div>
-        <button className="cursor-pointer rounded-lg bg-[#22C55E] px-6 py-3 font-heading font-semibold text-white shadow-[0_4px_10px_rgba(34,197,94,0.2)] transition-all hover:-translate-y-0.5 hover:bg-[#16a34a]">
-          + Agendar Curso
-        </button>
+        <Link
+          href="/#reservar"
+          className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 font-heading text-xs font-bold text-white shadow-plai-sm transition-all hover:bg-accent-hover hover:-translate-y-0.5"
+        >
+          <RiAddCircleLine className="text-base" /> Agendar Nueva Sesión
+        </Link>
       </div>
 
-      <div className="relative flex flex-col gap-6 before:absolute before:bottom-0 before:left-5 before:top-0 before:w-0.5 before:bg-gray-200 before:content-['']">
+      {/* Timeline */}
+      <div className="relative flex flex-col gap-6 before:absolute before:bottom-2 before:left-5 before:top-4 before:w-0.5 before:bg-gradient-to-b before:from-plai before:to-gray-200 before:content-['']">
         {cursos.map((curso) => (
-          <div key={curso.id} className="relative flex gap-6">
-            <div className="z-10 flex size-[42px] shrink-0 items-center justify-center rounded-full border-2 border-[#F59E0B] bg-white text-xl shadow-[0_0_0_4px_#F4F6F9]">
+          <div key={curso.id} className="relative flex gap-5 sm:gap-6">
+            <div className="z-10 flex size-11 shrink-0 items-center justify-center rounded-2xl border-2 border-plai bg-white text-xl shadow-md">
               {curso.icon}
             </div>
-            <div className="flex-1 rounded-xl border border-black/[0.08] bg-white p-6 shadow-plai-sm transition-all duration-200 hover:translate-x-1 hover:shadow-plai-md">
+
+            <div className="flex-1 rounded-2xl border border-black/[0.08] bg-white p-6 shadow-plai-sm transition-all duration-200 hover:border-plai/40 hover:shadow-plai-md">
               <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <h3 className="mb-1 font-heading text-lg font-bold text-navy">{curso.titulo}</h3>
-                  <span className="text-xs text-plai-muted">ID: {curso.id}</span>
+                  <span className="font-mono text-xs font-bold text-plai">{curso.id}</span>
+                  <h3 className="font-heading text-lg font-bold text-navy">{curso.titulo}</h3>
+                  <span className="text-xs text-plai-muted">{curso.tipo}</span>
                 </div>
-                <span className="rounded-full bg-[#fef3c7] px-3 py-1 font-heading text-xs font-semibold text-[#F59E0B]">{curso.fecha}</span>
+                <span className="rounded-full bg-blue-50 px-3 py-1 font-heading text-xs font-bold text-blue-700">
+                  {curso.fecha}
+                </span>
               </div>
               
-              <div className="flex flex-col gap-2 text-[0.95rem] text-plai-gray">
-                <div className="flex items-center gap-2">
-                  <span>🕒</span> {curso.hora}
+              <div className="grid grid-cols-1 gap-2 rounded-xl border border-black/[0.04] bg-[#F4F6F9] p-3 text-xs text-plai-gray sm:grid-cols-3">
+                <div className="flex items-center gap-2 font-medium">
+                  <RiTimeLine className="text-plai text-sm" /> {curso.hora}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span>📍</span> {curso.lugar}
+                <div className="flex items-center gap-2 font-medium">
+                  <RiMapPinLine className="text-accent text-sm" /> {curso.lugar}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span>👥</span> {curso.asistentes} asistentes registrados
+                <div className="flex items-center gap-2 font-medium">
+                  <RiGroupLine className="text-emerald-600 text-sm" /> {curso.asistentes} participantes
                 </div>
               </div>
 
-              <div className="mt-5 flex justify-end border-t border-gray-100 pt-4">
-                <button className="cursor-pointer rounded-md border border-gray-200 bg-transparent px-4 py-2 font-heading text-xs font-medium text-plai-gray transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-navy">
-                  Ver Detalles
+              <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3">
+                <span className="text-xs text-gray-500">Instructor: <strong>{curso.instructor}</strong></span>
+                <button 
+                  onClick={() => setSelectedCurso(curso)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-navy transition-all hover:border-plai hover:bg-plai hover:text-white"
+                >
+                  Ver Ficha <RiArrowRightLine />
                 </button>
               </div>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Modal Detalle Curso */}
+      {selectedCurso && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-pop-in" onClick={() => setSelectedCurso(null)}>
+          <div className="w-full max-w-[560px] rounded-2xl border border-black/[0.08] bg-white p-6 shadow-2xl md:p-8" onClick={e => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="font-heading text-lg font-bold text-navy">{selectedCurso.titulo}</h3>
+                <span className="font-mono text-xs font-bold text-plai">{selectedCurso.id}</span>
+              </div>
+              <button onClick={() => setSelectedCurso(null)} className="text-gray-400 hover:text-gray-700">
+                <RiCloseLine className="text-2xl" />
+              </button>
+            </div>
+
+            <div className="my-4 flex flex-col gap-3 text-xs text-gray-700">
+              <p className="leading-relaxed bg-blue-50/50 p-3.5 rounded-xl border border-blue-100 text-blue-950">
+                {selectedCurso.descripcion}
+              </p>
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <div>
+                  <span className="font-bold text-plai-muted uppercase text-[10px]">Fecha:</span>
+                  <p className="font-semibold text-navy">{selectedCurso.fecha}</p>
+                </div>
+                <div>
+                  <span className="font-bold text-plai-muted uppercase text-[10px]">Horario:</span>
+                  <p className="font-semibold text-navy">{selectedCurso.hora}</p>
+                </div>
+                <div>
+                  <span className="font-bold text-plai-muted uppercase text-[10px]">Ubicación:</span>
+                  <p className="font-semibold text-navy">{selectedCurso.lugar}</p>
+                </div>
+                <div>
+                  <span className="font-bold text-plai-muted uppercase text-[10px]">Cupo Registrado:</span>
+                  <p className="font-semibold text-emerald-700">{selectedCurso.asistentes} asistentes</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                onClick={() => setSelectedCurso(null)}
+                className="rounded-lg bg-[#1e5ca7] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-navy"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

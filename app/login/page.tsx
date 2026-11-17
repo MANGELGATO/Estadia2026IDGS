@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { ShieldCheck, User, Lock, Mail, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
@@ -11,12 +10,19 @@ function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '';
+  const isLogout = searchParams.get('logout') === 'true';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [quickLoginRole, setQuickLoginRole] = useState<'admin' | 'usuario' | null>(null);
+
+  useEffect(() => {
+    if (isLogout && typeof document !== 'undefined') {
+      document.cookie = 'plai_role=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    }
+  }, [isLogout]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

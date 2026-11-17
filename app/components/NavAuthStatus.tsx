@@ -37,11 +37,11 @@ export default function NavAuthStatus() {
         </Link>
 
         <button
-          onClick={() => {
+          onClick={async () => {
             if (typeof document !== 'undefined') {
-              document.cookie = 'plai_role=; path=/; max-age=0';
+              document.cookie = 'plai_role=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
             }
-            signOut({ callbackUrl: '/login' });
+            await signOut({ callbackUrl: '/login?logout=true' });
           }}
           className="flex items-center gap-1 rounded-full border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700"
           title="Cerrar Sesión"

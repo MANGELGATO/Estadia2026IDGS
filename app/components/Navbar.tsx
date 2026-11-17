@@ -13,8 +13,8 @@ const navLinkClass =
 export default function Navbar() {
   const pathname = usePathname();
 
-  // Ocultar la cabecera del sitio público dentro de todo el Dashboard de Administración
-  if (pathname?.startsWith('/admin')) {
+  // Ocultar la cabecera del sitio público dentro de los paneles privados (Admin y Usuario)
+  if (pathname?.startsWith('/admin') || pathname?.startsWith('/usuario')) {
     return null;
   }
 

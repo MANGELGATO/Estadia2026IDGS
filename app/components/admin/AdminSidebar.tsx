@@ -59,11 +59,11 @@ export default function AdminSidebar() {
   const userName = session?.user?.name || "Administrador PLAi";
   const userInitial = userName.charAt(0).toUpperCase();
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     if (typeof document !== 'undefined') {
-      document.cookie = 'plai_role=; path=/; max-age=0';
+      document.cookie = 'plai_role=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     }
-    signOut({ callbackUrl: "/login" });
+    await signOut({ callbackUrl: "/login?logout=true" });
   };
 
   return (
