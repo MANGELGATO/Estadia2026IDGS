@@ -65,21 +65,48 @@ export const env = {
   get nextAuthUrl(): string {
     return process.env.NEXTAUTH_URL || 'http://localhost:3000';
   },
+  /**
+   * Secreto de firma de NextAuth. En producción es OBLIGATORIO (Docker secret
+   * 
+extauth_secret o NEXTAUTH_SECRET); sin él la aplicación se niega a firmar
+   * sesiones. El valor de respaldo solo existe fuera de producción.
+   */
   get nextAuthSecret(): string {
-    return getEnvSecret('NEXTAUTH_SECRET', 'plai-dev-secret-key-32chars-min-2026');
+    const secret = getEnvSecret('NEXTAUTH_SECRET');
+    if (secret) return secret;
+    if (this.isProduction) {
+      throw new Error('NEXTAUTH_SECRET no está configurado (requerido en producción).');
+    }
+    return 'plai-dev-only-secret-not-for-production';
+  },
+  /**
+   * Cuentas de demostración. Habilitadas por defecto solo fuera de producción;
+   * en producción requieren DEMO_LOGIN_ENABLED=true de forma explícita.
+   */
+  get demoLoginEnabled(): boolean {
+    return !this.isProduction || process.env.DEMO_LOGIN_ENABLED === 'true';
+  },
+  get demoAdminPassword(): string {
+    return getEnvSecret('DEMO_ADMIN_PASSWORD', this.isProduction ? '' : 'demo-admin-local');
+  },
+  get demoUserPassword(): string {
+    return getEnvSecret('DEMO_USER_PASSWORD', this.isProduction ? '' : 'demo-user-local');
   },
   get dbHost(): string {
     return process.env.DB_HOST || '127.0.0.1';
   },
   get dbPort(): number {
-    const p = parseInt(process.env.DB_PORT || '3306', 10);
-    return Number.isNaN(p) ? 3306 : p;
+    const p = parseInt(process.env.DB_PORT || '5432', 10);
+    return Number.isNaN(p) ? 5432 : p;
   },
   get dbUser(): string {
-    return process.env.DB_USER || 'root';
+    return process.env.DB_USER || 'plai';
   },
   get dbPassword(): string {
-    return getEnvSecret('DB_PASSWORD', 'root');
+    return getEnvSecret('DB_PASSWORD');
+  },
+  get dbSsl(): boolean {
+    return process.env.DB_SSL === 'true';
   },
   get dbName(): string {
     return process.env.DB_NAME || 'plai_recursos';

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllCategoriesConfig, getCategoryConfig, updateCategoryConfig } from '../../../lib/categoriesConfig';
 import { logger } from '../../../lib/logger';
+import { requireSession } from '../../../lib/apiAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +39,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireSession(req, 'admin');
+  if (!auth.ok) return auth.response;
   try {
     const body = await req.json();
     const { id, name, description, plaiUsage, videoUrl, benefits, successCases } = body;

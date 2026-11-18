@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createTestDb } from '../../../lib/testDb';
 import { POST } from './route';
 import { NextRequest } from 'next/server';
 import { rateLimiter } from '../../../lib/rateLimit';
@@ -8,6 +9,7 @@ describe('POST /api/reservas Route Handler', () => {
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     rateLimiter.reset();
+    createTestDb({ demo: true });
   });
 
   it('procesa una reservación válida y responde con código 201', async () => {

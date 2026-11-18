@@ -1,6 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-import { logger } from './logger';
+import { getPool } from './pool';
 
 export interface SuccessCase {
   title: string;
@@ -87,83 +85,108 @@ export const defaultCategoriesConfig: Record<string, CategoryConfig> = {
   }
 };
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const CONFIG_FILE = path.join(DATA_DIR, 'categories-config.json');
+type CategoriaRow = {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  color: string | null;
+  plai_usage: string;
+  video_url: string;
+  beneficios: unknown;
+  casos_exito: unknown;
+  updated_at: Date | string | null;
+};
+
+function parseJson<T>(value: unknown, fallback: T): T {
+  if (value == null) return fallback;
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return fallback;
+    }
+  }
+  return value as T;
+}
+
+function mapRow(r: CategoriaRow): CategoryConfig {
+  return {
+    id: r.id,
+    name: r.nombre,
+    description: r.descripcion,
+    plaiUsage: r.plai_usage,
+    videoUrl: r.video_url,
+    color: r.color || undefined,
+    benefits: parseJson<string[]>(r.beneficios, []),
+    successCases: parseJson<SuccessCase[]>(r.casos_exito, []),
+    updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : undefined,
+  };
+}
 
 /**
- * Lee la configuración centralizada de categorías.
- * Si el archivo no existe, lo inicializa con los valores predeterminados de PLAi.
+ * Lee la configuración de categorías desde PostgreSQL (tabla `categorias`,
+ * sembrada por la migración 002).
  */
 export async function getAllCategoriesConfig(): Promise<Record<string, CategoryConfig>> {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-
-    if (!fs.existsSync(CONFIG_FILE)) {
-      fs.writeFileSync(CONFIG_FILE, JSON.stringify(defaultCategoriesConfig, null, 2), 'utf8');
-      return defaultCategoriesConfig;
-    }
-
-    const fileContent = fs.readFileSync(CONFIG_FILE, 'utf8');
-    const parsed = JSON.parse(fileContent);
-
-    // Fusionar con defaults para asegurar que no falten claves
-    return {
-      ...defaultCategoriesConfig,
-      ...parsed
-    };
-  } catch (error) {
-    logger.error('Error al leer configuración centralizada de categorías', { path: CONFIG_FILE }, error);
-    return defaultCategoriesConfig;
-  }
+  const { rows } = await getPool().query<CategoriaRow>('SELECT * FROM categorias ORDER BY id');
+  const result: Record<string, CategoryConfig> = {};
+  for (const row of rows) result[row.id] = mapRow(row);
+  return result;
 }
 
 /**
  * Obtiene la configuración de una categoría por su slug
  */
 export async function getCategoryConfig(slug: string): Promise<CategoryConfig | null> {
-  const all = await getAllCategoriesConfig();
-  return all[slug] || defaultCategoriesConfig[slug] || null;
+  const { rows } = await getPool().query<CategoriaRow>('SELECT * FROM categorias WHERE id = $1', [slug]);
+  return rows[0] ? mapRow(rows[0]) : null;
 }
 
 /**
- * Actualiza la configuración de una categoría específica y persiste los cambios
+ * Actualiza (o crea) la configuración de una categoría y la persiste en la base de datos
  */
 export async function updateCategoryConfig(
   slug: string,
   updates: Partial<Omit<CategoryConfig, 'id'>>
 ): Promise<CategoryConfig> {
-  const all = await getAllCategoriesConfig();
-  const current = all[slug] || defaultCategoriesConfig[slug] || {
-    id: slug,
-    name: slug,
-    description: '',
-    plaiUsage: '',
-    videoUrl: '',
-    benefits: [],
-    successCases: []
-  };
+  const current: CategoryConfig = (await getCategoryConfig(slug)) ||
+    defaultCategoriesConfig[slug] || {
+      id: slug,
+      name: slug,
+      description: '',
+      plaiUsage: '',
+      videoUrl: '',
+      benefits: [],
+      successCases: [],
+    };
 
-  const updated: CategoryConfig = {
-    ...current,
-    ...updates,
-    id: slug,
-    updatedAt: new Date().toISOString()
-  };
+  const merged: CategoryConfig = { ...current, ...updates, id: slug };
 
-  all[slug] = updated;
-
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(all, null, 2), 'utf8');
-    logger.info('Configuración de categoría persistida en servidor', { slug, updatedAt: updated.updatedAt });
-  } catch (error) {
-    logger.error('Error al escribir archivo centralizado de categorías', { path: CONFIG_FILE }, error);
-    throw error;
-  }
-
-  return updated;
+  const { rows } = await getPool().query<CategoriaRow>(
+    `
+    INSERT INTO categorias (id, nombre, descripcion, color, plai_usage, video_url, beneficios, casos_exito)
+    VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb)
+    ON CONFLICT (id) DO UPDATE SET
+      nombre = EXCLUDED.nombre,
+      descripcion = EXCLUDED.descripcion,
+      color = EXCLUDED.color,
+      plai_usage = EXCLUDED.plai_usage,
+      video_url = EXCLUDED.video_url,
+      beneficios = EXCLUDED.beneficios,
+      casos_exito = EXCLUDED.casos_exito,
+      updated_at = now()
+    RETURNING *
+    `,
+    [
+      slug,
+      merged.name,
+      merged.description,
+      merged.color || '#0086ff',
+      merged.plaiUsage,
+      merged.videoUrl,
+      JSON.stringify(merged.benefits || []),
+      JSON.stringify(merged.successCases || []),
+    ]
+  );
+  return mapRow(rows[0]);
 }

@@ -70,7 +70,7 @@ export default function CategoryCarousel() {
         setCategories(prev =>
           prev.map(c => {
             const count = eqList.length > 0
-              ? eqList.filter((e: any) => e.category?.toLowerCase() === c.filterKey.toLowerCase()).length
+              ? eqList.filter((e: { category?: string }) => e.category?.toLowerCase() === c.filterKey.toLowerCase()).length
               : c.count;
             const cfg = catMap[c.id];
             return {

@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCursosFromDB, insertCursoInDB, CursoAgendaItem } from '../../../lib/db';
 import { logger } from '../../../lib/logger';
+import { requireSession } from '../../../lib/apiAuth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireSession(req);
+  if (!auth.ok) return auth.response;
   try {
-    const cursos = await getCursosFromDB();
+    const todos = await getCursosFromDB();
+    // Usuarios no administradores solo ven sus propias solicitudes (LFPDPPP)
+    const email = String(auth.token.email || '').toLowerCase();
+    const cursos = auth.token.role === 'admin' ? todos : todos.filter((c) => c.solicitanteEmail?.toLowerCase() === email);
     return NextResponse.json({
       success: true,
       data: cursos,

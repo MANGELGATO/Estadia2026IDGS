@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { authOptions, DEMO_USERS } from './auth';
+import { authOptions, getDemoUsers } from './auth';
 
 describe('NextAuth.js Configuration (PLAi Standard v1.0)', () => {
   it('configura la estrategia de sesión basada en JWT', () => {
@@ -12,8 +12,8 @@ describe('NextAuth.js Configuration (PLAi Standard v1.0)', () => {
   });
 
   it('incluye los usuarios de demostración con sus roles correctos', () => {
-    const admin = DEMO_USERS.find((u) => u.email === 'admin@plai.mx');
-    const user = DEMO_USERS.find((u) => u.email === 'usuario@plai.mx');
+    const admin = getDemoUsers().find((u) => u.email === 'admin@plai.edu.mx');
+    const user = getDemoUsers().find((u) => u.email === 'user@plai.edu.mx');
 
     expect(admin).toBeDefined();
     expect(admin?.role).toBe('admin');
@@ -32,12 +32,12 @@ describe('NextAuth.js Configuration (PLAi Standard v1.0)', () => {
     expect(authorize).toBeDefined();
 
     const result = (await authorize!(
-      { email: 'admin@plai.mx', password: 'AdminPlai2026!' },
+      { email: 'admin@plai.edu.mx', password: 'demo-admin-local' },
       {}
     )) as { email: string; role: string } | null;
 
     expect(result).not.toBeNull();
-    expect(result?.email).toBe('admin@plai.mx');
+    expect(result?.email).toBe('admin@plai.edu.mx');
     expect(result?.role).toBe('admin');
   });
 
@@ -49,11 +49,19 @@ describe('NextAuth.js Configuration (PLAi Standard v1.0)', () => {
     const authorize = credentialsProvider.options?.authorize || credentialsProvider.authorize;
 
     const result = await authorize!(
-      { email: 'admin@plai.mx', password: 'password-invalida' },
+      { email: 'admin@plai.edu.mx', password: 'password-invalida' },
       {}
     );
 
     expect(result).toBeNull();
+  });
+
+  it('rechaza los atajos de contraseu{00F1}a heredados', async () => {
+    const provider = authOptions.providers.find((p) => p.id === 'credentials') as { options?: { authorize: (c: unknown, r: unknown) => Promise<unknown> }; authorize?: (c: unknown, r: unknown) => Promise<unknown> };
+    const authorize = provider.options?.authorize || provider.authorize;
+    for (const password of ['123admin', 'admin123', '123user', 'user123']) {
+      expect(await authorize!({ email: 'admin@plai.edu.mx', password }, {})).toBeNull();
+    }
   });
 
   it('rechaza usuarios inexistentes', async () => {

@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUsuariosFromDB, upsertUsuarioInDB, UsuarioItem } from '../../../lib/db';
 import { logger } from '../../../lib/logger';
+import { requireSession } from '../../../lib/apiAuth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+function omitPassword(u: UsuarioItem): Omit<UsuarioItem, 'password'> {
+  const safe = { ...u };
+  delete safe.password;
+  return safe;
+}
+
+export async function GET(req: NextRequest) {
+  const auth = await requireSession(req, 'admin');
+  if (!auth.ok) return auth.response;
   try {
-    const usuarios = await getUsuariosFromDB();
+    // Nunca exponer contraseu{00F1}as al cliente
+    const usuarios = (await getUsuariosFromDB()).map((u) => omitPassword(u));
     return NextResponse.json({
       success: true,
       data: usuarios,
@@ -22,6 +32,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireSession(req, 'admin');
+  if (!auth.ok) return auth.response;
   try {
     const body = await req.json();
     const { id, name, email, password, role, status, dependencia, telefono } = body;
@@ -48,7 +60,7 @@ export async function POST(req: NextRequest) {
 
     await upsertUsuarioInDB(user);
     const updatedList = await getUsuariosFromDB();
-    const saved = updatedList.find(u => u.email.toLowerCase() === user.email.toLowerCase()) || user;
+    const saved = omitPassword(updatedList.find(u => u.email.toLowerCase() === user.email.toLowerCase()) || user);
 
     logger.info('Usuario institucional guardado', { id: saved.id, email: saved.email, role: saved.role });
 

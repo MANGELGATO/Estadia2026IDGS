@@ -60,7 +60,7 @@ export default function BitacoraPage() {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
+  async function fetchData() {
     try {
       setLoading(true);
       const [bitRes, eqRes, resRes] = await Promise.all([
@@ -529,7 +529,7 @@ export default function BitacoraPage() {
                   </label>
                   <select
                     value={entregaCondicion}
-                    onChange={(e) => setEntregaCondicion(e.target.value as any)}
+                    onChange={(e) => setEntregaCondicion(e.target.value as BitacoraItem['condicionEntrega'])}
                     className="rounded-lg border border-gray-300 p-2.5 text-sm focus:border-plai focus:outline-none"
                   >
                     <option value="Excelente">Excelente (Impecable, sin marcas)</option>
@@ -639,7 +639,7 @@ export default function BitacoraPage() {
                 </label>
                 <select
                   value={devolucionCondicion}
-                  onChange={(e) => setDevolucionCondicion(e.target.value as any)}
+                  onChange={(e) => setDevolucionCondicion(e.target.value as NonNullable<BitacoraItem['condicionDevolucion']>)}
                   className="rounded-lg border border-gray-300 p-2.5 text-sm focus:border-plai focus:outline-none"
                 >
                   <option value="Excelente">Excelente (Sin novedades ni daños)</option>

@@ -1,9 +1,17 @@
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
+import { createTestDb } from '../../../lib/testDb';
 import { NextRequest } from 'next/server';
 import { GET, POST } from './route';
 import { getAllCategoriesConfig, defaultCategoriesConfig, updateCategoryConfig } from '../../../lib/categoriesConfig';
 
+vi.mock('../../../lib/apiAuth', () => ({
+  requireSession: vi.fn(async () => ({ ok: true, token: { role: 'admin', email: 'admin@plai.edu.mx' } })),
+}));
+
 describe('/api/categorias API Endpoint', () => {
+  beforeEach(() => {
+    createTestDb({ demo: true });
+  });
   afterAll(async () => {
     // Restaurar los valores oficiales de PLAi tras la ejecución de los tests
     await updateCategoryConfig('realidad-virtual', defaultCategoriesConfig['realidad-virtual']);

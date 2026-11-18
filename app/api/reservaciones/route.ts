@@ -8,6 +8,7 @@ import {
   BitacoraItem
 } from '../../../lib/db';
 import { logger } from '../../../lib/logger';
+import { requireSession } from '../../../lib/apiAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,9 +16,14 @@ function normalizeStr(s?: string): string {
   return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/-/g, ' ').trim();
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireSession(req);
+  if (!auth.ok) return auth.response;
   try {
-    const reservaciones = await getReservacionesFromDB();
+    const todas = await getReservacionesFromDB();
+    // Usuarios no administradores solo ven sus propias reservaciones (LFPDPPP)
+    const email = String(auth.token.email || '').toLowerCase();
+    const reservaciones = auth.token.role === 'admin' ? todas : todas.filter((r) => r.usuarioEmail?.toLowerCase() === email);
     return NextResponse.json({
       success: true,
       data: reservaciones,
@@ -33,6 +39,8 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
+  const auth = await requireSession(req, 'admin');
+  if (!auth.ok) return auth.response;
   try {
     const body = await req.json();
     const {

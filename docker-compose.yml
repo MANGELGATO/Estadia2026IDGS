@@ -15,11 +15,17 @@ services:
       PORT: "3000"
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_SITE_URL: https://recursos.example.plai.mx   # EJEMPLO
+      # Base de datos PostgreSQL (estándar PLAi sec. 3)
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: plai
+      DB_NAME: plai_recursos
     # Secretos: se montan en /run/secrets/<nombre> y la app los lee con el patrón VARIABLE_FILE.
     # Se activan al integrar Directus / NextAuth (ver .env.example).
     # secrets:
     #   - directus_token
     #   - nextauth_secret
+    #   - db_password
     volumes:
       # Único espacio escribible (sistema de archivos de solo lectura)
       - type: tmpfs
@@ -64,4 +70,6 @@ networks:
 #   directus_token:
 #     external: true
 #   nextauth_secret:
+#     external: true
+#   db_password:
 #     external: true

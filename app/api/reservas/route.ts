@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       id,
       folio,
       categoriaId: catSlug,
-      equipoId: String(parsed.data.deviceId),
+      equipoId: device ? device.id : undefined,
       codigoPlaiAsignado: device?.inventoryNumber,
       usuarioId: body.userId || 'usr-standard-01',
       usuarioNombre: parsed.data.userName,

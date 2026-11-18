@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSystemConfigFromDB, saveSystemConfigInDB } from '../../../lib/db';
 import { logger } from '../../../lib/logger';
+import { requireSession } from '../../../lib/apiAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const config = getSystemConfigFromDB();
+    const config = await getSystemConfigFromDB();
     return NextResponse.json({
       success: true,
       data: config,
@@ -21,10 +22,12 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireSession(req, 'admin');
+  if (!auth.ok) return auth.response;
   try {
     const body = await req.json();
-    const current = getSystemConfigFromDB();
-    const updated = saveSystemConfigInDB({
+    const current = await getSystemConfigFromDB();
+    const updated = await saveSystemConfigInDB({
       ...current,
       ...body,
     });

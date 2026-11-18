@@ -47,9 +47,6 @@ export default function UserSidebar() {
   const userInitial = userName.charAt(0).toUpperCase();
 
   const handleSignOut = async () => {
-    if (typeof document !== 'undefined') {
-      document.cookie = 'plai_role=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    }
     await signOut({ callbackUrl: "/login?logout=true" });
   };
 

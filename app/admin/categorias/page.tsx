@@ -39,12 +39,20 @@ export default function CategoriasConfigPage() {
   const [benefits, setBenefits] = useState<string[]>([]);
   const [successCases, setSuccessCases] = useState<SuccessCase[]>([]);
 
-  // 1. Cargar datos desde la API centralizada (/api/categorias)
-  useEffect(() => {
-    fetchCategories();
-  }, []);
+  // Carga los datos de una categoría en los campos del formulario
+  function loadCategoryIntoForm(catId: string, sourceData = categoriesData) {
+    const cat = sourceData[catId];
+    if (cat) {
+      setName(cat.name || '');
+      setDescription(cat.description || '');
+      setPlaiUsage(cat.plaiUsage || '');
+      setVideoUrl(cat.videoUrl || '');
+      setBenefits(Array.isArray(cat.benefits) ? [...cat.benefits] : []);
+      setSuccessCases(Array.isArray(cat.successCases) ? cat.successCases.map(c => ({ ...c })) : []);
+    }
+  }
 
-  const fetchCategories = async () => {
+  async function fetchCategories() {
     try {
       setIsLoading(true);
       const res = await fetch('/api/categorias');
@@ -58,20 +66,12 @@ export default function CategoriasConfigPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
-  // Carga los datos de una categoría en los campos del formulario
-  const loadCategoryIntoForm = (catId: string, sourceData = categoriesData) => {
-    const cat = sourceData[catId];
-    if (cat) {
-      setName(cat.name || '');
-      setDescription(cat.description || '');
-      setPlaiUsage(cat.plaiUsage || '');
-      setVideoUrl(cat.videoUrl || '');
-      setBenefits(Array.isArray(cat.benefits) ? [...cat.benefits] : []);
-      setSuccessCases(Array.isArray(cat.successCases) ? cat.successCases.map(c => ({ ...c })) : []);
-    }
-  };
+  // 1. Cargar datos desde la API centralizada (/api/categorias)
+  useEffect(() => {
+    fetchCategories();
+  }, []);
 
   const handleTabChange = (catId: string) => {
     setSelectedCategory(catId);

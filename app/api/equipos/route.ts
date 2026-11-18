@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getEquiposFromDB, insertEquipoInDB, deleteEquipoInDB } from '../../../lib/db';
 import { DeviceItem } from '../../../lib/mockData';
 import { logger } from '../../../lib/logger';
+import { requireSession } from '../../../lib/apiAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireSession(req, 'admin');
+  if (!auth.ok) return auth.response;
   try {
     const item = (await req.json()) as DeviceItem;
 
@@ -62,6 +65,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const auth = await requireSession(req, 'admin');
+  if (!auth.ok) return auth.response;
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

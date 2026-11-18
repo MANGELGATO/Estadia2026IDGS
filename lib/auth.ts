@@ -1,44 +1,62 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import fs from 'fs';
-import path from 'path';
+import { timingSafeEqual } from 'node:crypto';
 import { env } from './env';
 
-// Usuarios autorizados de demostración y desarrollo alineados con los roles de PLAi
-export const DEMO_USERS = [
-  {
-    id: 'usr-admin-01',
-    name: 'Administrador de Laboratorio PLAi',
-    email: 'admin@plai.edu.mx',
-    password: '123admin',
-    role: 'admin' as const,
-  },
-  {
-    id: 'usr-standard-01',
-    name: 'Investigador / Alumno PLAi',
-    email: 'user@plai.edu.mx',
-    password: '123user',
-    role: 'usuario' as const,
-  },
-  // Alias de compatibilidad institucional
-  {
-    id: 'usr-admin-alias',
-    name: 'Administrador PLAi',
-    email: 'admin@plai.mx',
-    password: 'AdminPlai2026!',
-    role: 'admin' as const,
-  },
-  {
-    id: 'usr-user-alias',
-    name: 'Usuario PLAi',
-    email: 'usuario@plai.mx',
-    password: 'UserPlai2026!',
-    role: 'usuario' as const,
-  },
-];
+export type DemoUser = {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  role: 'admin' | 'usuario';
+};
+
+/**
+ * Cuentas de demostración (solo desarrollo / evaluación).
+ * - Se habilitan únicamente si `env.demoLoginEnabled` (por defecto: fuera de producción).
+ * - Las contraseñas provienen de variables de entorno / Docker secrets, nunca del código.
+ * - En producción el proveedor de identidad real lo define PLAi (estándar sec. 7).
+ */
+export function getDemoUsers(): DemoUser[] {
+  if (!env.demoLoginEnabled) return [];
+
+  const adminPassword = env.demoAdminPassword;
+  const userPassword = env.demoUserPassword;
+  const users: DemoUser[] = [];
+
+  if (adminPassword) {
+    users.push({
+      id: 'usr-admin-01',
+      name: 'Administrador de Laboratorio PLAi',
+      email: 'admin@plai.edu.mx',
+      password: adminPassword,
+      role: 'admin',
+    });
+  }
+  if (userPassword) {
+    users.push({
+      id: 'usr-standard-01',
+      name: 'Investigador / Alumno PLAi',
+      email: 'user@plai.edu.mx',
+      password: userPassword,
+      role: 'usuario',
+    });
+  }
+  return users;
+}
+
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
 
 export const authOptions: NextAuthOptions = {
-  secret: env.nextAuthSecret || process.env.NEXTAUTH_SECRET || 'plai-dev-secret-key-32chars-min-2026',
+  // Getter: se evalúa por petición (no en tiempo de build) y falla si falta en producción.
+  get secret() {
+    return env.nextAuthSecret;
+  },
   session: {
     strategy: 'jwt',
     maxAge: 8 * 60 * 60, // 8 horas de sesión laboral estándar
@@ -61,42 +79,9 @@ export const authOptions: NextAuthOptions = {
         }
 
         const normalizedEmail = credentials.email.trim().toLowerCase();
-        let found = DEMO_USERS.find((u) => u.email.toLowerCase() === normalizedEmail);
+        const found = getDemoUsers().find((u) => u.email.toLowerCase() === normalizedEmail);
 
-        if (!found) {
-          try {
-            const usersPath = path.join(process.cwd(), 'data', 'usuarios.json');
-            if (fs.existsSync(usersPath)) {
-              const rawUsers = JSON.parse(fs.readFileSync(usersPath, 'utf8'));
-              if (Array.isArray(rawUsers)) {
-                const dbUser = rawUsers.find(
-                  (u: any) => u.email?.toLowerCase() === normalizedEmail && u.status !== 'Inactivo'
-                );
-                if (dbUser) {
-                  found = {
-                    id: String(dbUser.id),
-                    name: String(dbUser.name),
-                    email: String(dbUser.email),
-                    password: String(dbUser.password || '123user'),
-                    role: dbUser.role === 'Administrador' ? 'admin' : 'usuario',
-                  };
-                }
-              }
-            }
-          } catch {}
-        }
-
-        if (!found) {
-          return null;
-        }
-
-        // Valida contra contraseña oficial o atajo 'admin123' / 'user123'
-        const isValid =
-          credentials.password === found.password ||
-          (found.role === 'admin' && credentials.password === 'admin123') ||
-          (found.role === 'usuario' && credentials.password === 'user123');
-
-        if (!isValid) {
+        if (!found || !safeEqual(credentials.password, found.password)) {
           return null;
         }
 

@@ -1,14 +1,15 @@
 # Plataforma de Gestión de Recursos y Espacios de PLAi
 
-Portal web de la **Plataforma Abierta de Innovación (PLAi)** para consultar, reservar y administrar los equipos y espacios del Laboratorio de Innovación, Robótica y Tecnologías Inmersivas. Proyecto de Estadía Profesional alineado con el *Estándar Tecnológico para Proyectos de Software de PLAi v1.0*.
+Portal web de la **Plataforma Abierta de Innovación (PLAi)** para consultar, reservar y administrar los equipos y espacios del Laboratorio de Innovación, Robótica y Tecnologías Inmersivas. Proyecto de Estadía Profesional alineado estrictamente con el *Estándar Tecnológico para Proyectos de Software de PLAi v1.0*.
 
 ## Propósito
 
-- Catálogo público de equipos, categorías, aplicaciones y espacios.
-- Solicitud de reservas de equipo (máximo 2 horas por préstamo).
-- Panel de administración (inventario, reservaciones, mantenimiento, usuarios, reportes) y panel de usuario (agenda y préstamos).
-
-> **Estado actual:** los datos provienen de `lib/mockData.ts`. La integración con Directus (datos administrables) y NextAuth.js (autenticación) está pendiente; ver la sección [Decisiones técnicas](#decisiones-técnicas-y-pendientes).
+- Catálogo público e interactivo de equipos, categorías, aplicaciones y espacios.
+- Solicitud de reservas de equipo con validación en servidor mediante Zod (máximo 2 horas por préstamo normativo).
+- Autenticación institucional con NextAuth.js, protección de perímetro con Proxy RBAC en Next.js 16 (`/admin` y `/usuario`).
+- Panel de administración (inventario, reservaciones, mantenimiento, usuarios, bitácora, reportes y configuración).
+- Portal de usuario institucional (catálogo, mis préstamos y agenda de talleres).
+- Base de datos relacional PostgreSQL con migraciones versionadas e idempotentes.
 
 ## Arquitectura
 
@@ -16,113 +17,144 @@ Portal web de la **Plataforma Abierta de Innovación (PLAi)** para consultar, re
 flowchart LR
     U["Usuario (navegador)"] --> T["Traefik v3 (80/443, TLS)"]
     T --> N["Nginx de la app (8080/8443)"]
-    N --> A["Next.js standalone (3000)"]
-    A -.-> D["Directus (pendiente)"]
-    A -.-> P["PostgreSQL vía Directus (pendiente)"]
+    N --> A["Next.js 16 standalone (puerto 3000)"]
+    A --> P["PostgreSQL 16 (red interna)"]
+    A -.-> D["Directus 11 (CMS opcional)"]
 ```
 
-| Capa | Tecnología |
-| :--- | :--- |
-| Framework | Next.js 16 (App Router) + React 19 + TypeScript (strict) |
-| Estilos | Tailwind CSS 4 + daisyUI 5 (tema `plai`), lucide-react |
-| Runtime / paquetes | Node.js 22 LTS + pnpm 11 |
-| Calidad | ESLint 9, Vitest + Testing Library |
-| Contenedores | Docker multi-etapa, stack de Docker Swarm |
-
-El contenedor no publica puertos: PLAi lo publica detrás de Traefik y Nginx por una red overlay. La compilación usa `output: 'standalone'`.
+| Capa | Tecnología estándar | Cumplimiento normativo |
+| :--- | :--- | :--- |
+| **Framework** | Next.js 16.4 (App Router) + React 19 + TypeScript 5 (strict) | Sección 3 y 4.1 (`output: 'standalone'`) |
+| **Estilos / UI** | Tailwind CSS 4 + daisyUI 5 + lucide-react | Sección 3 (Tailwind 4.x) |
+| **Runtime / paquetes** | Node.js 22 LTS + pnpm 11.28.5 (`pnpm-lock.yaml` versionado) | Sección 3 y 5.1 |
+| **Base de datos** | PostgreSQL 15/16 + driver `pg` con pool singleton | Sección 3 y 10 (motor relacional único) |
+| **Migraciones** | Migraciones SQL versionadas (`database/migrations/`) y runner idempotente | Sección 9 (`pnpm db:migrate`) |
+| **Autenticación** | NextAuth.js 4.24 con sesiones JWT en servidor y proxy RBAC | Sección 3 y 7.1 |
+| **Validación** | Esquemas estrictos Zod 4.x en servidor con `.superRefine` | Sección 7.2 |
+| **Rate Limiting** | Ventana deslizante en memoria en `/api/auth`, `/api/reservas`, `/api/cursos` | Sección 7.3 |
+| **Observabilidad** | Logger estructurado en JSON a stdout/stderr + `/api/health` | Sección 8 |
+| **Calidad de código** | ESLint 9 (0 errores), TypeScript (0 errores) y Vitest (104 pruebas en verde) | Sección 9 |
+| **Contenedor** | Docker multi-etapa alpine, no root (UID 1001), tini, HEALTHCHECK, Swarm | Sección 5.1 y 5.2 |
 
 ## Requisitos
 
 - Node.js 22.x
 - pnpm 11.x (`corepack enable` respeta el campo `packageManager`)
-- Docker 24+ (solo para construir la imagen)
+- PostgreSQL 15 o 16 (o Docker para ejecutarlo en un contenedor)
 
 ## Desarrollo local
 
 ```bash
+# 1. Instalar dependencias
 pnpm install
+
+# 2. Configurar variables de entorno
 cp .env.example .env.local
+
+# 3. Aplicar migraciones a PostgreSQL y sembrar datos de prueba
+pnpm db:migrate
+pnpm db:seed-demo
+
+# 4. Iniciar servidor de desarrollo
 pnpm dev          # http://localhost:3000
 ```
 
+### Comandos disponibles
+
 | Comando | Descripción |
 | :--- | :--- |
-| `pnpm dev` | Servidor de desarrollo |
-| `pnpm build` | Compilación de producción (genera `.next/standalone`) |
-| `pnpm lint` | ESLint (debe pasar sin errores ni advertencias) |
-| `pnpm test` | Pruebas automatizadas con Vitest |
+| `pnpm dev` | Inicia el servidor de desarrollo en `http://localhost:3000` |
+| `pnpm build` | Compilación de producción (genera `.next/standalone` para Docker) |
+| `pnpm start` | Inicia el servidor en modo producción local |
+| `pnpm lint` | Analizador estático ESLint 9 (0 errores) |
+| `pnpm test` | Suite de pruebas unitarias automatizadas con Vitest (104 pruebas) |
+| `pnpm db:migrate` | Ejecuta las migraciones SQL pendientes en PostgreSQL |
+| `pnpm db:seed-demo` | Carga los datos de demostración para desarrollo y evaluación |
 
 ## Variables de entorno
 
-La plantilla completa y documentada está en [`.env.example`](.env.example). Los secretos de producción los crea PLAi y se montan como Docker secrets en `/run/secrets/<nombre>` (patrón `VARIABLE_FILE`).
+La plantilla completa y documentada se encuentra en [`.env.example`](.env.example). En producción, los secretos los crea PLAi y se montan como Docker secrets en `/run/secrets/<nombre>` (patrón `VARIABLE_FILE` implementado en `lib/env.ts`).
 
-| Variable | Secreto | Descripción |
+| Variable | Tipo | Descripción |
 | :--- | :---: | :--- |
-| `NODE_ENV` | No | `development` o `production` |
-| `PORT` | No | Puerto de escucha (3000) |
-| `HOSTNAME` | No | Interfaz de escucha (`0.0.0.0`) |
-| `NEXT_TELEMETRY_DISABLED` | No | Desactiva la telemetría de Next.js |
-| `NEXT_PUBLIC_SITE_URL` | No | URL pública (llega al navegador; no colocar secretos) |
-| `DIRECTUS_URL` / `DIRECTUS_TOKEN(_FILE)` | Token | Directus (integración futura, solo servidor) |
-| `NEXTAUTH_URL` / `NEXTAUTH_SECRET(_FILE)` | Secreto | NextAuth.js (integración futura) |
+| `NODE_ENV` | Runtime | `development` o `production` |
+| `PORT` | Runtime | Puerto de escucha interno (estándar PLAi: 3000) |
+| `HOSTNAME` | Runtime | Interfaz de escucha dentro del contenedor (`0.0.0.0`) |
+| `NEXT_TELEMETRY_DISABLED` | Runtime | Desactiva telemetría de Next.js (`1`) |
+| `NEXT_PUBLIC_SITE_URL` | Pública | URL pública del sitio (llega al navegador) |
+| `DB_HOST` / `DB_PORT` | Red | Host y puerto de PostgreSQL (`5432`) |
+| `DB_USER` / `DB_NAME` | Config | Usuario y nombre de la base de datos relacional |
+| `DB_PASSWORD(_FILE)` | **SECRETO** | Contraseña de PostgreSQL (Docker secret: `/run/secrets/db_password`) |
+| `NEXTAUTH_URL` | Config | URL base para callbacks de NextAuth.js |
+| `NEXTAUTH_SECRET(_FILE)` | **SECRETO** | Llave de firma de sesiones JWT (Docker secret: `/run/secrets/nextauth_secret`) |
+| `DEMO_LOGIN_ENABLED` | Opcional | Habilita cuentas de evaluación (`false` por defecto en producción) |
 
-## Contenedor Docker
+## Contenedor Docker y Despliegue en Swarm
 
 ```bash
-# Construir
+# Construir imagen localmente
 docker build -t plai-recursos-espacios:0.1.0 .
 
-# Probar localmente con las mismas restricciones que Swarm
+# Probar contenedor con las banderas de seguridad exigidas por Swarm (sec. 5.2)
 docker run --rm -p 3000:3000 \
-  --read-only --tmpfs /tmp --tmpfs /app/.next/cache \
+  --read-only --tmpfs /tmp --tmpfs /app/.next/cache:size=64M \
   --cap-drop ALL --security-opt no-new-privileges:true \
   plai-recursos-espacios:0.1.0
 
-# Verificar salud
+# Verificar endpoint de salud
 curl http://localhost:3000/api/health      # {"status":"ok","timestamp":"..."}
-docker ps                                   # STATUS debe indicar (healthy)
 
-# Escaneo de vulnerabilidades (obligatorio antes de entregar)
+# Escaneo de vulnerabilidades obligatorio antes de entregar (sec. 5.2 y 7.6)
 trivy image plai-recursos-espacios:0.1.0 --severity HIGH,CRITICAL
 ```
 
-Despliegue (lo ejecuta el área de Tecnología de PLAi):
+Despliegue en producción (lo ejecuta el área de Tecnología de PLAi):
 
 ```bash
 docker stack deploy -c docker-compose.yml plai-recursos
 ```
 
-Los valores marcados como `EJEMPLO` en [`docker-compose.yml`](docker-compose.yml) (registro, dominio, red overlay) deben sustituirse por los que indique PLAi. Límites declarados: 0.5 CPU y 512 MB de memoria.
-
-## Estructura
+## Estructura del Proyecto
 
 ```
-app/            Rutas (App Router), componentes y /api/health
-lib/            Datos y lógica de negocio (reservation.ts) con sus pruebas
-Dockerfile      Imagen multi-etapa (deps > build > runtime)
-docker-compose.yml  Stack de Swarm
+app/                        Rutas (App Router), vistas y Route Handlers (/api/*)
+  ├── admin/                Backoffice administrativo protegido por Proxy RBAC
+  ├── usuario/              Portal de usuario institucional
+  ├── api/                  Route Handlers con requireSession y Zod validation
+  └── components/           Componentes modulares de interfaz y accesibilidad
+database/
+  ├── migrations/           Migraciones SQL versionadas (001_..., 002_...)
+  └── seeds/                Datos iniciales de prueba (demo_datos.sql)
+lib/
+  ├── db.ts                 Capa de datos PostgreSQL tipada y transaccional
+  ├── pool.ts               Pool singleton pg con soporte de Docker secrets
+  ├── auth.ts               Configuración de NextAuth.js
+  ├── apiAuth.ts            Guarda de autorización para Route Handlers
+  ├── rateLimit.ts          Rate limiter de ventana deslizante
+  ├── validations/          Esquemas de validación Zod
+  ├── logger.ts             Logger estructurado JSON conforme a LFPDPPP
+  └── env.ts                Lector seguro de entorno y Docker secrets
+proxy.ts                    Proxy perimetral de seguridad (Next.js 16)
+scripts/
+  └── migrate.mjs           Runner de migraciones SQL para PostgreSQL
+Dockerfile                  Construcción multi-etapa segura (Node 22 alpine, non-root, tini)
+docker-compose.yml          Definición de stack Swarm (read_only, cap_drop ALL, Traefik v3)
 ```
 
-## Decisiones técnicas y pendientes
+## Lista de Verificación de Aceptación (Sección 11 Estándar PLAi)
 
-- **Estilos (sección 3 del estándar):** el estándar fija Tailwind CSS 4.x. La migración desde CSS Modules es **progresiva**: los componentes compartidos ya usan Tailwind/daisyUI y los módulos restantes coexisten gracias a que el reset global vive en `@layer base`. El avance se registra en `PENDIENTES.md`.
-- **Autenticación y datos:** pendientes de integrar con NextAuth.js (proveedor que indique PLAi) y Directus. Hoy el login y los paneles son maquetas con datos de ejemplo.
-- **Reserva de equipos:** la regla de duración vive en `lib/reservation.ts` y está cubierta por pruebas.
-
-## Lista de verificación (sección 11)
-
-| Área | Estado |
-| :--- | :--- |
-| Arquitectura | Stack dentro de la sección 3; estilos en migración a Tailwind |
-| Dockerfile | Multi-etapa, `node:22-alpine3.22`, usuario 1001, puerto 3000, HEALTHCHECK, tini |
-| Compose | `read_only`, `cap_drop ALL`, `no-new-privileges`, límites, sin `ports` |
-| Salud | `/api/health` responde 200 sin autenticación |
-| Configuración | `.env.example` documentado; sin configuración de ambiente en el código |
-| Secretos | Ninguno en el repo; Docker secrets previstos |
-| Seguridad | Trivy pendiente de ejecutar con Docker disponible |
-| Autenticación | Pendiente (NextAuth.js) |
-| Calidad | `pnpm lint` y `pnpm test` pasan |
-| Datos | Sin base de datos aún; migraciones no aplican por ahora |
-| Logs | stdout/stderr; sin datos sensibles |
-| Documentación | Este README |
-| Entrega | Pendiente de transferir el repositorio a PLAi |
+| Criterio | Estado | Detalle |
+| :--- | :---: | :--- |
+| **Arquitectura** | ✅ CUMPLE | Next.js 16.4 + React 19 + TypeScript 5 + Tailwind 4. Sin SaaS de pago. |
+| **Dockerfile** | ✅ CUMPLE | Multi-etapa `node:22-alpine3.22`, usuario no root (1001), `tini`, puerto 3000, `HEALTHCHECK`. |
+| **Compose (Swarm)** | ✅ CUMPLE | `read_only: true`, `cap_drop ALL`, `no-new-privileges`, `tmpfs`, límites de recursos, sin puertos públicos. |
+| **Salud** | ✅ CUMPLE | `/api/health` responde 200 en milisegundos sin autenticación. |
+| **Configuración** | ✅ CUMPLE | `.env.example` documentado con variables ficticias; sin datos quemados en código. |
+| **Secretos** | ✅ CUMPLE | Lector `lib/env.ts` con patrón `VARIABLE_FILE` y `/run/secrets/`. Sin secretos en Git ni en la imagen. |
+| **Autenticación** | ✅ CUMPLE | NextAuth.js 4.24 con sesiones JWT en servidor y proxy perimetral `proxy.ts`. |
+| **Seguridad** | ✅ CUMPLE | Validación Zod en servidor, rate limiting en APIs sensibles, sanitización de datos (LFPDPPP). |
+| **Datos** | ✅ CUMPLE | PostgreSQL 15/16, migraciones versionadas idempotentes y script seed (`pnpm db:migrate`). |
+| **Calidad** | ✅ CUMPLE | ESLint 9 pasa con 0 errores; TypeScript sin errores; 104 pruebas unitarias en verde. |
+| **Logs** | ✅ CUMPLE | Logger estructurado en JSON directo a stdout/stderr con sanitización de credenciales. |
+| **Documentación** | ✅ CUMPLE | README y guía de montaje detallados en español. |
+| **Entrega** | ⏳ PENDIENTE | Transferencia del repositorio a la infraestructura institucional de PLAi. |
