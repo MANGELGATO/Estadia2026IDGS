@@ -254,7 +254,7 @@ export default function ReservacionesPage() {
       key: 'categoriaId',
       label: 'Categoría / Equipo Asignado',
       render: (v: string, item: ReservacionItem) => {
-        const catName = (v || item.categoriaId || 'General').replace(/-/g, ' ');
+        const catName = String(v || item?.categoriaId || 'General').replace(/-/g, ' ');
         return (
           <div>
             <div className="text-xs font-semibold capitalize text-navy">
@@ -418,7 +418,7 @@ export default function ReservacionesPage() {
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-navy uppercase tracking-wider">Categoría solicitada:</span>
                   <span className="rounded bg-blue-600 px-2 py-0.5 font-bold uppercase text-white">
-                    {(selectedItem?.categoriaId || 'General').replace(/-/g, ' ')}
+                    {String(selectedItem?.categoriaId || 'General').replace(/-/g, ' ')}
                   </span>
                 </div>
                 <div className="mt-2 text-xs text-gray-600">
@@ -699,7 +699,7 @@ export default function ReservacionesPage() {
               </div>
               <div>
                 <span className="font-bold text-plai-muted uppercase">Categoría:</span>
-                <p className="font-semibold text-navy capitalize">{(selectedItem?.categoriaId || 'General').replace(/-/g, ' ')}</p>
+                <p className="font-semibold text-navy capitalize">{String(selectedItem?.categoriaId || 'General').replace(/-/g, ' ')}</p>
               </div>
               <div>
                 <span className="font-bold text-plai-muted uppercase">Código PLAi Asignado:</span>

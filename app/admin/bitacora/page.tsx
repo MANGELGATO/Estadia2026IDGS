@@ -325,7 +325,7 @@ export default function BitacoraPage() {
                     <td className="px-5 py-4 whitespace-nowrap text-xs">
                       <div className="text-gray-500">Est: {log.fechaDevolucionEstimada ? log.fechaDevolucionEstimada.replace('T', ' ').slice(0, 16) : ''}</div>
                       {log.fechaDevolucionReal ? (
-                        <div className="font-bold text-emerald-700">Real: {log.fechaDevolucionReal.replace('T', ' ').slice(0, 16)}</div>
+                        <div className="font-bold text-emerald-700">Real: {String(log.fechaDevolucionReal).replace('T', ' ').slice(0, 16)}</div>
                       ) : (
                         <span className="text-[10px] font-semibold text-amber-600">Pendiente de retorno</span>
                       )}

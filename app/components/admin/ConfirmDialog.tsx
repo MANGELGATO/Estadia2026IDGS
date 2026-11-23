@@ -93,7 +93,7 @@ export default function ConfirmDialog({
             className={`rounded-xl px-5 py-2 font-heading text-sm font-bold text-white shadow-plai-sm transition-all active:scale-95 ${
               isDestructive
                 ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-primary hover:bg-[#004a87]'
+                : 'bg-[#ed8d1b] hover:bg-[#d67a10]'
             }`}
           >
             {confirmText}

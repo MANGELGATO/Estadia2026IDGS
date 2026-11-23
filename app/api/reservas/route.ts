@@ -81,7 +81,9 @@ export async function POST(req: NextRequest) {
       horaFin: parsed.data.endTime,
       actividad: parsed.data.activity,
       estado: 'Pendiente',
-      accesoriosIncluidos: device?.accessories ? device.accessories.slice(0, 2).join(', ') : 'Equipo base con accesorios originales',
+      accesoriosIncluidos: (Array.isArray(body.accessories) && body.accessories.length > 0)
+        ? body.accessories.join(', ')
+        : (device?.accessories ? device.accessories.join(', ') : 'Equipo base con accesorios originales'),
       condicionSalida: 'Excelente',
       observacionesAdmin: parsed.data.notes || `Solicitud para ${device ? `${device.name} (${device.inventoryNumber})` : 'equipo'} enviada desde el portal institucional.`,
     };

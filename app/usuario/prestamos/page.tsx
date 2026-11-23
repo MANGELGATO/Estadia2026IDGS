@@ -140,7 +140,7 @@ export default function PrestamosPage() {
                     <div className="font-semibold text-navy">{item.actividad}</div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="font-medium capitalize text-navy">{(item.categoriaId || 'General').replace(/-/g, ' ')}</div>
+                    <div className="font-medium capitalize text-navy">{String(item?.categoriaId || 'General').replace(/-/g, ' ')}</div>
                     {item.codigoPlaiAsignado ? (
                       <span className="inline-block mt-0.5 rounded bg-blue-50 px-2 py-0.5 text-[11px] font-mono font-bold text-blue-700">
                         Cód: {item.codigoPlaiAsignado}
@@ -206,7 +206,7 @@ export default function PrestamosPage() {
               </div>
               <div>
                 <span className="font-bold text-plai-muted uppercase">Categoría:</span>
-                <p className="font-semibold text-navy capitalize">{(selectedItem?.categoriaId || 'General').replace(/-/g, ' ')}</p>
+                <p className="font-semibold text-navy capitalize">{String(selectedItem?.categoriaId || 'General').replace(/-/g, ' ')}</p>
               </div>
               <div>
                 <span className="font-bold text-plai-muted uppercase">Dispositivo Asignado:</span>

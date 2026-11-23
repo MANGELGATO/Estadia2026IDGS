@@ -177,7 +177,7 @@ export default function UserDashboard() {
                         <span className="font-mono text-[10px] text-plai-muted">({reserva.folio})</span>
                       </div>
                       <p className="text-xs text-plai-muted">
-                        Fecha: <span className="font-semibold text-gray-700">{reserva.fechaUso}</span> ({reserva.horaInicio} - {reserva.horaFin}) · Categoría: <span className="capitalize">{(reserva.categoriaId || 'General').replace(/-/g, ' ')}</span>
+                        Fecha: <span className="font-semibold text-gray-700">{reserva.fechaUso}</span> ({reserva.horaInicio} - {reserva.horaFin}) · Categoría: <span className="capitalize">{String(reserva.categoriaId || 'General').replace(/-/g, ' ')}</span>
                       </p>
                     </div>
                   </div>
