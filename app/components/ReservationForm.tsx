@@ -31,9 +31,11 @@ export default function ReservationForm({ device, onClose }: Props) {
 
   const [submitted, setSubmitted] = useState(false);
   const [submittedFolio, setSubmittedFolio] = useState('');
-  const [userName, setUserName] = useState('');
-  const [userEmail, setUserEmail] = useState('');
-  const [userInstitution, setUserInstitution] = useState('Universidad de Guadalajara (CUAAD)');
+  const [userNameOverride, setUserNameOverride] = useState<string | null>(null);
+  const [userEmailOverride, setUserEmailOverride] = useState<string | null>(null);
+  const userName = userNameOverride ?? session?.user?.name ?? '';
+  const userEmail = userEmailOverride ?? session?.user?.email ?? '';
+  const [userInstitution, setUserInstitution] = useState('');
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -50,14 +52,6 @@ export default function ReservationForm({ device, onClose }: Props) {
   const [ineFrontName, setIneFrontName] = useState<string | null>(null);
   const [ineBackName, setIneBackName] = useState<string | null>(null);
   const [responsivaDocName, setResponsivaDocName] = useState<string | null>(null);
-
-  // Auto-llenado de datos personales cuando el usuario está logueado
-  useEffect(() => {
-    if (session?.user) {
-      if (session.user.name) setUserName(session.user.name);
-      if (session.user.email) setUserEmail(session.user.email);
-    }
-  }, [session]);
 
   const handleEndTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newEnd = e.target.value;
@@ -114,10 +108,9 @@ export default function ReservationForm({ device, onClose }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           deviceId: device.id,
-          userName: userName.trim() || session?.user?.name || 'Usuario Institucional',
-          userEmail: userEmail.trim() || session?.user?.email || 'user@plai.edu.mx',
+          userName: userName.trim() || session?.user?.name || '',
+          userEmail: userEmail.trim() || session?.user?.email || '',
           userInstitution: userInstitution.trim() || 'Comunidad PLAi',
-          userId: session?.user?.id || 'usr-standard-01',
           date,
           startTime,
           endTime,
@@ -178,14 +171,7 @@ export default function ReservationForm({ device, onClose }: Props) {
             Para solicitar el préstamo de <strong>{device.name}</strong>, es necesario ingresar con tu cuenta institucional de PLAi. Tus datos personales se vincularán automáticamente a tu expediente y a la solicitud en el panel administrativo.
           </p>
 
-          <div className="my-4 rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-left text-xs text-blue-900">
-            <p className="font-bold mb-1 flex items-center gap-1.5">
-              <ShieldCheck size={14} className="text-blue-600" /> Cuenta de demostración de usuario:
-            </p>
-            <p className="font-mono text-[11px] text-blue-800">user@plai.edu.mx · Contraseña: 123user</p>
-          </div>
-
-          <div className="mt-2 flex flex-col sm:flex-row gap-2.5">
+          <div className="mt-5 flex flex-col sm:flex-row gap-2.5">
             <button
               type="button"
               onClick={onClose}
@@ -347,7 +333,7 @@ export default function ReservationForm({ device, onClose }: Props) {
                 required
                 id="res-user"
                 value={userName}
-                onChange={(e) => setUserName(e.target.value)}
+                onChange={(e) => setUserNameOverride(e.target.value)}
               />
             </div>
 
@@ -358,11 +344,11 @@ export default function ReservationForm({ device, onClose }: Props) {
               <input
                 type="email"
                 className="w-full rounded-[0.65rem] border-[1.5px] border-black/[0.08] bg-gray-50/70 px-4 py-[0.7rem] font-body text-[0.88rem] text-navy outline-none transition-all duration-[250ms] focus:border-plai focus:bg-white"
-                placeholder="user@plai.edu.mx"
+                placeholder="correo@plai.mx"
                 required
                 id="res-email"
                 value={userEmail}
-                onChange={(e) => setUserEmail(e.target.value)}
+                onChange={(e) => setUserEmailOverride(e.target.value)}
               />
             </div>
           </div>

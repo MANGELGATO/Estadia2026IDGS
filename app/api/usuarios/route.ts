@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUsuariosFromDB, upsertUsuarioInDB, UsuarioItem } from '../../../lib/db';
+import { requireSession } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  const auth = await requireSession(['admin']);
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const usuarios = await getUsuariosFromDB();
     return NextResponse.json({
@@ -22,6 +26,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireSession(['admin']);
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await req.json();
     const { id, name, email, password, role, status, dependencia, telefono } = body;
@@ -33,11 +40,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const user: UsuarioItem = {
+    const isNew = !id;
+    if (isNew && (!password || String(password).trim().length < 8)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Para crear un usuario nuevo se requiere una contraseña de al menos 8 caracteres.',
+        },
+        { status: 400 }
+      );
+    }
+
+    const user: UsuarioItem & { password?: string } = {
       id: id ? String(id) : `usr-${Date.now()}`,
       name: String(name).trim(),
       email: String(email).trim().toLowerCase(),
-      password: password ? String(password) : undefined,
+      password: password ? String(password).trim() : undefined,
       role: role || 'Usuario Final',
       status: status || 'Activo',
       dependencia: dependencia ? String(dependencia).trim() : 'Comunidad PLAi',
@@ -46,17 +64,23 @@ export async function POST(req: NextRequest) {
       reservations: 0,
     };
 
-    await upsertUsuarioInDB(user);
-    const updatedList = await getUsuariosFromDB();
-    const saved = updatedList.find(u => u.email.toLowerCase() === user.email.toLowerCase()) || user;
+    const saved = await upsertUsuarioInDB(user);
 
-    logger.info('Usuario institucional guardado', { id: saved.id, email: saved.email, role: saved.role });
+    logger.info('Usuario institucional guardado', {
+      id: saved.id,
+      email: saved.email,
+      role: saved.role,
+      actor: auth.user.email,
+    });
 
-    return NextResponse.json({
-      success: true,
-      message: 'Usuario guardado exitosamente',
-      data: saved,
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Usuario guardado exitosamente',
+        data: saved,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     logger.error('Error al guardar usuario', { path: '/api/usuarios' }, error);
     return NextResponse.json(

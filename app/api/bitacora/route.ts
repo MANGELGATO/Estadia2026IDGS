@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { 
-  getBitacoraFromDB, 
-  insertBitacoraEntregaInDB, 
+import {
+  getBitacoraFromDB,
+  insertBitacoraEntregaInDB,
   updateBitacoraDevolucionInDB,
   getEquipoByCodigoPLAi,
   insertIncidenciaInDB,
   BitacoraItem,
-  IncidenciaItem 
+  IncidenciaItem,
 } from '../../../lib/db';
+import { requireSession } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  const auth = await requireSession(['admin', 'colaborador']);
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const logs = await getBitacoraFromDB();
     return NextResponse.json({
@@ -30,21 +34,34 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireSession(['admin', 'colaborador']);
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await req.json();
 
-    if (!body.codigoPlai || !body.usuarioNombre || !body.fechaEntrega || !body.fechaDevolucionEstimada) {
+    if (
+      !body.codigoPlai ||
+      !body.usuarioNombre ||
+      !body.fechaEntrega ||
+      !body.fechaDevolucionEstimada
+    ) {
       return NextResponse.json(
-        { success: false, message: 'Faltan campos obligatorios para registrar la entrega del dispositivo' },
+        {
+          success: false,
+          message: 'Faltan campos obligatorios para registrar la entrega del dispositivo',
+        },
         { status: 400 }
       );
     }
 
-    // Validar existencia del equipo
     const equipo = await getEquipoByCodigoPLAi(body.codigoPlai);
     if (!equipo) {
       return NextResponse.json(
-        { success: false, message: `No se encontró ningún equipo con el código PLAi: ${body.codigoPlai}` },
+        {
+          success: false,
+          message: `No se encontró ningún equipo con el código PLAi: ${body.codigoPlai}`,
+        },
         { status: 404 }
       );
     }
@@ -55,25 +72,37 @@ export async function POST(req: NextRequest) {
       codigoPlai: equipo.inventoryNumber,
       equipoNombre: equipo.name,
       usuarioNombre: String(body.usuarioNombre).trim(),
-      usuarioEmail: String(body.usuarioEmail || 'usuario@plai.mx').trim(),
-      usuarioDependencia: body.usuarioDependencia ? String(body.usuarioDependencia).trim() : undefined,
+      usuarioEmail: String(body.usuarioEmail || '').trim().toLowerCase(),
+      usuarioDependencia: body.usuarioDependencia
+        ? String(body.usuarioDependencia).trim()
+        : undefined,
       fechaEntrega: body.fechaEntrega,
       fechaDevolucionEstimada: body.fechaDevolucionEstimada,
       estadoPrestamo: 'Activo',
       condicionEntrega: body.condicionEntrega || 'Excelente',
       accesoriosEntregados: body.accesoriosEntregados || 'Equipo completo con accesorios originales',
-      observacionesEntrega: body.observacionesEntrega ? String(body.observacionesEntrega).trim() : undefined,
-      adminEntrega: body.adminEntrega || 'Administrador PLAi',
+      observacionesEntrega: body.observacionesEntrega
+        ? String(body.observacionesEntrega).trim()
+        : undefined,
+      adminEntrega: auth.user.name,
     };
 
     await insertBitacoraEntregaInDB(item, body.reservaId ? String(body.reservaId) : undefined);
-    logger.info('Entrega de equipo registrada en bitácora', { id: item.id, codigo: item.codigoPlai, reservaId: body.reservaId });
+    logger.info('Entrega de equipo registrada en bitácora', {
+      id: item.id,
+      codigo: item.codigoPlai,
+      reservaId: body.reservaId,
+      actor: auth.user.email,
+    });
 
-    return NextResponse.json({
-      success: true,
-      message: 'Entrega de dispositivo registrada correctamente',
-      data: item,
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Entrega de dispositivo registrada correctamente',
+        data: item,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     logger.error('Error al registrar entrega en bitácora', { path: '/api/bitacora' }, error);
     return NextResponse.json(
@@ -84,13 +113,27 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+  const auth = await requireSession(['admin', 'colaborador']);
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await req.json();
-    const { id, fechaDevolucionReal, condicionDevolucion, accesoriosDevueltos, observacionesDevolucion, incidenciaGenerada, adminRecibe, descripcionIncidencia } = body;
+    const {
+      id,
+      fechaDevolucionReal,
+      condicionDevolucion,
+      accesoriosDevueltos,
+      observacionesDevolucion,
+      incidenciaGenerada,
+      descripcionIncidencia,
+    } = body;
 
     if (!id || !fechaDevolucionReal || !condicionDevolucion) {
       return NextResponse.json(
-        { success: false, message: 'ID, fecha de devolución real y condición de retorno son obligatorios' },
+        {
+          success: false,
+          message: 'ID, fecha de devolución real y condición de retorno son obligatorios',
+        },
         { status: 400 }
       );
     }
@@ -101,13 +144,12 @@ export async function PUT(req: NextRequest) {
       accesoriosDevueltos: accesoriosDevueltos || 'Completos',
       observacionesDevolucion,
       incidenciaGenerada: Boolean(incidenciaGenerada),
-      adminRecibe: adminRecibe || 'Administrador PLAi',
+      adminRecibe: auth.user.name,
     });
 
-    // Si se reportó incidencia al devolver, registrar automáticamente en el módulo de mantenimiento (Req 5)
     if (incidenciaGenerada) {
       const logs = await getBitacoraFromDB();
-      const item = logs.find(b => b.id === id);
+      const item = logs.find((b) => b.id === id);
       if (item) {
         const incidencia: IncidenciaItem = {
           id: `inc-${Date.now()}`,
@@ -118,13 +160,19 @@ export async function PUT(req: NextRequest) {
           origen: 'Devolución de Préstamo',
           tipoFalla: 'Daño Físico',
           severidad: 'Media',
-          descripcion: descripcionIncidencia || observacionesDevolucion || 'Incidencia detectada durante la revisión de retorno del dispositivo.',
+          descripcion:
+            descripcionIncidencia ||
+            observacionesDevolucion ||
+            'Incidencia detectada durante la revisión de retorno del dispositivo.',
           estado: 'Reportada',
-          tecnicoResponsable: adminRecibe || 'Técnico de Laboratorio PLAi',
+          tecnicoResponsable: auth.user.name,
           fechaReporte: fechaDevolucionReal,
         };
         await insertIncidenciaInDB(incidencia);
-        logger.info('Incidencia automática generada desde bitácora de devolución', { folio: incidencia.folio });
+        logger.info('Incidencia automática generada desde bitácora de devolución', {
+          folio: incidencia.folio,
+          actor: auth.user.email,
+        });
       }
     }
 

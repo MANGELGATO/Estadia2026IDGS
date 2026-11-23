@@ -100,7 +100,7 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
 
   const [selectedDetailsId, setSelectedDetailsId] = useState<string | null>(null);
   const [selectedReserveId, setSelectedReserveId]  = useState<string | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string>('https://www.youtube.com/embed/dQw4w9WgXcQ');
+  const [videoUrl, setVideoUrl] = useState<string>('');
   const [isLoaded, setIsLoaded] = useState(false);
   const [quoteSubmitted, setQuoteSubmitted] = useState(false);
   const [printFolio, setPrintFolio] = useState('');

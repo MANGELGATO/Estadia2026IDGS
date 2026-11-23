@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { spaceRequestSchema } from '../../../lib/validations/schemas';
 import { logger } from '../../../lib/logger';
 import { insertReservacionInDB, ReservacionItem } from '../../../lib/db';
+import { requireSession, isStaffRole } from '../../../lib/authGuard';
 import {
   checkRateLimit,
   getClientIp,
@@ -12,7 +13,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 const ESPACIO_NAMES: Record<string, string> = {
-  'auditorio': 'Auditorio Principal (150 personas)',
+  auditorio: 'Auditorio Principal (150 personas)',
   'aula-robotica': 'Aula de Robótica y Automatización',
   'workshop-vr': 'Workshop de Realidad Virtual',
   'sala-juntas': 'Sala de Juntas Creativa',
@@ -22,7 +23,6 @@ export async function POST(req: NextRequest) {
   const reqId = req.headers.get('x-request-id') || `req-${Date.now()}`;
   const ip = getClientIp(req);
 
-  // Rate Limiting en servidor (Sección 7.3 Estándar PLAi)
   const rate = checkRateLimit(`espacio_route:${ip}`, RATE_LIMIT_MUTATION);
   if (!rate.success) {
     logger.warn('Rate limit excedido en POST /api/solicitudes-espacios', {
@@ -33,6 +33,9 @@ export async function POST(req: NextRequest) {
     });
     return createRateLimitResponse(rate);
   }
+
+  const auth = await requireSession();
+  if (auth.errorResponse) return auth.errorResponse;
 
   try {
     const body = await req.json();
@@ -65,18 +68,22 @@ export async function POST(req: NextRequest) {
       ? 'realidad-virtual'
       : 'computo-multimedia';
 
-    // Calcular hora fin estimada (+2 horas)
     const [h, m] = parsed.data.hora.split(':').map(Number);
     const endH = Math.min((h || 10) + 2, 20);
     const horaFin = `${String(endH).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
+
+    const authoritativeEmail = isStaffRole(auth.user.role)
+      ? parsed.data.email
+      : auth.user.email;
 
     const nuevaReservaEspacio: ReservacionItem = {
       id: `esp-${timestamp}`,
       folio,
       categoriaId: catSlug,
       codigoPlaiAsignado: `ESPACIO-${parsed.data.espacioId.toUpperCase()}`,
+      usuarioId: auth.user.id || undefined,
       usuarioNombre: parsed.data.nombreSolicitante,
-      usuarioEmail: parsed.data.email,
+      usuarioEmail: authoritativeEmail,
       usuarioTelefono: body.telefono ? String(body.telefono) : undefined,
       usuarioInstitucion: body.institucion || parsed.data.nombreSolicitante,
       fechaUso: parsed.data.fecha,
@@ -86,7 +93,7 @@ export async function POST(req: NextRequest) {
       estado: 'Pendiente',
       accesoriosIncluidos: 'Proyector 4K, Audio, Conectividad Wi-Fi Dedicada',
       condicionSalida: 'Excelente',
-      observacionesAdmin: `Solicitud de espacio físico (${espacioNombre}). Contacto: ${body.telefono || parsed.data.email}.`,
+      observacionesAdmin: `Solicitud de espacio físico (${espacioNombre}). Contacto: ${body.telefono || authoritativeEmail}.`,
     };
 
     await insertReservacionInDB(nuevaReservaEspacio);
@@ -97,7 +104,7 @@ export async function POST(req: NextRequest) {
       status: 201,
       folio,
       espacioId: parsed.data.espacioId,
-      solicitante: parsed.data.nombreSolicitante,
+      actor: auth.user.email,
     });
 
     return NextResponse.json(
@@ -113,7 +120,11 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    logger.error('Error al procesar solicitud de espacio', { reqId, path: '/api/solicitudes-espacios' }, error);
+    logger.error(
+      'Error al procesar solicitud de espacio',
+      { reqId, path: '/api/solicitudes-espacios' },
+      error
+    );
     return NextResponse.json(
       { success: false, message: 'Error interno del servidor.' },
       { status: 500 }

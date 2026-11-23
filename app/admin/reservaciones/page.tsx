@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import DataTable, { Column } from '../../components/admin/DataTable';
-import { RiCalendarCheckLine, RiCheckLine, RiCloseLine, RiTimeLine, RiEyeLine, RiEdit2Line } from 'react-icons/ri';
+import { RiCalendarCheckLine, RiCheckLine, RiCloseLine, RiTimeLine, RiEyeLine } from 'react-icons/ri';
 import StatCard from '../../components/admin/StatCard';
 import { ReservacionItem } from '../../../lib/db';
 import { DeviceItem } from '../../../lib/mockData';
@@ -30,7 +30,6 @@ function StatusBadge({ value }: { value: string }) {
 export default function ReservacionesPage() {
   const [data, setData] = useState<ReservacionItem[]>([]);
   const [equipos, setEquipos] = useState<DeviceItem[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Modals
   const [selectedItem, setSelectedItem] = useState<ReservacionItem | null>(null);
@@ -63,13 +62,27 @@ export default function ReservacionesPage() {
       }
     } catch (err) {
       console.error('Error fetching data:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    let active = true;
+    Promise.all([fetch('/api/reservaciones'), fetch('/api/equipos')])
+      .then(async ([resRes, resEq]) => {
+        if (!active) return;
+        if (resRes.ok) {
+          const json = await resRes.json();
+          if (active && json.data) setData(json.data);
+        }
+        if (resEq.ok) {
+          const jsonEq = await resEq.json();
+          if (active && jsonEq.data) setEquipos(jsonEq.data);
+        }
+      })
+      .catch((err) => console.error('Error fetching data:', err));
+    return () => {
+      active = false;
+    };
   }, []);
 
   const pendientes = data.filter(r => r.estado === 'Pendiente').length;

@@ -14,7 +14,6 @@ export default function ReportesPage() {
   const [bitacora, setBitacora] = useState<BitacoraItem[]>([]);
   const [reservaciones, setReservaciones] = useState<ReservacionItem[]>([]);
   const [incidencias, setIncidencias] = useState<IncidenciaItem[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
@@ -27,7 +26,6 @@ export default function ReportesPage() {
       if (bit.data) setBitacora(bit.data);
       if (res.data) setReservaciones(res.data);
       if (inc.data) setIncidencias(inc.data);
-      setLoading(false);
     });
   }, []);
 

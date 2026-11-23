@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEquiposFromDB, insertEquipoInDB, deleteEquipoInDB } from '../../../lib/db';
 import { DeviceItem } from '../../../lib/mockData';
+import { requireSession } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireSession(['admin']);
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const item = (await req.json()) as DeviceItem;
 
@@ -41,27 +45,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    logger.info('Equipo registrado o actualizado en base de datos MySQL', {
+    logger.info('Equipo registrado o actualizado en PostgreSQL', {
       id: item.id,
       codigo_plai: item.inventoryNumber,
-      nombre: item.name
+      actor: auth.user.email,
     });
 
-    return NextResponse.json({
-      success: true,
-      message: 'Equipo guardado correctamente en MySQL',
-      data: item,
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Equipo guardado correctamente',
+        data: item,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     logger.error('Error al guardar equipo en base de datos', { path: '/api/equipos' }, error);
     return NextResponse.json(
-      { success: false, message: 'Error al persistir equipo en MySQL' },
+      { success: false, message: 'Error al persistir equipo en la base de datos' },
       { status: 500 }
     );
   }
 }
 
 export async function DELETE(req: NextRequest) {
+  const auth = await requireSession(['admin']);
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
@@ -81,15 +91,15 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    logger.info('Equipo eliminado de la base de datos MySQL', { id });
+    logger.info('Equipo eliminado de la base de datos', { id, actor: auth.user.email });
 
     return NextResponse.json({
       success: true,
-      message: 'Equipo eliminado de la base de datos MySQL',
+      message: 'Equipo eliminado correctamente',
       data: { id },
     });
   } catch (error) {
-    logger.error('Error al eliminar equipo de MySQL', { path: '/api/equipos' }, error);
+    logger.error('Error al eliminar equipo', { path: '/api/equipos' }, error);
     return NextResponse.json(
       { success: false, message: 'Error interno al eliminar equipo' },
       { status: 500 }

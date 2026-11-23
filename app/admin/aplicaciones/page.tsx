@@ -11,7 +11,6 @@ import {
   RiComputerLine, 
   RiAddLine, 
   RiCloseLine, 
-  RiImageLine,
   RiUploadCloud2Line 
 } from 'react-icons/ri';
 
@@ -74,7 +73,6 @@ const ALL_AGE_RATINGS: AgeRating[] = ['Todas las edades', '3+', '6+', '10+', '12
 
 export default function AplicacionesPage() {
   const [data, setData] = useState<Application[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Application | null>(null);
   const [detailItem, setDetailItem] = useState<Application | null>(null);
@@ -85,25 +83,19 @@ export default function AplicacionesPage() {
   const [filterPlatform, setFilterPlatform] = useState<string>('Todas');
   const [filterCategory, setFilterCategory] = useState<string>('Todas');
 
-  // Load from API
-  const fetchApps = async () => {
-    try {
-      const res = await fetch('/api/aplicaciones');
-      if (res.ok) {
-        const json = await res.json();
-        if (json.data && Array.isArray(json.data)) {
+  useEffect(() => {
+    let active = true;
+    fetch('/api/aplicaciones')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (active && json?.data && Array.isArray(json.data)) {
           setData(json.data);
         }
-      }
-    } catch (err) {
-      console.error('Error fetching aplicaciones:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchApps();
+      })
+      .catch((err) => console.error('Error fetching aplicaciones:', err));
+    return () => {
+      active = false;
+    };
   }, []);
 
   const totalVR = data.filter(a => String(a.platform).includes('Meta Quest')).length;

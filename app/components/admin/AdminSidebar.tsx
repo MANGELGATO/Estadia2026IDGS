@@ -3,10 +3,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { 
-  RiDashboardLine, 
-  RiComputerLine, 
-  RiAppsLine, 
+import {
+  RiDashboardLine,
+  RiComputerLine,
+  RiAppsLine,
   RiSettings4Line,
   RiCalendarCheckLine,
   RiUserSettingsLine,
@@ -15,7 +15,7 @@ import {
   RiLogoutBoxRLine,
   RiHistoryLine,
   RiExternalLinkLine,
-  RiGamepadLine
+  RiGamepadLine,
 } from "react-icons/ri";
 import { useSession, signOut } from "next-auth/react";
 
@@ -23,31 +23,31 @@ const navSections = [
   {
     label: "General",
     items: [
-      { name: "Dashboard", href: "/admin", icon: <RiDashboardLine /> },
+      { name: "Dashboard", href: "/admin", icon: <RiDashboardLine />, adminOnly: false },
     ],
   },
   {
     label: "Gestión Operativa",
     items: [
-      { name: "Categorías", href: "/admin/categorias", icon: <RiAppsLine /> },
-      { name: "Inventario", href: "/admin/inventario", icon: <RiComputerLine /> },
-      { name: "Bitácora de Uso", href: "/admin/bitacora", icon: <RiHistoryLine /> },
-      { name: "Aplicaciones", href: "/admin/aplicaciones", icon: <RiGamepadLine /> },
-      { name: "Mantenimiento", href: "/admin/mantenimiento", icon: <RiToolsLine /> },
+      { name: "Categorías", href: "/admin/categorias", icon: <RiAppsLine />, adminOnly: true },
+      { name: "Inventario", href: "/admin/inventario", icon: <RiComputerLine />, adminOnly: false },
+      { name: "Bitácora de Uso", href: "/admin/bitacora", icon: <RiHistoryLine />, adminOnly: false },
+      { name: "Aplicaciones", href: "/admin/aplicaciones", icon: <RiGamepadLine />, adminOnly: false },
+      { name: "Mantenimiento", href: "/admin/mantenimiento", icon: <RiToolsLine />, adminOnly: false },
     ],
   },
   {
     label: "Reservaciones",
     items: [
-      { name: "Reservaciones", href: "/admin/reservaciones", icon: <RiCalendarCheckLine /> },
+      { name: "Reservaciones", href: "/admin/reservaciones", icon: <RiCalendarCheckLine />, adminOnly: false },
     ],
   },
   {
     label: "Administración",
     items: [
-      { name: "Usuarios", href: "/admin/usuarios", icon: <RiUserSettingsLine /> },
-      { name: "Reportes", href: "/admin/reportes", icon: <RiBarChartLine /> },
-      { name: "Configuración", href: "/admin/configuracion", icon: <RiSettings4Line /> },
+      { name: "Usuarios", href: "/admin/usuarios", icon: <RiUserSettingsLine />, adminOnly: true },
+      { name: "Reportes", href: "/admin/reportes", icon: <RiBarChartLine />, adminOnly: false },
+      { name: "Configuración", href: "/admin/configuracion", icon: <RiSettings4Line />, adminOnly: true },
     ],
   },
 ];
@@ -56,21 +56,25 @@ export default function AdminSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
 
-  const userName = session?.user?.name || "Administrador PLAi";
+  const role = session?.user?.role || "usuario";
+  const isAdmin = role === "admin";
+  const userName = session?.user?.name || "Personal PLAi";
+  const userEmail = session?.user?.email || "";
   const userInitial = userName.charAt(0).toUpperCase();
 
   const handleSignOut = async () => {
-    if (typeof document !== 'undefined') {
-      document.cookie = 'plai_role=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    }
-    await signOut({ callbackUrl: "/login?logout=true" });
+    await signOut({ callbackUrl: "/login" });
   };
 
   return (
     <aside className="sticky top-0 z-40 flex h-auto w-full flex-col overflow-y-auto border-r border-white/10 bg-[#1e5ca7] p-4 text-white shadow-xl [scrollbar-color:rgba(255,255,255,0.2)_transparent] [scrollbar-width:thin] md:h-screen md:w-[270px] md:p-6">
-      {/* Brand Header */}
       <div className="mb-4 flex items-center justify-between border-b border-white/15 px-2 pb-5 pt-2">
-        <Link href="/" target="_blank" className="flex items-center gap-2 rounded-lg bg-white/95 px-2.5 py-1.5 shadow-sm transition hover:bg-white" title="Ver sitio web público">
+        <Link
+          href="/"
+          target="_blank"
+          className="flex items-center gap-2 rounded-lg bg-white/95 px-2.5 py-1.5 shadow-sm transition hover:bg-white"
+          title="Ver sitio web público"
+        >
           <Image
             src="/logotipo.png"
             alt="PLAi"
@@ -80,43 +84,49 @@ export default function AdminSidebar() {
           />
         </Link>
         <span className="rounded bg-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-          Admin
+          {isAdmin ? "Admin" : "Colaborador"}
         </span>
       </div>
 
-      {/* Navigation */}
       <nav className="flex flex-1 flex-col gap-1">
-        {navSections.map((section) => (
-          <div key={section.label} className="mb-2">
-            <span className="block px-3 pb-[0.35rem] pt-2 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-white/50">
-              {section.label}
-            </span>
-            {section.items.map((item) => {
-              const isActive =
-                pathname === item.href ||
-                (pathname.startsWith(item.href) && item.href !== "/admin");
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`relative flex items-center gap-3 overflow-hidden rounded-xl px-3.5 py-[0.65rem] font-heading text-[0.875rem] font-medium transition-all duration-150 ${
-                    isActive
-                      ? "bg-white text-[#1e5ca7] font-bold shadow-md shadow-black/10"
-                      : "text-white/80 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  <span className={`flex shrink-0 items-center text-[1.15rem] ${isActive ? 'text-plai' : 'text-white/80'}`}>
-                    {item.icon}
-                  </span>
-                  <span>{item.name}</span>
-                </Link>
-              );
-            })}
-          </div>
-        ))}
+        {navSections.map((section) => {
+          const visibleItems = section.items.filter((item) => !item.adminOnly || isAdmin);
+          if (visibleItems.length === 0) return null;
+          return (
+            <div key={section.label} className="mb-2">
+              <span className="block px-3 pb-[0.35rem] pt-2 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-white/50">
+                {section.label}
+              </span>
+              {visibleItems.map((item) => {
+                const isActive =
+                  pathname === item.href ||
+                  (pathname.startsWith(item.href) && item.href !== "/admin");
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`relative flex items-center gap-3 overflow-hidden rounded-xl px-3.5 py-[0.65rem] font-heading text-[0.875rem] font-medium transition-all duration-150 ${
+                      isActive
+                        ? "bg-white font-bold text-[#1e5ca7] shadow-md shadow-black/10"
+                        : "text-white/80 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <span
+                      className={`flex shrink-0 items-center text-[1.15rem] ${
+                        isActive ? "text-plai" : "text-white/80"
+                      }`}
+                    >
+                      {item.icon}
+                    </span>
+                    <span>{item.name}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          );
+        })}
       </nav>
 
-      {/* User Info & Integrated Sign Out */}
       <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-white/15 bg-white/10 p-3.5">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white font-heading text-sm font-bold text-[#1e5ca7] shadow-sm">
@@ -126,9 +136,7 @@ export default function AdminSidebar() {
             <span className="truncate font-heading text-[0.82rem] font-bold text-white">
               {userName}
             </span>
-            <span className="truncate text-[0.7rem] text-white/70">
-              {session?.user?.email || "admin@plai.edu.mx"}
-            </span>
+            <span className="truncate text-[0.7rem] text-white/70">{userEmail}</span>
           </div>
         </div>
 
@@ -144,7 +152,7 @@ export default function AdminSidebar() {
         <Link
           href="/"
           target="_blank"
-          className="flex items-center justify-center gap-1.5 text-[0.72rem] text-white/70 hover:text-white hover:underline transition"
+          className="flex items-center justify-center gap-1.5 text-[0.72rem] text-white/70 transition hover:text-white hover:underline"
         >
           <span>Ir al Portal Público</span>
           <RiExternalLinkLine size={12} />

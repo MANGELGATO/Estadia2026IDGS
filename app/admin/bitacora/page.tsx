@@ -8,13 +8,8 @@ import {
   RiAlertLine, 
   RiSearchLine, 
   RiTimeLine, 
-  RiUser3Line, 
-  RiComputerLine, 
   RiCloseLine,
-  RiCheckLine,
-  RiArrowRightLine,
-  RiFilter3Line,
-  RiToolsLine
+  RiFilter3Line
 } from 'react-icons/ri';
 import StatCard from '../../components/admin/StatCard';
 import type { BitacoraItem, DeviceItem, ReservacionItem } from '../../../lib/db';
@@ -52,13 +47,9 @@ export default function BitacoraPage() {
   const [devolucionObservaciones, setDevolucionObservaciones] = useState('');
   const [devolucionIncidencia, setDevolucionIncidencia] = useState(false);
   const [devolucionDescripcionIncidencia, setDevolucionDescripcionIncidencia] = useState('');
-  const [devolucionAdmin, setDevolucionAdmin] = useState('Administrador General PLAi');
+  const [devolucionAdmin] = useState('Administrador General PLAi');
 
   const [notification, setNotification] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const fetchData = async () => {
     try {
@@ -78,6 +69,30 @@ export default function BitacoraPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetch('/api/bitacora').then(r => r.json()),
+      fetch('/api/equipos').then(r => r.json()),
+      fetch('/api/reservaciones').then(r => r.json()).catch(() => ({ data: [] })),
+    ])
+      .then(([bitRes, eqRes, resRes]) => {
+        if (!active) return;
+        if (bitRes.data) setLogs(bitRes.data);
+        if (eqRes.data) setEquipos(eqRes.data);
+        if (resRes.data) setReservaciones(resRes.data);
+      })
+      .catch(() => {
+        if (active) setNotification({ text: 'Error al cargar registros de la bitácora', type: 'error' });
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleEntregaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -529,7 +544,7 @@ export default function BitacoraPage() {
                   </label>
                   <select
                     value={entregaCondicion}
-                    onChange={(e) => setEntregaCondicion(e.target.value as any)}
+                    onChange={(e) => setEntregaCondicion(e.target.value as 'Excelente' | 'Bueno' | 'Regular')}
                     className="rounded-lg border border-gray-300 p-2.5 text-sm focus:border-plai focus:outline-none"
                   >
                     <option value="Excelente">Excelente (Impecable, sin marcas)</option>
@@ -639,7 +654,7 @@ export default function BitacoraPage() {
                 </label>
                 <select
                   value={devolucionCondicion}
-                  onChange={(e) => setDevolucionCondicion(e.target.value as any)}
+                  onChange={(e) => setDevolucionCondicion(e.target.value as 'Excelente' | 'Bueno' | 'Observación' | 'En revisión' | 'Dañado')}
                   className="rounded-lg border border-gray-300 p-2.5 text-sm focus:border-plai focus:outline-none"
                 >
                   <option value="Excelente">Excelente (Sin novedades ni daños)</option>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { reservationSchema } from '../../../lib/validations/schemas';
 import { logger } from '../../../lib/logger';
 import { getEquiposFromDB, insertReservacionInDB, ReservacionItem } from '../../../lib/db';
+import { requireSession, isStaffRole } from '../../../lib/authGuard';
 import {
   checkRateLimit,
   getClientIp,
@@ -15,7 +16,6 @@ export async function POST(req: NextRequest) {
   const reqId = req.headers.get('x-request-id') || `req-${Date.now()}`;
   const ip = getClientIp(req);
 
-  // Rate Limiting en servidor (Sección 7.3 Estándar PLAi)
   const rate = checkRateLimit(`reserva_route:${ip}`, RATE_LIMIT_MUTATION);
   if (!rate.success) {
     logger.warn('Rate limit excedido en POST /api/reservas', {
@@ -27,9 +27,11 @@ export async function POST(req: NextRequest) {
     return createRateLimitResponse(rate);
   }
 
+  const auth = await requireSession();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await req.json();
-
     const parsed = reservationSchema.safeParse(body);
 
     if (!parsed.success) {
@@ -51,41 +53,53 @@ export async function POST(req: NextRequest) {
     }
 
     const allEquipos = await getEquiposFromDB();
-    const device = allEquipos.find(e => e.id === String(parsed.data.deviceId));
+    const device = allEquipos.find((e) => e.id === String(parsed.data.deviceId));
 
     const categorySlugMap: Record<string, string> = {
       'Realidad Virtual': 'realidad-virtual',
-      'Robótica': 'robotica',
-      'Cómputo': 'computo-multimedia',
-      'Drones': 'drones',
+      Robótica: 'robotica',
+      Cómputo: 'computo-multimedia',
+      Drones: 'drones',
       'Fabricación digital': 'fabricacion-digital',
     };
-    const catSlug = device ? (categorySlugMap[device.category] || 'realidad-virtual') : 'realidad-virtual';
+    const catSlug = device
+      ? categorySlugMap[device.category] || 'realidad-virtual'
+      : 'realidad-virtual';
 
     const timestamp = Date.now();
     const id = `res-${timestamp}`;
     const folio = `RES-${timestamp.toString().slice(-4)}`;
 
+    // Vincular correo e ID del usuario autenticado (evita suplantación por usuarios estándar)
+    const authoritativeEmail = isStaffRole(auth.user.role)
+      ? parsed.data.userEmail || auth.user.email
+      : auth.user.email;
+
     const newReserva: ReservacionItem = {
       id,
       folio,
       categoriaId: catSlug,
-      equipoId: String(parsed.data.deviceId),
+      equipoId: device ? device.id : undefined,
       codigoPlaiAsignado: device?.inventoryNumber,
-      usuarioId: body.userId || 'usr-standard-01',
-      usuarioNombre: parsed.data.userName,
-      usuarioEmail: parsed.data.userEmail || body.userEmail || (parsed.data.userName.includes('@') ? parsed.data.userName : 'user@plai.edu.mx'),
-      usuarioInstitucion: parsed.data.userInstitution || body.userInstitution || 'Comunidad PLAi',
+      usuarioId: auth.user.id || undefined,
+      usuarioNombre: parsed.data.userName || auth.user.name,
+      usuarioEmail: authoritativeEmail,
+      usuarioInstitucion: parsed.data.userInstitution || 'Comunidad PLAi',
       fechaUso: parsed.data.date,
       horaInicio: parsed.data.startTime,
       horaFin: parsed.data.endTime,
       actividad: parsed.data.activity,
       estado: 'Pendiente',
-      accesoriosIncluidos: (Array.isArray(body.accessories) && body.accessories.length > 0)
-        ? body.accessories.join(', ')
-        : (device?.accessories ? device.accessories.join(', ') : 'Equipo base con accesorios originales'),
+      accesoriosIncluidos:
+        Array.isArray(body.accessories) && body.accessories.length > 0
+          ? body.accessories.join(', ')
+          : device?.accessories
+          ? device.accessories.join(', ')
+          : 'Equipo base con accesorios originales',
       condicionSalida: 'Excelente',
-      observacionesAdmin: parsed.data.notes || `Solicitud para ${device ? `${device.name} (${device.inventoryNumber})` : 'equipo'} enviada desde el portal institucional.`,
+      observacionesAdmin:
+        parsed.data.notes ||
+        `Solicitud para ${device ? `${device.name} (${device.inventoryNumber})` : 'equipo'} enviada desde el portal institucional.`,
     };
 
     await insertReservacionInDB(newReserva);
@@ -96,7 +110,6 @@ export async function POST(req: NextRequest) {
       status: 201,
       folio: newReserva.folio,
       deviceId: String(parsed.data.deviceId),
-      userName: parsed.data.userName,
       userEmail: newReserva.usuarioEmail,
       date: parsed.data.date,
     });
@@ -104,9 +117,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: 'Reservación procesada exitosamente conforme a los lineamientos institucionales.',
+        message: 'Solicitud de reservación registrada correctamente.',
         data: {
-          id: folio,
+          id: newReserva.folio,
           ...parsed.data,
           status: 'Pendiente',
           reserva: newReserva,
@@ -116,12 +129,8 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     logger.error('Error al procesar la reservación', { reqId, path: '/api/reservas' }, error);
-
     return NextResponse.json(
-      {
-        success: false,
-        message: 'Ocurrió un error interno al procesar la solicitud.',
-      },
+      { success: false, message: 'Error interno al procesar la solicitud de reservación.' },
       { status: 500 }
     );
   }

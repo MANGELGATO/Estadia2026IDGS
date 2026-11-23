@@ -3,8 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import DataTable, { Column } from '../../components/admin/DataTable';
 import StatCard from '../../components/admin/StatCard';
-import ConfirmDialog from '../../components/admin/ConfirmDialog';
-import { RiToolsLine, RiAlertLine, RiCheckLine, RiTimeLine, RiSearch2Line, RiCloseLine } from 'react-icons/ri';
+import { RiToolsLine, RiAlertLine, RiCheckLine, RiTimeLine, RiCloseLine } from 'react-icons/ri';
 import { DeviceItem } from '../../../lib/mockData';
 import { IncidenciaItem } from '../../../lib/db';
 
@@ -26,14 +25,12 @@ const severidadConfig: Record<string, { bg: string; color: string }> = {
 export default function MantenimientoPage() {
   const [data, setData] = useState<IncidenciaItem[]>([]);
   const [equipos, setEquipos] = useState<DeviceItem[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<IncidenciaItem | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<DeviceItem | null>(null);
   const [searchCodigo, setSearchCodigo] = useState('');
-  const [closingRecord, setClosingRecord] = useState<IncidenciaItem | null>(null);
 
   const [filterStatus, setFilterStatus] = useState<string>('Todas');
 
@@ -53,13 +50,27 @@ export default function MantenimientoPage() {
       }
     } catch (err) {
       console.error('Error cargando datos de mantenimiento:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    let active = true;
+    Promise.all([fetch('/api/mantenimiento'), fetch('/api/equipos')])
+      .then(async ([resInc, resEq]) => {
+        if (!active) return;
+        if (resInc.ok) {
+          const jsonInc = await resInc.json();
+          if (active && jsonInc.data) setData(jsonInc.data);
+        }
+        if (resEq.ok) {
+          const jsonEq = await resEq.json();
+          if (active && jsonEq.data) setEquipos(jsonEq.data);
+        }
+      })
+      .catch((err) => console.error('Error cargando datos de mantenimiento:', err));
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Sync selected device when user types or selects Código PLAi

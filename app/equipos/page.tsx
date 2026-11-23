@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowLeft, Cpu, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Cpu } from 'lucide-react';
 import EquipmentFilterGrid from '../components/EquipmentFilterGrid';
 
 export const metadata: Metadata = {

@@ -18,14 +18,10 @@ import {
   RiBarcodeLine,
   RiHistoryLine,
   RiAddCircleLine,
-  RiUser3Line,
-  RiBuildingLine,
   RiCalendarCheckLine,
   RiCheckboxCircleLine,
-  RiAlertLine,
   RiFileList3Line,
-  RiUploadCloud2Line,
-  RiImageLine
+  RiUploadCloud2Line
 } from 'react-icons/ri';
 
 function useIsMounted() {

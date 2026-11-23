@@ -1,47 +1,23 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import fs from 'fs';
-import path from 'path';
 import { env } from './env';
+import { getUsuarioByEmailForAuth, updateUsuarioLastLogin } from './db';
+import { verifyPassword } from './password';
+import { logger } from './logger';
+import type { UserRole } from '../types/next-auth';
 
-// Usuarios autorizados de demostración y desarrollo alineados con los roles de PLAi
-export const DEMO_USERS = [
-  {
-    id: 'usr-admin-01',
-    name: 'Administrador de Laboratorio PLAi',
-    email: 'admin@plai.edu.mx',
-    password: '123admin',
-    role: 'admin' as const,
-  },
-  {
-    id: 'usr-standard-01',
-    name: 'Investigador / Alumno PLAi',
-    email: 'user@plai.edu.mx',
-    password: '123user',
-    role: 'usuario' as const,
-  },
-  // Alias de compatibilidad institucional
-  {
-    id: 'usr-admin-alias',
-    name: 'Administrador PLAi',
-    email: 'admin@plai.mx',
-    password: 'AdminPlai2026!',
-    role: 'admin' as const,
-  },
-  {
-    id: 'usr-user-alias',
-    name: 'Usuario PLAi',
-    email: 'usuario@plai.mx',
-    password: 'UserPlai2026!',
-    role: 'usuario' as const,
-  },
-];
-
+/**
+ * Configuración definitiva de NextAuth.js v4 (Estándar Tecnológico PLAi v1.0, Sección 7).
+ * - Sesiones JWT firmadas en servidor (8 horas).
+ * - Validación de credenciales contra la tabla `usuarios` de PostgreSQL/Neon con hash scrypt.
+ * - Los roles ('admin', 'colaborador', 'usuario') se obtienen exclusivamente del registro autenticado.
+ * - Listo para incorporar un proveedor OIDC/OAuth institucional de PLAi en `providers`.
+ */
 export const authOptions: NextAuthOptions = {
-  secret: env.nextAuthSecret || process.env.NEXTAUTH_SECRET || 'plai-dev-secret-key-32chars-min-2026',
+  secret: env.nextAuthSecret,
   session: {
     strategy: 'jwt',
-    maxAge: 8 * 60 * 60, // 8 horas de sesión laboral estándar
+    maxAge: 8 * 60 * 60, // 8 horas de jornada laboral estándar
   },
   pages: {
     signIn: '/login',
@@ -61,50 +37,31 @@ export const authOptions: NextAuthOptions = {
         }
 
         const normalizedEmail = credentials.email.trim().toLowerCase();
-        let found = DEMO_USERS.find((u) => u.email.toLowerCase() === normalizedEmail);
+        const user = await getUsuarioByEmailForAuth(normalizedEmail);
 
-        if (!found) {
-          try {
-            const usersPath = path.join(process.cwd(), 'data', 'usuarios.json');
-            if (fs.existsSync(usersPath)) {
-              const rawUsers = JSON.parse(fs.readFileSync(usersPath, 'utf8'));
-              if (Array.isArray(rawUsers)) {
-                const dbUser = rawUsers.find(
-                  (u: any) => u.email?.toLowerCase() === normalizedEmail && u.status !== 'Inactivo'
-                );
-                if (dbUser) {
-                  found = {
-                    id: String(dbUser.id),
-                    name: String(dbUser.name),
-                    email: String(dbUser.email),
-                    password: String(dbUser.password || '123user'),
-                    role: dbUser.role === 'Administrador' ? 'admin' : 'usuario',
-                  };
-                }
-              }
-            }
-          } catch {}
-        }
-
-        if (!found) {
+        if (!user) {
           return null;
         }
 
-        // Valida contra contraseña oficial o atajo 'admin123' / 'user123'
-        const isValid =
-          credentials.password === found.password ||
-          (found.role === 'admin' && credentials.password === 'admin123') ||
-          (found.role === 'usuario' && credentials.password === 'user123');
+        if (user.status !== 'Activo') {
+          logger.warn('Intento de acceso con cuenta inactiva o suspendida', {
+            userId: user.id,
+          });
+          return null;
+        }
 
+        const isValid = verifyPassword(credentials.password, user.passwordHash);
         if (!isValid) {
           return null;
         }
 
+        await updateUsuarioLastLogin(user.id);
+
         return {
-          id: found.id,
-          name: found.name,
-          email: found.email,
-          role: found.role,
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
         };
       },
     }),
@@ -120,7 +77,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = (token.id as string) || (token.sub as string);
-        session.user.role = (token.role as 'admin' | 'usuario') || 'usuario';
+        session.user.role = (token.role as UserRole) || 'usuario';
       }
       return session;
     },

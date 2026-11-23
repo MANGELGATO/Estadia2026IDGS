@@ -9,40 +9,40 @@ export default function NavAuthStatus() {
   const { data: session, status } = useSession();
 
   if (status === 'loading') {
-    return (
-      <div className="h-9 w-28 animate-pulse rounded-full bg-gray-200" />
-    );
+    return <div className="h-9 w-28 animate-pulse rounded-full bg-gray-200" />;
   }
 
   if (session?.user) {
-    const isAdmin = session.user.role === 'admin';
-    const dashboardHref = isAdmin ? '/admin' : '/usuario';
+    const role = session.user.role || 'usuario';
+    const isStaff = role === 'admin' || role === 'colaborador';
+    const dashboardHref = isStaff ? '/admin' : '/usuario';
+    const roleLabel =
+      role === 'admin' ? 'Admin' : role === 'colaborador' ? 'Colaborador' : 'Usuario';
 
     return (
       <div className="flex items-center gap-3">
         <Link
           href={dashboardHref}
           className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
-            isAdmin
+            isStaff
               ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
               : 'bg-sky-100 text-sky-900 hover:bg-sky-200'
           }`}
-          title={`Ir al portal de ${isAdmin ? 'Administrador' : 'Usuario'}`}
+          title={`Ir al portal de ${roleLabel}`}
         >
-          {isAdmin ? <ShieldCheck size={14} className="text-amber-700" /> : <User size={14} className="text-plai" />}
+          {isStaff ? (
+            <ShieldCheck size={14} className="text-amber-700" />
+          ) : (
+            <User size={14} className="text-plai" />
+          )}
           <span className="hidden sm:inline">{session.user.name?.split(' ')[0]}</span>
           <span className="rounded bg-white/70 px-1 py-0.2 text-[10px] uppercase tracking-wide">
-            {isAdmin ? 'Admin' : 'Usuario'}
+            {roleLabel}
           </span>
         </Link>
 
         <button
-          onClick={async () => {
-            if (typeof document !== 'undefined') {
-              document.cookie = 'plai_role=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-            }
-            await signOut({ callbackUrl: '/login?logout=true' });
-          }}
+          onClick={() => signOut({ callbackUrl: '/login' })}
           className="flex items-center gap-1 rounded-full border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700"
           title="Cerrar Sesión"
         >

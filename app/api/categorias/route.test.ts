@@ -1,15 +1,33 @@
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, afterAll, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, POST } from './route';
-import { getAllCategoriesConfig, defaultCategoriesConfig, updateCategoryConfig } from '../../../lib/categoriesConfig';
+import { defaultCategoriesConfig, updateCategoryConfig } from '../../../lib/categoriesConfig';
+import * as nextAuth from 'next-auth';
+
+vi.mock('next-auth', () => ({
+  getServerSession: vi.fn(),
+}));
 
 describe('/api/categorias API Endpoint', () => {
+  const getServerSessionMock = vi.mocked(nextAuth.getServerSession);
+
+  beforeEach(() => {
+    getServerSessionMock.mockReset();
+    getServerSessionMock.mockResolvedValue({
+      user: {
+        id: 'usr-admin-01',
+        name: 'Administrador PLAi',
+        email: 'admin@plai.mx',
+        role: 'admin',
+      },
+    });
+  });
+
   afterAll(async () => {
-    // Restaurar los valores oficiales de PLAi tras la ejecución de los tests
     await updateCategoryConfig('realidad-virtual', defaultCategoriesConfig['realidad-virtual']);
   });
 
-  it('GET devuelve todas las categorías con éxito', async () => {
+  it('GET devuelve todas las categorías con éxito sin requerir autenticación', async () => {
     const req = new NextRequest('http://localhost:3000/api/categorias');
     const res = await GET(req);
     expect(res.status).toBe(200);
@@ -43,17 +61,37 @@ describe('/api/categorias API Endpoint', () => {
     expect(json.success).toBe(false);
   });
 
-  it('POST actualiza los textos y multimedia de una categoría en el servidor', async () => {
+  it('POST rechaza usuarios con rol estándar con código 403', async () => {
+    getServerSessionMock.mockResolvedValueOnce({
+      user: {
+        id: 'usr-01',
+        name: 'Usuario Estándar',
+        email: 'usuario@plai.mx',
+        role: 'usuario',
+      },
+    });
+
+    const req = new NextRequest('http://localhost:3000/api/categorias', {
+      method: 'POST',
+      body: JSON.stringify({ id: 'realidad-virtual', name: 'Intento no autorizado' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(403);
+  });
+
+  it('POST actualiza los textos y multimedia de una categoría cuando es administrador', async () => {
     const updatePayload = {
       id: 'realidad-virtual',
       name: 'Realidad Virtual Avanzada PLAi',
       description: 'Nueva descripción institucional para el laboratorio.',
       plaiUsage: 'Uso formativo en metaverso y simulación de alta fidelidad.',
-      videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      videoUrl: 'https://www.youtube.com/watch?v=example123',
       benefits: ['Beneficio 1', 'Beneficio 2', 'Beneficio 3'],
       successCases: [
-        { title: 'Proyecto Médico', desc: 'Simulador quirúrgico de alta precisión.' }
-      ]
+        { title: 'Proyecto Médico', desc: 'Simulador quirúrgico de alta precisión.' },
+      ],
     };
 
     const req = new NextRequest('http://localhost:3000/api/categorias', {
@@ -71,7 +109,6 @@ describe('/api/categorias API Endpoint', () => {
     expect(json.category.description).toBe('Nueva descripción institucional para el laboratorio.');
     expect(json.category.benefits).toEqual(['Beneficio 1', 'Beneficio 2', 'Beneficio 3']);
 
-    // Verificar que se persista en la consulta siguiente
     const verifyReq = new NextRequest('http://localhost:3000/api/categorias?slug=realidad-virtual');
     const verifyRes = await GET(verifyReq);
     const verifyJson = await verifyRes.json();

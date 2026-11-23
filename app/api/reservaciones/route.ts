@@ -1,23 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { 
-  getReservacionesFromDB, 
-  updateReservacionInDB, 
+import {
+  getReservacionesFromDB,
+  updateReservacionInDB,
   getEquiposFromDB,
   insertBitacoraEntregaInDB,
   ReservacionItem,
-  BitacoraItem
+  BitacoraItem,
 } from '../../../lib/db';
+import { requireSession, isStaffRole } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
 
 export const dynamic = 'force-dynamic';
 
 function normalizeStr(s?: string): string {
-  return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/-/g, ' ').trim();
+  return (s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/-/g, ' ')
+    .trim();
 }
 
 export async function GET() {
+  const auth = await requireSession();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
-    const reservaciones = await getReservacionesFromDB();
+    // El personal (admin / colaborador) consulta todas; un usuario final solo ve sus propias reservaciones
+    const filterEmail = isStaffRole(auth.user.role) ? undefined : auth.user.email;
+    const reservaciones = await getReservacionesFromDB(filterEmail);
     return NextResponse.json({
       success: true,
       data: reservaciones,
@@ -33,6 +44,9 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
+  const auth = await requireSession(['admin', 'colaborador']);
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await req.json();
     const {
@@ -43,7 +57,6 @@ export async function PUT(req: NextRequest) {
       accesoriosIncluidos,
       condicionSalida,
       observacionesAdmin,
-      aprobadoPor,
       usuarioNombre,
       fechaUso,
       horaInicio,
@@ -60,20 +73,22 @@ export async function PUT(req: NextRequest) {
     }
 
     const allReservas = await getReservacionesFromDB();
-    const reserva = allReservas.find(r => r.id === id);
+    const reserva = allReservas.find((r) => r.id === id);
     const allEquipos = await getEquiposFromDB();
 
     let resolvedEquipoId = equipoId || reserva?.equipoId;
     let resolvedCodigo = codigoPlaiAsignado || reserva?.codigoPlaiAsignado;
 
-    // Si se aprueba sin especificar equipo, auto-asignar el equipo solicitado o el primero disponible de la categoría
     if (estado === 'Aprobada' && !resolvedCodigo && reserva) {
       const catNorm = normalizeStr(reserva.categoriaId);
       const disponible =
-        allEquipos.find(e => e.id === reserva.equipoId && e.status === 'Disponible') ||
-        allEquipos.find(e => {
+        allEquipos.find((e) => e.id === reserva.equipoId && e.status === 'Disponible') ||
+        allEquipos.find((e) => {
           const eqCatNorm = normalizeStr(e.category);
-          return e.status === 'Disponible' && (eqCatNorm.includes(catNorm) || (catNorm !== '' && catNorm.includes(eqCatNorm)));
+          return (
+            e.status === 'Disponible' &&
+            (eqCatNorm.includes(catNorm) || (catNorm !== '' && catNorm.includes(eqCatNorm)))
+          );
         });
       if (disponible) {
         resolvedEquipoId = disponible.id;
@@ -81,12 +96,13 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    // Si se especificó código pero no ID, o viceversa, sincronizar ambos
     if (resolvedCodigo && !resolvedEquipoId) {
-      const eq = allEquipos.find(e => e.inventoryNumber.toLowerCase() === resolvedCodigo.toLowerCase());
+      const eq = allEquipos.find(
+        (e) => e.inventoryNumber.toLowerCase() === resolvedCodigo.toLowerCase()
+      );
       if (eq) resolvedEquipoId = eq.id;
     } else if (resolvedEquipoId && !resolvedCodigo) {
-      const eq = allEquipos.find(e => e.id === resolvedEquipoId);
+      const eq = allEquipos.find((e) => e.id === resolvedEquipoId);
       if (eq) resolvedCodigo = eq.inventoryNumber;
     }
 
@@ -97,7 +113,7 @@ export async function PUT(req: NextRequest) {
       ...(accesoriosIncluidos !== undefined ? { accesoriosIncluidos } : {}),
       ...(condicionSalida ? { condicionSalida } : {}),
       ...(observacionesAdmin !== undefined ? { observacionesAdmin } : {}),
-      ...(aprobadoPor ? { aprobadoPor } : {}),
+      aprobadoPor: auth.user.name,
       ...(usuarioNombre ? { usuarioNombre } : {}),
       ...(fechaUso ? { fechaUso } : {}),
       ...(horaInicio ? { horaInicio } : {}),
@@ -107,34 +123,47 @@ export async function PUT(req: NextRequest) {
 
     await updateReservacionInDB(id, updatePayload);
 
-    // Si pasa a "En uso" o se solicitó registrar entrega en bitácora, crear registro en bitácora_uso
     if ((estado === 'En uso' || registrarEntregaEnBitacora) && reserva) {
-      const assignedDevice = allEquipos.find(e =>
-        (resolvedCodigo && e.inventoryNumber.toLowerCase() === resolvedCodigo.toLowerCase()) ||
-        (resolvedEquipoId && e.id === resolvedEquipoId)
+      const assignedDevice = allEquipos.find(
+        (e) =>
+          (resolvedCodigo && e.inventoryNumber.toLowerCase() === resolvedCodigo.toLowerCase()) ||
+          (resolvedEquipoId && e.id === resolvedEquipoId)
       );
-      const nowStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
-      const estReturn = `${fechaUso || reserva.fechaUso} ${(horaFin || reserva.horaFin || '14:00').slice(0, 5)}:00`;
-      const bitItem: BitacoraItem = {
-        id: `bit-${Date.now()}`,
-        equipoId: assignedDevice?.id || resolvedEquipoId || 'eq-vr-001',
-        codigoPlai: assignedDevice?.inventoryNumber || resolvedCodigo || 'PLAI-VR-001',
-        equipoNombre: assignedDevice?.name || 'Equipo de Laboratorio PLAi',
-        usuarioNombre: usuarioNombre || reserva.usuarioNombre,
-        usuarioEmail: reserva.usuarioEmail || 'user@plai.edu.mx',
-        usuarioDependencia: reserva.usuarioInstitucion || 'Comunidad PLAi',
-        fechaEntrega: nowStr,
-        fechaDevolucionEstimada: estReturn,
-        estadoPrestamo: 'Activo',
-        condicionEntrega: (condicionSalida || reserva.condicionSalida || 'Excelente') as BitacoraItem['condicionEntrega'],
-        accesoriosEntregados: accesoriosIncluidos || reserva.accesoriosIncluidos || assignedDevice?.accessories?.join(', ') || 'Equipo completo',
-        observacionesEntrega: `Entrega vinculada a reservación ${reserva.folio}: ${actividad || reserva.actividad}`,
-        adminEntrega: aprobadoPor || 'Administrador PLAi',
-      };
-      await insertBitacoraEntregaInDB(bitItem, id);
+      if (assignedDevice) {
+        const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const estReturn = `${fechaUso || reserva.fechaUso} ${(horaFin || reserva.horaFin || '14:00').slice(0, 5)}:00`;
+        const bitItem: BitacoraItem = {
+          id: `bit-${Date.now()}`,
+          equipoId: assignedDevice.id,
+          codigoPlai: assignedDevice.inventoryNumber,
+          equipoNombre: assignedDevice.name,
+          usuarioNombre: usuarioNombre || reserva.usuarioNombre,
+          usuarioEmail: reserva.usuarioEmail,
+          usuarioDependencia: reserva.usuarioInstitucion || 'Comunidad PLAi',
+          fechaEntrega: nowStr,
+          fechaDevolucionEstimada: estReturn,
+          estadoPrestamo: 'Activo',
+          condicionEntrega: (condicionSalida ||
+            reserva.condicionSalida ||
+            'Excelente') as BitacoraItem['condicionEntrega'],
+          accesoriosEntregados:
+            accesoriosIncluidos ||
+            reserva.accesoriosIncluidos ||
+            assignedDevice.accessories?.join(', ') ||
+            'Equipo completo',
+          observacionesEntrega: `Entrega vinculada a reservación ${reserva.folio}: ${actividad || reserva.actividad}`,
+          adminEntrega: auth.user.name,
+        };
+        await insertBitacoraEntregaInDB(bitItem, id);
+      }
     }
 
-    logger.info('Reservación actualizada', { id, estado, codigoAsignado: resolvedCodigo });
+    logger.info('Reservación actualizada', {
+      id,
+      estado,
+      codigoAsignado: resolvedCodigo,
+      actor: auth.user.email,
+    });
 
     return NextResponse.json({
       success: true,

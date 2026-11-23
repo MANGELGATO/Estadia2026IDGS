@@ -1,10 +1,11 @@
-# Stack de Docker Swarm (estándar PLAi, sección 5.2). Despliegue: docker stack deploy -c docker-compose.yml plai-recursos
+# Stack de Docker Swarm (Estándar PLAi v1.0, Sección 5.2)
+# Despliegue: docker stack deploy -c docker-compose.yml plai-recursos
 # PLAi construye y publica la imagen en su registro privado; 'build' no se usa en Swarm.
-# Reemplazar los valores marcados como EJEMPLO por los que indique el área de Tecnología.
+# Sustituir los valores marcados como EJEMPLO por los asignados por Tecnología PLAi.
 services:
   app:
     # Versión fija, nunca :latest
-    image: registry.example.plai.mx/plai-recursos-espacios:0.1.0
+    image: registry.example.plai.mx/plai-recursos-espacios:1.0.0
     read_only: true
     cap_drop:
       - ALL
@@ -15,11 +16,12 @@ services:
       PORT: "3000"
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_SITE_URL: https://recursos.example.plai.mx   # EJEMPLO
-    # Secretos: se montan en /run/secrets/<nombre> y la app los lee con el patrón VARIABLE_FILE.
-    # Se activan al integrar Directus / NextAuth (ver .env.example).
-    # secrets:
-    #   - directus_token
-    #   - nextauth_secret
+      NEXTAUTH_URL: https://recursos.example.plai.mx           # EJEMPLO
+      NEXTAUTH_SECRET_FILE: /run/secrets/nextauth_secret
+      DATABASE_URL_FILE: /run/secrets/database_url
+    secrets:
+      - nextauth_secret
+      - database_url
     volumes:
       # Único espacio escribible (sistema de archivos de solo lectura)
       - type: tmpfs
@@ -60,8 +62,8 @@ networks:
   plai_internal:
     external: true   # Red overlay cifrada existente (nombre EJEMPLO)
 
-# secrets:
-#   directus_token:
-#     external: true
-#   nextauth_secret:
-#     external: true
+secrets:
+  nextauth_secret:
+    external: true
+  database_url:
+    external: true

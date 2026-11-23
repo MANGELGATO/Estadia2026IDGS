@@ -3,15 +3,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { 
-  RiDashboardLine, 
-  RiCalendarCheckLine, 
+import {
+  RiDashboardLine,
+  RiCalendarCheckLine,
   RiFileListLine,
   RiLogoutBoxRLine,
   RiComputerLine,
   RiArrowRightUpLine,
-  RiAddCircleLine,
-  RiHome4Line
+  RiHome4Line,
 } from "react-icons/ri";
 import { useSession, signOut } from "next-auth/react";
 
@@ -35,7 +34,7 @@ const navSections = [
       { name: "Catálogo de Equipos", href: "/equipos", icon: <RiComputerLine /> },
       { name: "Sitio Web Público", href: "/", icon: <RiHome4Line /> },
     ],
-  }
+  },
 ];
 
 export default function UserSidebar() {
@@ -43,23 +42,19 @@ export default function UserSidebar() {
   const { data: session } = useSession();
 
   const userName = session?.user?.name || "Usuario Institucional";
-  const userEmail = session?.user?.email || "user@plai.edu.mx";
+  const userEmail = session?.user?.email || "";
   const userInitial = userName.charAt(0).toUpperCase();
 
   const handleSignOut = async () => {
-    if (typeof document !== 'undefined') {
-      document.cookie = 'plai_role=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    }
-    await signOut({ callbackUrl: "/login?logout=true" });
+    await signOut({ callbackUrl: "/login" });
   };
 
   return (
     <aside className="sticky top-0 z-40 flex h-auto w-full flex-col overflow-y-auto border-r border-white/10 bg-[#1e5ca7] p-4 text-white shadow-xl [scrollbar-color:rgba(255,255,255,0.2)_transparent] [scrollbar-width:thin] md:h-screen md:w-[270px] md:p-6">
-      {/* Brand Header */}
       <div className="mb-4 flex items-center justify-between border-b border-white/15 px-2 pb-5 pt-2">
-        <Link 
-          href="/" 
-          className="flex items-center gap-2 rounded-lg bg-white/95 px-2.5 py-1.5 shadow-sm transition hover:bg-white" 
+        <Link
+          href="/"
+          className="flex items-center gap-2 rounded-lg bg-white/95 px-2.5 py-1.5 shadow-sm transition hover:bg-white"
           title="Ir al inicio de PLAi"
         >
           <Image
@@ -75,7 +70,6 @@ export default function UserSidebar() {
         </span>
       </div>
 
-      {/* Navigation Links */}
       <nav className="flex flex-1 flex-col gap-1">
         {navSections.map((section) => (
           <div key={section.label} className="mb-2">
@@ -84,10 +78,10 @@ export default function UserSidebar() {
             </span>
             {section.items.map((item) => {
               const isExternal = item.href === "/" || item.href === "/equipos";
-              const isActive = !isExternal && (
-                pathname === item.href ||
-                (pathname.startsWith(item.href) && item.href !== "/usuario")
-              );
+              const isActive =
+                !isExternal &&
+                (pathname === item.href ||
+                  (pathname.startsWith(item.href) && item.href !== "/usuario"));
 
               return (
                 <Link
@@ -95,17 +89,21 @@ export default function UserSidebar() {
                   href={item.href}
                   className={`relative flex items-center justify-between overflow-hidden rounded-xl px-3.5 py-[0.65rem] font-heading text-[0.875rem] font-medium transition-all duration-150 ${
                     isActive
-                      ? "bg-white text-[#1e5ca7] font-bold shadow-md shadow-black/10"
+                      ? "bg-white font-bold text-[#1e5ca7] shadow-md shadow-black/10"
                       : "text-white/80 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className={`flex shrink-0 items-center text-[1.15rem] ${isActive ? 'text-plai' : 'text-white/80'}`}>
+                    <span
+                      className={`flex shrink-0 items-center text-[1.15rem] ${
+                        isActive ? "text-plai" : "text-white/80"
+                      }`}
+                    >
                       {item.icon}
                     </span>
                     <span>{item.name}</span>
                   </div>
-                  {isExternal && <RiArrowRightUpLine className="text-white/40 text-xs" />}
+                  {isExternal && <RiArrowRightUpLine className="text-xs text-white/40" />}
                 </Link>
               );
             })}
@@ -113,7 +111,6 @@ export default function UserSidebar() {
         ))}
       </nav>
 
-      {/* User Info & Sign Out Card */}
       <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-white/15 bg-white/10 p-3.5">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white font-heading text-sm font-bold text-[#1e5ca7] shadow-sm">
@@ -123,9 +120,7 @@ export default function UserSidebar() {
             <span className="truncate font-heading text-[0.82rem] font-bold text-white">
               {userName}
             </span>
-            <span className="truncate text-[0.7rem] text-white/70">
-              {userEmail}
-            </span>
+            <span className="truncate text-[0.7rem] text-white/70">{userEmail}</span>
           </div>
         </div>
 

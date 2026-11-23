@@ -165,11 +165,7 @@ export default function EspaciosPage() {
             <p className="mt-2 text-xs sm:text-sm text-plai-gray leading-relaxed">
               Para solicitar el uso de <strong>{activeEspacio.name}</strong>, inicia sesión con tu cuenta institucional. Tus datos se autocompletarán y la solicitud quedará vinculada a tu portal y al panel administrativo.
             </p>
-            <div className="my-4 rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-left text-xs text-blue-900">
-              <p className="font-bold mb-1">Cuenta de demostración:</p>
-              <p className="font-mono text-[11px] text-blue-800">user@plai.edu.mx · Contraseña: 123user</p>
-            </div>
-            <div className="mt-3 flex gap-2.5">
+            <div className="mt-5 flex gap-2.5">
               <button type="button" onClick={closeReserve} className="w-full rounded-full border border-gray-200 py-2.5 font-heading text-xs font-bold text-gray-600 hover:bg-gray-100">
                 Cancelar
               </button>

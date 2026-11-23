@@ -69,7 +69,18 @@ export default function UsuariosPage() {
   };
 
   useEffect(() => {
-    fetchUsuarios();
+    let active = true;
+    fetch('/api/usuarios')
+      .then((res) => res.json())
+      .then((json) => {
+        if (active && json.success && Array.isArray(json.data)) {
+          setData(json.data);
+        }
+      })
+      .catch((err) => console.error('Error al cargar usuarios:', err));
+    return () => {
+      active = false;
+    };
   }, []);
 
   const admins = data.filter(u => u.role === 'Administrador').length;
@@ -234,7 +245,8 @@ export default function UsuariosPage() {
                   <input
                     type="password"
                     name="password"
-                    placeholder={editingItem ? 'Sin cambios' : 'Ej. 123user'}
+                    placeholder={editingItem ? 'Dejar vacío para conservar actual' : 'Mínimo 8 caracteres'}
+                    minLength={editingItem ? undefined : 8}
                     required={!editingItem}
                     className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20"
                   />

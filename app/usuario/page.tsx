@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { 
   RiCalendarCheckLine, 
-  RiMacbookLine, 
   RiTimeLine, 
   RiAddCircleLine, 
   RiArrowRightLine,

@@ -19,7 +19,7 @@ export default function Footer() {
           <div>
             <div className="mb-3 flex items-center gap-3">
               <Image
-                src="/images/footerimg/logo-solo-BDfajDsx.svg"
+                src="/images/FOOTERIMG/logo-solo-BDfajDsx.svg"
                 alt="Logo Aprender"
                 width={40}
                 height={26}
@@ -191,7 +191,7 @@ export default function Footer() {
             {/* 1. Ciudad Creativa Digital */}
             <div className="flex items-center justify-center">
               <Image
-                src="/images/footerimg/A_CCD.154e6245.svg"
+                src="/images/FOOTERIMG/A_CCD.154e6245.svg"
                 alt="Ciudad Creativa Digital"
                 width={155}
                 height={55}
@@ -202,7 +202,7 @@ export default function Footer() {
             {/* 2. PLAi */}
             <div className="flex items-center justify-center">
               <Image
-                src="/images/footerimg/A_PLAi.8631c8bf.svg"
+                src="/images/FOOTERIMG/A_PLAi.8631c8bf.svg"
                 alt="Plataforma Abierta de Innovación"
                 width={178}
                 height={55}
@@ -213,7 +213,7 @@ export default function Footer() {
             {/* 3. SICyT */}
             <div className="flex items-center justify-center">
               <Image
-                src="/images/footerimg/A_SICYT.ee61346a.svg"
+                src="/images/FOOTERIMG/A_SICYT.ee61346a.svg"
                 alt="Innovación, Ciencia y Tecnología"
                 width={236}
                 height={55}
@@ -224,7 +224,7 @@ export default function Footer() {
             {/* 4. Coordinación de Crecimiento y Desarrollo Económico */}
             <div className="flex items-center justify-center">
               <Image
-                src="/images/footerimg/A_COORDINACION.e75ecbc5.svg"
+                src="/images/FOOTERIMG/A_COORDINACION.e75ecbc5.svg"
                 alt="Coordinación de Crecimiento y Desarrollo Económico"
                 width={236}
                 height={55}
@@ -235,7 +235,7 @@ export default function Footer() {
             {/* 5. Al Estilo Jalisco */}
             <div className="flex items-center justify-center">
               <Image
-                src="/images/footerimg/A_JALISCO.1b4e7f4a.svg"
+                src="/images/FOOTERIMG/A_JALISCO.1b4e7f4a.svg"
                 alt="Al Estilo Jalisco"
                 width={214}
                 height={55}

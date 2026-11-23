@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { 
-  getIncidenciasFromDB, 
-  insertIncidenciaInDB, 
+import {
+  getIncidenciasFromDB,
+  insertIncidenciaInDB,
   updateIncidenciaStatusInDB,
   getEquipoByCodigoPLAi,
-  IncidenciaItem 
+  IncidenciaItem,
 } from '../../../lib/db';
+import { requireSession } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  const auth = await requireSession(['admin', 'colaborador']);
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const incidencias = await getIncidenciasFromDB();
     return NextResponse.json({
@@ -28,6 +32,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireSession(['admin', 'colaborador']);
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await req.json();
 
@@ -38,11 +45,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Localizar equipo en la base de datos (Req 5)
     const equipo = await getEquipoByCodigoPLAi(body.codigoPlai);
     if (!equipo) {
       return NextResponse.json(
-        { success: false, message: `No se encontró ningún equipo registrado con el código: ${body.codigoPlai}` },
+        {
+          success: false,
+          message: `No se encontró ningún equipo registrado con el código: ${body.codigoPlai}`,
+        },
         { status: 404 }
       );
     }
@@ -58,19 +67,26 @@ export async function POST(req: NextRequest) {
       severidad: body.severidad || 'Media',
       descripcion: body.descripcion.trim(),
       estado: body.estado || 'Reportada',
-      tecnicoResponsable: body.tecnicoResponsable?.trim() || 'Técnico de Laboratorio PLAi',
+      tecnicoResponsable: body.tecnicoResponsable?.trim() || auth.user.name,
       fechaReporte: body.fechaReporte || new Date().toISOString().slice(0, 19).replace('T', ' '),
       accionesRealizadas: body.accionesRealizadas?.trim() || undefined,
     };
 
     await insertIncidenciaInDB(incidencia);
-    logger.info('Incidencia registrada y equipo puesto en mantenimiento', { folio: incidencia.folio, codigo: equipo.inventoryNumber });
+    logger.info('Incidencia registrada y equipo puesto en mantenimiento', {
+      folio: incidencia.folio,
+      codigo: equipo.inventoryNumber,
+      actor: auth.user.email,
+    });
 
-    return NextResponse.json({
-      success: true,
-      message: `Incidencia ${incidencia.folio} registrada. El equipo ${equipo.inventoryNumber} pasó a estado "En mantenimiento".`,
-      data: incidencia,
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        message: `Incidencia ${incidencia.folio} registrada. El equipo ${equipo.inventoryNumber} pasó a estado "En mantenimiento".`,
+        data: incidencia,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     logger.error('Error al registrar incidencia', { path: '/api/mantenimiento' }, error);
     return NextResponse.json(
@@ -81,6 +97,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+  const auth = await requireSession(['admin', 'colaborador']);
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await req.json();
     const { id, estado, accionesRealizadas } = body;
@@ -93,6 +112,8 @@ export async function PUT(req: NextRequest) {
     }
 
     await updateIncidenciaStatusInDB(id, estado, accionesRealizadas);
+    logger.info('Estado de incidencia actualizado', { id, estado, actor: auth.user.email });
+
     return NextResponse.json({
       success: true,
       message: `Incidencia actualizada a estado: ${estado}`,

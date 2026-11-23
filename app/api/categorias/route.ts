@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllCategoriesConfig, getCategoryConfig, updateCategoryConfig } from '../../../lib/categoriesConfig';
+import {
+  getAllCategoriesConfig,
+  getCategoryConfig,
+  updateCategoryConfig,
+} from '../../../lib/categoriesConfig';
+import { requireSession } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -38,6 +43,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireSession(['admin']);
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await req.json();
     const { id, name, description, plaiUsage, videoUrl, benefits, successCases } = body;
@@ -54,16 +62,24 @@ export async function POST(req: NextRequest) {
       description: typeof description === 'string' ? description.trim() : undefined,
       plaiUsage: typeof plaiUsage === 'string' ? plaiUsage.trim() : undefined,
       videoUrl: typeof videoUrl === 'string' ? videoUrl.trim() : undefined,
-      benefits: Array.isArray(benefits) ? benefits.map((b: string) => String(b).trim()).filter(Boolean) : undefined,
+      benefits: Array.isArray(benefits)
+        ? benefits.map((b: string) => String(b).trim()).filter(Boolean)
+        : undefined,
       successCases: Array.isArray(successCases)
-        ? successCases.map((c: { title?: string; desc?: string }) => ({
-            title: String(c.title || '').trim(),
-            desc: String(c.desc || '').trim(),
-          })).filter(c => c.title.length > 0)
+        ? successCases
+            .map((c: { title?: string; desc?: string }) => ({
+              title: String(c.title || '').trim(),
+              desc: String(c.desc || '').trim(),
+            }))
+            .filter((c) => c.title.length > 0)
         : undefined,
     });
 
-    logger.info('Configuración de categoría actualizada mediante API', { id, name: updated.name });
+    logger.info('Configuración de categoría actualizada mediante API', {
+      id,
+      name: updated.name,
+      actor: auth.user.email,
+    });
 
     return NextResponse.json({
       success: true,

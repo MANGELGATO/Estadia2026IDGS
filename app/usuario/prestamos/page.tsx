@@ -4,13 +4,10 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { 
-  RiFileListLine, 
   RiAddCircleLine, 
   RiEyeLine, 
   RiSearchLine, 
   RiCloseLine,
-  RiCheckLine,
-  RiTimeLine,
   RiUser3Line
 } from 'react-icons/ri';
 import { ReservacionItem } from '../../../lib/db';

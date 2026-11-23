@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAplicacionesFromDB, insertAplicacionInDB, deleteAplicacionInDB } from '../../../lib/db';
+import {
+  getAplicacionesFromDB,
+  insertAplicacionInDB,
+  deleteAplicacionInDB,
+} from '../../../lib/db';
 import { AppItem } from '../../../lib/mockData';
+import { requireSession } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +28,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireSession(['admin']);
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = (await req.json()) as AppItem;
 
@@ -49,13 +57,20 @@ export async function POST(req: NextRequest) {
     };
 
     await insertAplicacionInDB(appToSave);
-    logger.info('Aplicación guardada exitosamente', { id: appToSave.id, name: appToSave.name });
+    logger.info('Aplicación guardada exitosamente', {
+      id: appToSave.id,
+      name: appToSave.name,
+      actor: auth.user.email,
+    });
 
-    return NextResponse.json({
-      success: true,
-      message: 'Aplicación registrada correctamente en la base de datos',
-      data: appToSave,
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Aplicación registrada correctamente en la base de datos',
+        data: appToSave,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     logger.error('Error al guardar aplicación', { path: '/api/aplicaciones' }, error);
     return NextResponse.json(
@@ -66,6 +81,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const auth = await requireSession(['admin']);
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
@@ -78,6 +96,8 @@ export async function DELETE(req: NextRequest) {
     }
 
     await deleteAplicacionInDB(id);
+    logger.info('Aplicación eliminada', { id, actor: auth.user.email });
+
     return NextResponse.json({
       success: true,
       message: 'Aplicación eliminada de la base de datos',

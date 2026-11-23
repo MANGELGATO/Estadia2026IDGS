@@ -39,27 +39,6 @@ export default function CategoriasConfigPage() {
   const [benefits, setBenefits] = useState<string[]>([]);
   const [successCases, setSuccessCases] = useState<SuccessCase[]>([]);
 
-  // 1. Cargar datos desde la API centralizada (/api/categorias)
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  const fetchCategories = async () => {
-    try {
-      setIsLoading(true);
-      const res = await fetch('/api/categorias');
-      const data = await res.json();
-      if (data.success && data.categories) {
-        setCategoriesData(data.categories);
-        loadCategoryIntoForm(selectedCategory, data.categories);
-      }
-    } catch {
-      setStatusMessage({ text: 'Error al conectar con el servidor central de categorías.', type: 'error' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // Carga los datos de una categoría en los campos del formulario
   const loadCategoryIntoForm = (catId: string, sourceData = categoriesData) => {
     const cat = sourceData[catId];
@@ -72,6 +51,43 @@ export default function CategoriasConfigPage() {
       setSuccessCases(Array.isArray(cat.successCases) ? cat.successCases.map(c => ({ ...c })) : []);
     }
   };
+
+  // 1. Cargar datos desde la API centralizada (/api/categorias)
+  useEffect(() => {
+    let active = true;
+    fetch('/api/categorias')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!active) return;
+        if (data.success && data.categories) {
+          setCategoriesData(data.categories);
+          const cat = data.categories['realidad-virtual'];
+          if (cat) {
+            setName(cat.name || '');
+            setDescription(cat.description || '');
+            setPlaiUsage(cat.plaiUsage || '');
+            setVideoUrl(cat.videoUrl || '');
+            setBenefits(Array.isArray(cat.benefits) ? [...cat.benefits] : []);
+            setSuccessCases(
+              Array.isArray(cat.successCases)
+                ? cat.successCases.map((c: SuccessCase) => ({ ...c }))
+                : []
+            );
+          }
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setStatusMessage({ text: 'Error al conectar con el servidor central de categorías.', type: 'error' });
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleTabChange = (catId: string) => {
     setSelectedCategory(catId);

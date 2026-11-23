@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import type { JWT } from 'next-auth/jwt';
 import {
   checkRateLimit,
   getClientIp,
@@ -10,21 +9,19 @@ import {
   RATE_LIMIT_LOGIN_PAGE,
   RATE_LIMIT_MUTATION,
 } from './lib/rateLimit';
+import { env } from './lib/env';
 import { logger } from './lib/logger';
 
 /**
  * Proxy de seguridad de Next.js 16 (reemplazo normativo de middleware.ts).
- * Protege las rutas privadas `/admin/*` y `/usuario/*`, verifica los roles
- * institucionales y redirige usuarios no autenticados hacia `/login`.
- * Aplica además Rate Limiting normativo en endpoints sensibles (Sección 7.3).
+ * Protege las rutas privadas `/admin/*` y `/usuario/*` verificando exclusivamente
+ * el JWT firmado por NextAuth.js y aplica Rate Limiting en endpoints sensibles (Sección 7.3).
  */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const ip = getClientIp(request);
 
-  // 1. Rate Limiting en endpoints sensibles (Sección 7.3 Estándar PLAi)
-  // A) Endpoints de Autenticación (/api/auth/signin, callback o POST)
-  // Previene ataques de fuerza bruta en credenciales sin bloquear el sondeo de sesión legítimo (GET /api/auth/session)
+  // 1. Rate Limiting en endpoints sensibles (Estándar PLAi v1.0, Sección 7.3)
   const isAuthAttempt =
     pathname.startsWith('/api/auth') &&
     (pathname.includes('/signin') || pathname.includes('/callback') || request.method === 'POST');
@@ -41,7 +38,6 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // B) Formularios públicos de reservación y solicitudes (POST)
   if (
     request.method === 'POST' &&
     (pathname === '/api/reservas' || pathname === '/api/solicitudes-espacios')
@@ -57,7 +53,6 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // C) Vista de inicio de sesión (/login) - En producción
   if (pathname === '/login' && process.env.NODE_ENV === 'production') {
     const rate = checkRateLimit(`login_page:${ip}`, RATE_LIMIT_LOGIN_PAGE);
     if (!rate.success) {
@@ -70,51 +65,36 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  const secret = process.env.NEXTAUTH_SECRET || 'plai-dev-secret-key-32chars-min-2026';
-  let token = await getToken({ req: request, secret });
+  const token = await getToken({ req: request, secret: env.nextAuthSecret });
 
   const isAdminRoute = pathname.startsWith('/admin');
+  const isAdminOnlyRoute =
+    pathname.startsWith('/admin/usuarios') || pathname.startsWith('/admin/configuracion');
   const isUsuarioRoute = pathname.startsWith('/usuario');
   const isLoginRoute = pathname === '/login';
-  const isLogout = isLoginRoute && request.nextUrl.searchParams.get('logout') === 'true';
 
-  // Soporte para cookie de sesión rápida / evaluación de roles
-  // Solo se aplica en rutas protegidas para evitar retener al usuario cuando quiere cerrar sesión en /login
-  const roleCookie = request.cookies.get('plai_role')?.value;
-  if (!token && !isLoginRoute && (roleCookie === 'admin' || roleCookie === 'usuario')) {
-    token = {
-      id: roleCookie === 'admin' ? 'usr-admin-01' : 'usr-standard-01',
-      name: roleCookie === 'admin' ? 'Administrador PLAi' : 'Usuario PLAi',
-      email: roleCookie === 'admin' ? 'admin@plai.mx' : 'usuario@plai.mx',
-      role: roleCookie as 'admin' | 'usuario',
-    } as unknown as JWT;
-  }
-
-  // 2. Acceso a rutas protegidas sin sesión activa
+  // 2. Acceso a rutas protegidas sin sesión válida
   if (!token && (isAdminRoute || isUsuarioRoute)) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // 3. Control de acceso basado en roles (RBAC):
-  // Un usuario estándar no debe tener acceso a las herramientas administrativas
-  if (token && isAdminRoute && token.role !== 'admin') {
-    return NextResponse.redirect(new URL('/usuario', request.url));
+  // 3. Control de acceso basado en roles (RBAC)
+  if (token && isAdminRoute) {
+    const role = token.role;
+    if (role !== 'admin' && role !== 'colaborador') {
+      return NextResponse.redirect(new URL('/usuario', request.url));
+    }
+    if (isAdminOnlyRoute && role !== 'admin') {
+      return NextResponse.redirect(new URL('/admin', request.url));
+    }
   }
 
-  // 4. Manejo de /login:
-  // Si el usuario solicitó cerrar sesión o no tiene sesión real, se limpia la cookie y se muestra /login
-  if (isLoginRoute) {
-    if (isLogout || !token) {
-      const response = NextResponse.next();
-      if (roleCookie) {
-        response.cookies.delete('plai_role');
-      }
-      return response;
-    }
-
-    const destination = token.role === 'admin' ? '/admin' : '/usuario';
+  // 4. Redirección automática si el usuario ya está autenticado y visita /login
+  if (isLoginRoute && token) {
+    const destination =
+      token.role === 'admin' || token.role === 'colaborador' ? '/admin' : '/usuario';
     return NextResponse.redirect(new URL(destination, request.url));
   }
 

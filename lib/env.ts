@@ -10,7 +10,7 @@ import fs from 'node:fs';
  * Cumple con el estándar PLAi v1.0, secciones 5.2 y 6 (patrón VARIABLE_FILE).
  */
 export function getEnvSecret(name: string, fallback = ''): string {
-  // 1. VARIABLE_FILE explícita (p. ej. DIRECTUS_TOKEN_FILE=/run/secrets/directus_token)
+  // 1. VARIABLE_FILE explícita (p. ej. DATABASE_URL_FILE=/run/secrets/database_url)
   const fileVar = process.env[`${name}_FILE`];
   if (fileVar && fs.existsSync(fileVar)) {
     try {
@@ -40,7 +40,7 @@ export function getEnvSecret(name: string, fallback = ''): string {
 }
 
 /**
- * Configuración de entorno tipada de la aplicación
+ * Configuración de entorno tipada de la aplicación (Estándar PLAi v1.0)
  */
 export const env = {
   get nodeEnv(): string {
@@ -66,22 +66,42 @@ export const env = {
     return process.env.NEXTAUTH_URL || 'http://localhost:3000';
   },
   get nextAuthSecret(): string {
-    return getEnvSecret('NEXTAUTH_SECRET', 'plai-dev-secret-key-32chars-min-2026');
+    const configured = getEnvSecret('NEXTAUTH_SECRET');
+    if (configured) {
+      return configured;
+    }
+    if (this.isProduction) {
+      return '';
+    }
+    return 'plai-local-development-secret-only-change-in-production';
+  },
+  // PostgreSQL / Neon (Estándar PLAi: PostgreSQL 15/16)
+  get databaseUrl(): string {
+    return getEnvSecret('DATABASE_URL');
   },
   get dbHost(): string {
-    return process.env.DB_HOST || '127.0.0.1';
+    return process.env.PGHOST || process.env.DB_HOST || '';
   },
   get dbPort(): number {
-    const p = parseInt(process.env.DB_PORT || '3306', 10);
-    return Number.isNaN(p) ? 3306 : p;
+    const p = parseInt(process.env.PGPORT || process.env.DB_PORT || '5432', 10);
+    return Number.isNaN(p) ? 5432 : p;
   },
   get dbUser(): string {
-    return process.env.DB_USER || 'root';
+    return process.env.PGUSER || process.env.DB_USER || '';
   },
   get dbPassword(): string {
-    return getEnvSecret('DB_PASSWORD', 'root');
+    return getEnvSecret('PGPASSWORD') || getEnvSecret('DB_PASSWORD');
   },
   get dbName(): string {
-    return process.env.DB_NAME || 'plai_recursos';
+    return process.env.PGDATABASE || process.env.DB_NAME || 'plai_recursos';
+  },
+  get dbSsl(): boolean {
+    if (process.env.DB_SSL === 'true') return true;
+    if (process.env.DB_SSL === 'false') return false;
+    const url = this.databaseUrl.toLowerCase();
+    return url.includes('sslmode=require') || url.includes('neon.tech');
+  },
+  get hasDatabaseConfig(): boolean {
+    return Boolean(this.databaseUrl || (this.dbHost && this.dbUser));
   },
 };

@@ -1,65 +1,85 @@
-import mysql, { Pool, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
-import fs from 'fs';
-import path from 'path';
+import { Pool } from 'pg';
 import { env } from './env';
 import { DeviceItem, mockDevices, AppItem, mockApps } from './mockData';
-export type { DeviceItem };
+import { hashPassword } from './password';
 import { logger } from './logger';
 
-// Pool singleton para reutilizar conexiones en Next.js
+export type { DeviceItem };
+
+// Pool singleton de PostgreSQL / Neon para reutilizar conexiones en Next.js
 declare global {
-  var __mysqlPool: Pool | undefined;
+  var __pgPool: Pool | undefined;
 }
 
 export function getPool(): Pool {
-  if (!global.__mysqlPool) {
-    global.__mysqlPool = mysql.createPool({
-      host: env.dbHost,
-      port: env.dbPort,
-      user: env.dbUser,
-      password: env.dbPassword,
-      database: env.dbName,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      enableKeepAlive: true,
-      keepAliveInitialDelay: 0,
-      charset: 'utf8mb4',
-    });
+  if (!global.__pgPool) {
+    if (env.databaseUrl) {
+      global.__pgPool = new Pool({
+        connectionString: env.databaseUrl,
+        ssl: env.dbSsl ? { rejectUnauthorized: false } : undefined,
+        max: 10,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000,
+      });
+    } else {
+      global.__pgPool = new Pool({
+        host: env.dbHost || '127.0.0.1',
+        port: env.dbPort,
+        user: env.dbUser || 'postgres',
+        password: env.dbPassword || undefined,
+        database: env.dbName,
+        ssl: env.dbSsl ? { rejectUnauthorized: false } : undefined,
+        max: 10,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000,
+      });
+    }
   }
-  return global.__mysqlPool;
+  return global.__pgPool;
 }
 
-// Rutas de respaldo persistente en el servidor
-const DATA_DIR = path.join(process.cwd(), 'data');
-function ensureDataFile<T>(filename: string, initialData: T): T {
+export async function checkDatabaseConnection(): Promise<boolean> {
+  if (!env.hasDatabaseConfig) return false;
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    const filePath = path.join(DATA_DIR, filename);
-    if (!fs.existsSync(filePath)) {
-      fs.writeFileSync(filePath, JSON.stringify(initialData, null, 2), 'utf8');
-      return initialData;
-    }
-    const raw = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(raw) as T;
-  } catch (error) {
-    logger.warn(`Error al acceder al archivo de persistencia ${filename}, usando datos iniciales`, { error });
-    return initialData;
+    const pool = getPool();
+    await pool.query('SELECT 1');
+    return true;
+  } catch {
+    return false;
   }
 }
 
-function writeDataFile<T>(filename: string, data: T): void {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    const filePath = path.join(DATA_DIR, filename);
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
-  } catch (error) {
-    logger.error(`Error al persistir ${filename}`, { error });
+// Almacenamiento en memoria únicamente para entornos sin BD configurada (ej. pruebas unitarias).
+// Cumple con Docker Swarm read_only: true (nunca escribe archivos en disco junto al código).
+interface MemoryStore {
+  equipos: DeviceItem[];
+  aplicaciones: AppItem[];
+  bitacora: BitacoraItem[];
+  reservaciones: ReservacionItem[];
+  incidencias: IncidenciaItem[];
+  usuarios: UsuarioRecord[];
+  cursos: CursoAgendaItem[];
+  config: SystemConfig;
+}
+
+declare global {
+  var __plaiMemoryStore: MemoryStore | undefined;
+}
+
+function getMemoryStore(): MemoryStore {
+  if (!global.__plaiMemoryStore) {
+    global.__plaiMemoryStore = {
+      equipos: [...mockDevices],
+      aplicaciones: [...mockApps],
+      bitacora: [],
+      reservaciones: [],
+      incidencias: [],
+      usuarios: [],
+      cursos: [],
+      config: { ...initialSystemConfig },
+    };
   }
+  return global.__plaiMemoryStore;
 }
 
 // Mapeos de categorías
@@ -79,63 +99,57 @@ const CATEGORY_TO_ID_MAP: Record<string, string> = {
   'Cómputo': 'computo-multimedia',
 };
 
+function parseStringArray(val: unknown, fallback: string[]): string[] {
+  if (Array.isArray(val)) {
+    return val.map(String);
+  }
+  if (typeof val === 'string' && val.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed.map(String);
+    } catch {
+      return [val];
+    }
+  }
+  return fallback;
+}
+
 // ====================================================================
 // 1. EQUIPOS
 // ====================================================================
-export interface EquipoRow extends RowDataPacket {
+interface EquipoRow {
   id: string;
   categoria_id: string;
-  categoria_nombre?: string;
-  categoria_slug?: string;
+  categoria_nombre?: string | null;
   nombre: string;
   marca: string;
   modelo: string;
-  almacenamiento?: string;
+  almacenamiento?: string | null;
   numero_serie: string;
   codigo_plai: string;
   estado: DeviceItem['status'];
   ubicacion: string;
-  especificaciones: string | string[] | null;
-  accesorios: string | string[] | null;
+  especificaciones: unknown;
+  accesorios: unknown;
   imagen_emoji: string | null;
   imagen_url?: string | null;
   responsable: string | null;
   observaciones: string | null;
-  created_at: string | Date;
-  updated_at: string | Date;
+  created_at: string | Date | null;
 }
 
 export function mapRowToDeviceItem(row: EquipoRow): DeviceItem {
-  let specs: string[] = [];
-  if (Array.isArray(row.especificaciones)) {
-    specs = row.especificaciones;
-  } else if (typeof row.especificaciones === 'string') {
-    try {
-      const parsed = JSON.parse(row.especificaciones);
-      specs = Array.isArray(parsed) ? parsed : [row.especificaciones];
-    } catch {
-      specs = [row.especificaciones];
-    }
-  }
-
-  let accessories: string[] = [];
-  if (Array.isArray(row.accesorios)) {
-    accessories = row.accesorios;
-  } else if (typeof row.accesorios === 'string') {
-    try {
-      const parsed = JSON.parse(row.accesorios);
-      accessories = Array.isArray(parsed) ? parsed : [row.accesorios];
-    } catch {
-      accessories = [row.accesorios];
-    }
-  }
-
-  const category = CATEGORY_MAP[row.categoria_id] || (row.categoria_nombre as DeviceItem['category']) || 'Realidad Virtual';
+  const specs = parseStringArray(row.especificaciones, ['Sin especificaciones registradas']);
+  const accessories = parseStringArray(row.accesorios, ['Equipo estándar']);
+  const category =
+    CATEGORY_MAP[row.categoria_id] ||
+    (row.categoria_nombre as DeviceItem['category']) ||
+    'Realidad Virtual';
 
   let dateAdded: string | undefined;
   if (row.created_at) {
     const d = new Date(row.created_at);
-    if (!isNaN(d.getTime())) {
+    if (!Number.isNaN(d.getTime())) {
       dateAdded = d.toISOString().split('T')[0];
     }
   }
@@ -151,8 +165,8 @@ export function mapRowToDeviceItem(row: EquipoRow): DeviceItem {
     storage: row.almacenamiento || 'N/A',
     status: row.estado || 'Disponible',
     location: row.ubicacion || 'Laboratorio de Innovación PLAi',
-    specs: specs.length > 0 ? specs : ['Sin especificaciones registradas'],
-    accessories: accessories.length > 0 ? accessories : ['Equipo estándar'],
+    specs,
+    accessories,
     imageEmoji: row.imagen_emoji || '📦',
     imageUrl: row.imagen_url || undefined,
     responsible: row.responsable || 'Laboratorio de Innovación PLAi',
@@ -162,147 +176,143 @@ export function mapRowToDeviceItem(row: EquipoRow): DeviceItem {
 }
 
 export async function getEquiposFromDB(): Promise<DeviceItem[]> {
-  const localItems = ensureDataFile<DeviceItem[]>('equipos.json', mockDevices);
-  try {
-    const pool = getPool();
-    const [rows] = await pool.query<EquipoRow[]>(`
-      SELECT e.*, c.nombre AS categoria_nombre, c.id AS categoria_slug 
-      FROM equipos e
-      LEFT JOIN categorias c ON e.categoria_id = c.id
-      ORDER BY e.created_at DESC
-    `);
-
-    if (rows && rows.length > 0) {
-      const dbItems = rows.map(mapRowToDeviceItem);
-      const mergedMap = new Map<string, DeviceItem>();
-      for (const dbItem of dbItems) {
-        mergedMap.set(dbItem.id, dbItem);
-      }
-      for (const localItem of localItems) {
-        const existing = mergedMap.get(localItem.id);
-        mergedMap.set(localItem.id, {
-          ...existing,
-          ...localItem,
-          imageUrl: localItem.imageUrl || existing?.imageUrl,
-        });
-      }
-      return Array.from(mergedMap.values());
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      const { rows } = await pool.query<EquipoRow>(`
+        SELECT e.*, c.nombre AS categoria_nombre
+        FROM equipos e
+        LEFT JOIN categorias c ON e.categoria_id = c.id
+        ORDER BY e.created_at DESC, e.id ASC
+      `);
+      return rows.map(mapRowToDeviceItem);
+    } catch (error) {
+      logger.error('Error al consultar equipos en PostgreSQL', { error: String(error) });
     }
-  } catch (error) {
-    logger.warn('MySQL no disponible para equipos, usando almacenamiento centralizado', { error: String(error) });
   }
-
-  return localItems;
+  return getMemoryStore().equipos;
 }
 
 export async function insertEquipoInDB(item: DeviceItem): Promise<boolean> {
   const categoriaId = CATEGORY_TO_ID_MAP[item.category] || 'realidad-virtual';
 
-  try {
-    const pool = getPool();
-    const query = `
-      INSERT INTO equipos (
-        id, categoria_id, nombre, marca, modelo, almacenamiento, 
-        numero_serie, codigo_plai, estado, ubicacion, especificaciones, 
-        accesorios, imagen_emoji, imagen_url, responsable, observaciones
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        categoria_id = VALUES(categoria_id),
-        nombre = VALUES(nombre),
-        marca = VALUES(marca),
-        modelo = VALUES(modelo),
-        almacenamiento = VALUES(almacenamiento),
-        estado = VALUES(estado),
-        ubicacion = VALUES(ubicacion),
-        especificaciones = VALUES(especificaciones),
-        accesorios = VALUES(accesorios),
-        imagen_emoji = VALUES(imagen_emoji),
-        imagen_url = VALUES(imagen_url),
-        responsable = VALUES(responsable),
-        observaciones = VALUES(observaciones)
-    `;
-
-    const values = [
-      item.id,
-      categoriaId,
-      item.name,
-      item.brand,
-      item.model,
-      item.storage || 'N/A',
-      item.serialNumber || `SN-${Date.now()}`,
-      item.inventoryNumber,
-      item.status,
-      item.location,
-      JSON.stringify(item.specs || []),
-      JSON.stringify(item.accessories || []),
-      item.imageEmoji || '📦',
-      item.imageUrl || null,
-      item.responsible || 'Laboratorio de Innovación PLAi',
-      item.observations || null,
-    ];
-
-    const [result] = await pool.execute<ResultSetHeader>(query, values);
-    if (result.affectedRows > 0) {
-      // Sincronizar archivo local
-      const items = ensureDataFile<DeviceItem[]>('equipos.json', mockDevices);
-      const idx = items.findIndex(e => e.id === item.id || e.inventoryNumber === item.inventoryNumber);
-      if (idx >= 0) items[idx] = item;
-      else items.unshift(item);
-      writeDataFile('equipos.json', items);
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      await pool.query(
+        `
+        INSERT INTO equipos (
+          id, categoria_id, nombre, marca, modelo, almacenamiento,
+          numero_serie, codigo_plai, estado, ubicacion, especificaciones,
+          accesorios, imagen_emoji, imagen_url, responsable, observaciones
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, $13, $14, $15, $16)
+        ON CONFLICT (id) DO UPDATE SET
+          categoria_id = EXCLUDED.categoria_id,
+          nombre = EXCLUDED.nombre,
+          marca = EXCLUDED.marca,
+          modelo = EXCLUDED.modelo,
+          almacenamiento = EXCLUDED.almacenamiento,
+          numero_serie = EXCLUDED.numero_serie,
+          codigo_plai = EXCLUDED.codigo_plai,
+          estado = EXCLUDED.estado,
+          ubicacion = EXCLUDED.ubicacion,
+          especificaciones = EXCLUDED.especificaciones,
+          accesorios = EXCLUDED.accesorios,
+          imagen_emoji = EXCLUDED.imagen_emoji,
+          imagen_url = EXCLUDED.imagen_url,
+          responsable = EXCLUDED.responsable,
+          observaciones = EXCLUDED.observaciones,
+          updated_at = NOW()
+        `,
+        [
+          item.id,
+          categoriaId,
+          item.name,
+          item.brand,
+          item.model,
+          item.storage || 'N/A',
+          item.serialNumber || `SN-${Date.now()}`,
+          item.inventoryNumber,
+          item.status,
+          item.location,
+          JSON.stringify(item.specs || []),
+          JSON.stringify(item.accessories || []),
+          item.imageEmoji || '📦',
+          item.imageUrl || null,
+          item.responsible || 'Laboratorio de Innovación PLAi',
+          item.observations || null,
+        ]
+      );
       return true;
+    } catch (error) {
+      logger.error('Error al guardar equipo en PostgreSQL', { error: String(error) });
+      throw error;
     }
-  } catch (error) {
-    logger.warn('Error al persistir en MySQL equipos, guardando en respaldo local', { error: String(error) });
   }
 
-  // Respaldo en servidor
-  const items = ensureDataFile<DeviceItem[]>('equipos.json', mockDevices);
-  const idx = items.findIndex(e => e.id === item.id || e.inventoryNumber === item.inventoryNumber);
-  if (idx >= 0) items[idx] = item;
-  else items.unshift(item);
-  writeDataFile('equipos.json', items);
+  const store = getMemoryStore();
+  const idx = store.equipos.findIndex(
+    (e) => e.id === item.id || e.inventoryNumber === item.inventoryNumber
+  );
+  if (idx >= 0) store.equipos[idx] = item;
+  else store.equipos.unshift(item);
   return true;
 }
 
 export async function deleteEquipoInDB(id: string): Promise<boolean> {
-  try {
-    const pool = getPool();
-    const [result] = await pool.execute<ResultSetHeader>('DELETE FROM equipos WHERE id = ?', [id]);
-    if (result.affectedRows > 0) {
-      const items = ensureDataFile<DeviceItem[]>('equipos.json', mockDevices).filter(e => e.id !== id);
-      writeDataFile('equipos.json', items);
-      return true;
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      const result = await pool.query('DELETE FROM equipos WHERE id = $1', [id]);
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      logger.error('Error al eliminar equipo en PostgreSQL', { error: String(error) });
+      throw error;
     }
-  } catch (error) {
-    logger.warn('Error al eliminar en MySQL equipos', { error: String(error) });
   }
 
-  const items = ensureDataFile<DeviceItem[]>('equipos.json', mockDevices).filter(e => e.id !== id);
-  writeDataFile('equipos.json', items);
-  return true;
+  const store = getMemoryStore();
+  const prevLen = store.equipos.length;
+  store.equipos = store.equipos.filter((e) => e.id !== id);
+  return store.equipos.length < prevLen;
 }
 
 export async function getEquipoByCodigoPLAi(codigo: string): Promise<DeviceItem | null> {
   const all = await getEquiposFromDB();
   const normalized = codigo.trim().toLowerCase();
-  return all.find(e => e.inventoryNumber.toLowerCase() === normalized) || null;
+  return all.find((e) => e.inventoryNumber.toLowerCase() === normalized) || null;
 }
 
 // ====================================================================
 // 2. APLICACIONES VR / PC
 // ====================================================================
+interface AppRow {
+  id: string;
+  nombre: string;
+  desarrollador: string;
+  version: string;
+  categoria: string;
+  plataforma: AppItem['platform'];
+  clasificacion_edad: string;
+  descripcion: string;
+  imagen_url: string | null;
+  equipos_instalados: number;
+  estado: AppItem['status'];
+}
+
 export async function getAplicacionesFromDB(): Promise<AppItem[]> {
-  const localApps = ensureDataFile<AppItem[]>('aplicaciones.json', mockApps);
-  try {
-    const pool = getPool();
-    const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM aplicaciones ORDER BY created_at DESC');
-    if (rows && rows.length > 0) {
-      const dbApps: AppItem[] = rows.map(r => ({
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      const { rows } = await pool.query<AppRow>(
+        'SELECT * FROM aplicaciones ORDER BY created_at DESC, id ASC'
+      );
+      return rows.map((r) => ({
         id: String(r.id),
         name: r.nombre,
         developer: r.desarrollador,
         version: r.version,
-        category: r.categoria,
+        category: r.categoria as AppItem['category'],
         platform: r.plataforma,
         ageRating: r.clasificacion_edad,
         description: r.descripcion,
@@ -311,84 +321,78 @@ export async function getAplicacionesFromDB(): Promise<AppItem[]> {
         devicesInstalled: Number(r.equipos_instalados || 1),
         status: r.estado,
       }));
-      const mergedMap = new Map<string, AppItem>();
-      for (const dbApp of dbApps) mergedMap.set(dbApp.id, dbApp);
-      for (const localApp of localApps) {
-        const existing = mergedMap.get(localApp.id);
-        mergedMap.set(localApp.id, {
-          ...existing,
-          ...localApp,
-          imageUrl: localApp.imageUrl || existing?.imageUrl,
-          iconUrl: localApp.iconUrl || localApp.imageUrl || existing?.iconUrl,
-        });
-      }
-      return Array.from(mergedMap.values());
+    } catch (error) {
+      logger.error('Error al consultar aplicaciones en PostgreSQL', { error: String(error) });
     }
-  } catch (error) {
-    logger.warn('MySQL no disponible para aplicaciones, usando respaldo local', { error: String(error) });
   }
-
-  return localApps;
+  return getMemoryStore().aplicaciones;
 }
 
 export async function insertAplicacionInDB(app: AppItem): Promise<boolean> {
-  try {
-    const pool = getPool();
-    const query = `
-      INSERT INTO aplicaciones (
-        id, nombre, desarrollador, version, categoria, plataforma,
-        clasificacion_edad, descripcion, imagen_url, equipos_instalados, estado
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        nombre = VALUES(nombre),
-        desarrollador = VALUES(desarrollador),
-        version = VALUES(version),
-        categoria = VALUES(categoria),
-        plataforma = VALUES(plataforma),
-        clasificacion_edad = VALUES(clasificacion_edad),
-        descripcion = VALUES(descripcion),
-        imagen_url = VALUES(imagen_url),
-        equipos_instalados = VALUES(equipos_instalados),
-        estado = VALUES(estado)
-    `;
-
-    const values = [
-      app.id,
-      app.name,
-      app.developer,
-      app.version || '1.0',
-      app.category,
-      app.platform,
-      app.ageRating || 'Todas las edades',
-      app.description,
-      app.imageUrl || null,
-      app.devicesInstalled || 1,
-      app.status || 'Activa',
-    ];
-
-    await pool.execute(query, values);
-  } catch (error) {
-    logger.warn('Error al guardar aplicación en MySQL', { error: String(error) });
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      await pool.query(
+        `
+        INSERT INTO aplicaciones (
+          id, nombre, desarrollador, version, categoria, plataforma,
+          clasificacion_edad, descripcion, imagen_url, equipos_instalados, estado
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        ON CONFLICT (id) DO UPDATE SET
+          nombre = EXCLUDED.nombre,
+          desarrollador = EXCLUDED.desarrollador,
+          version = EXCLUDED.version,
+          categoria = EXCLUDED.categoria,
+          plataforma = EXCLUDED.plataforma,
+          clasificacion_edad = EXCLUDED.clasificacion_edad,
+          descripcion = EXCLUDED.descripcion,
+          imagen_url = EXCLUDED.imagen_url,
+          equipos_instalados = EXCLUDED.equipos_instalados,
+          estado = EXCLUDED.estado,
+          updated_at = NOW()
+        `,
+        [
+          app.id,
+          app.name,
+          app.developer,
+          app.version || '1.0',
+          app.category,
+          app.platform,
+          app.ageRating || 'Todas las edades',
+          app.description,
+          app.imageUrl || app.iconUrl || null,
+          app.devicesInstalled || 1,
+          app.status || 'Activa',
+        ]
+      );
+      return true;
+    } catch (error) {
+      logger.error('Error al guardar aplicación en PostgreSQL', { error: String(error) });
+      throw error;
+    }
   }
 
-  const apps = ensureDataFile<AppItem[]>('aplicaciones.json', mockApps);
-  const idx = apps.findIndex(a => a.id === app.id);
-  if (idx >= 0) apps[idx] = app;
-  else apps.unshift(app);
-  writeDataFile('aplicaciones.json', apps);
+  const store = getMemoryStore();
+  const idx = store.aplicaciones.findIndex((a) => a.id === app.id);
+  if (idx >= 0) store.aplicaciones[idx] = app;
+  else store.aplicaciones.unshift(app);
   return true;
 }
 
 export async function deleteAplicacionInDB(id: string): Promise<boolean> {
-  try {
-    const pool = getPool();
-    await pool.execute('DELETE FROM aplicaciones WHERE id = ?', [id]);
-  } catch (error) {
-    logger.warn('Error al eliminar aplicación en MySQL', { error: String(error) });
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      const result = await pool.query('DELETE FROM aplicaciones WHERE id = $1', [id]);
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      logger.error('Error al eliminar aplicación en PostgreSQL', { error: String(error) });
+      throw error;
+    }
   }
 
-  const apps = ensureDataFile<AppItem[]>('aplicaciones.json', mockApps).filter(a => a.id !== id);
-  writeDataFile('aplicaciones.json', apps);
+  const store = getMemoryStore();
+  store.aplicaciones = store.aplicaciones.filter((a) => a.id !== id);
   return true;
 }
 
@@ -419,56 +423,43 @@ export interface BitacoraItem {
   createdAt?: string;
 }
 
-const initialBitacora: BitacoraItem[] = [
-  {
-    id: 'bit-001',
-    equipoId: 'eq-vr-001',
-    codigoPlai: 'PLAI-VR-001',
-    equipoNombre: 'Meta Quest 3 512GB',
-    usuarioNombre: 'Lic. Mariana Torres',
-    usuarioEmail: 'mariana.torres@cudi.edu.mx',
-    usuarioDependencia: 'Universidad de Guadalajara',
-    fechaEntrega: '2026-10-10 09:30:00',
-    fechaDevolucionEstimada: '2026-10-10 13:30:00',
-    fechaDevolucionReal: '2026-10-10 13:15:00',
-    estadoPrestamo: 'Devuelto',
-    condicionEntrega: 'Excelente',
-    condicionDevolucion: 'Excelente',
-    accesoriosEntregados: '2 Controles Touch Plus, cargador original, cable USB-C',
-    accesoriosDevueltos: 'Todos completos',
-    observacionesEntrega: 'Préstamo para taller de arquitectura inmersiva',
-    adminEntrega: 'Ing. Carlos Mendoza',
-    adminRecibe: 'Ing. Carlos Mendoza',
-  },
-  {
-    id: 'bit-002',
-    equipoId: 'eq-dro-001',
-    codigoPlai: 'PLAI-DR-001',
-    equipoNombre: 'Dron DJI Mini 3 Pro con DJI RC',
-    usuarioNombre: 'Arq. Sergio Velasco',
-    usuarioEmail: 'svelasco@jalteca.mx',
-    usuarioDependencia: 'Secretaría de Medio Ambiente Jalisco',
-    fechaEntrega: '2026-10-12 10:00:00',
-    fechaDevolucionEstimada: '2026-10-12 16:00:00',
-    fechaDevolucionReal: '2026-10-12 15:45:00',
-    estadoPrestamo: 'Devuelto',
-    condicionEntrega: 'Excelente',
-    condicionDevolucion: 'Bueno',
-    accesoriosEntregados: 'Control DJI RC, 3 baterías, cargador múltiple, maletín',
-    accesoriosDevueltos: 'Todos completos',
-    observacionesEntrega: 'Mapeo fotogramétrico en Ciudad Creativa Digital',
-    adminEntrega: 'Ing. Fernando Tapia',
-    adminRecibe: 'Ing. Fernando Tapia',
-  }
-];
+interface BitacoraRow {
+  id: string;
+  equipo_id: string;
+  codigo_plai: string;
+  equipo_nombre: string;
+  usuario_nombre: string;
+  usuario_email: string;
+  usuario_dependencia: string | null;
+  fecha_entrega: string | Date;
+  fecha_devolucion_estimada: string | Date;
+  fecha_devolucion_real: string | Date | null;
+  estado_prestamo: BitacoraItem['estadoPrestamo'];
+  condicion_entrega: BitacoraItem['condicionEntrega'];
+  condicion_devolucion: BitacoraItem['condicionDevolucion'] | null;
+  accesorios_entregados: string;
+  accesorios_devueltos: string | null;
+  observaciones_entrega: string | null;
+  observaciones_devolucion: string | null;
+  incidencia_generada: boolean;
+  admin_entrega: string;
+  admin_recibe: string | null;
+}
+
+function formatTimestamp(val: string | Date | null | undefined): string {
+  if (!val) return '';
+  if (val instanceof Date) return val.toISOString().slice(0, 19).replace('T', ' ');
+  return String(val);
+}
 
 export async function getBitacoraFromDB(): Promise<BitacoraItem[]> {
-  const localLogs = ensureDataFile<BitacoraItem[]>('bitacora.json', initialBitacora);
-  try {
-    const pool = getPool();
-    const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM bitacora_uso ORDER BY fecha_entrega DESC');
-    if (rows && rows.length > 0) {
-      const dbLogs: BitacoraItem[] = rows.map(r => ({
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      const { rows } = await pool.query<BitacoraRow>(
+        'SELECT * FROM bitacora_uso ORDER BY fecha_entrega DESC'
+      );
+      return rows.map((r) => ({
         id: String(r.id),
         equipoId: r.equipo_id,
         codigoPlai: r.codigo_plai,
@@ -476,9 +467,11 @@ export async function getBitacoraFromDB(): Promise<BitacoraItem[]> {
         usuarioNombre: r.usuario_nombre,
         usuarioEmail: r.usuario_email,
         usuarioDependencia: r.usuario_dependencia || undefined,
-        fechaEntrega: String(r.fecha_entrega),
-        fechaDevolucionEstimada: String(r.fecha_devolucion_estimada),
-        fechaDevolucionReal: r.fecha_devolucion_real ? String(r.fecha_devolucion_real) : undefined,
+        fechaEntrega: formatTimestamp(r.fecha_entrega),
+        fechaDevolucionEstimada: formatTimestamp(r.fecha_devolucion_estimada),
+        fechaDevolucionReal: r.fecha_devolucion_real
+          ? formatTimestamp(r.fecha_devolucion_real)
+          : undefined,
         estadoPrestamo: r.estado_prestamo,
         condicionEntrega: r.condicion_entrega,
         condicionDevolucion: r.condicion_devolucion || undefined,
@@ -490,88 +483,87 @@ export async function getBitacoraFromDB(): Promise<BitacoraItem[]> {
         adminEntrega: r.admin_entrega,
         adminRecibe: r.admin_recibe || undefined,
       }));
-      const mergedMap = new Map<string, BitacoraItem>();
-      for (const dbLog of dbLogs) mergedMap.set(dbLog.id, dbLog);
-      for (const localLog of localLogs) {
-        const existing = mergedMap.get(localLog.id);
-        mergedMap.set(localLog.id, { ...existing, ...localLog });
-      }
-      return Array.from(mergedMap.values());
+    } catch (error) {
+      logger.error('Error al consultar bitácora en PostgreSQL', { error: String(error) });
     }
-  } catch (error) {
-    logger.warn('MySQL no disponible para bitácora, usando respaldo local', { error: String(error) });
   }
-
-  return localLogs;
+  return getMemoryStore().bitacora;
 }
 
-export async function insertBitacoraEntregaInDB(item: BitacoraItem, reservaId?: string): Promise<boolean> {
-  try {
+export async function insertBitacoraEntregaInDB(
+  item: BitacoraItem,
+  reservaId?: string
+): Promise<boolean> {
+  if (env.hasDatabaseConfig) {
     const pool = getPool();
-    const query = `
-      INSERT INTO bitacora_uso (
-        id, equipo_id, codigo_plai, equipo_nombre, usuario_nombre,
-        usuario_email, usuario_dependencia, fecha_entrega, fecha_devolucion_estimada,
-        estado_prestamo, condicion_entrega, accesorios_entregados, observaciones_entrega,
-        admin_entrega
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    const values = [
-      item.id,
-      item.equipoId,
-      item.codigoPlai,
-      item.equipoNombre,
-      item.usuarioNombre,
-      item.usuarioEmail,
-      item.usuarioDependencia || null,
-      item.fechaEntrega,
-      item.fechaDevolucionEstimada,
-      item.estadoPrestamo || 'Activo',
-      item.condicionEntrega || 'Excelente',
-      item.accesoriosEntregados || 'Equipo completo',
-      item.observacionesEntrega || null,
-      item.adminEntrega || 'Administrador PLAi',
-    ];
-
-    await pool.execute(query, values);
-    await pool.execute('UPDATE equipos SET estado = "En uso" WHERE codigo_plai = ? OR id = ?', [item.codigoPlai, item.equipoId]);
-  } catch (error) {
-    logger.warn('Error al guardar bitácora en MySQL', { error: String(error) });
-  }
-
-  const log = ensureDataFile<BitacoraItem[]>('bitacora.json', initialBitacora);
-  const existingIdx = log.findIndex(b => b.id === item.id);
-  if (existingIdx >= 0) log[existingIdx] = item;
-  else log.unshift(item);
-  writeDataFile('bitacora.json', log);
-
-  // Actualizar estado de equipo en respaldo local a "En uso"
-  const equipos = ensureDataFile<DeviceItem[]>('equipos.json', mockDevices);
-  const eq = equipos.find(e => e.inventoryNumber.toLowerCase() === item.codigoPlai.toLowerCase() || e.id === item.equipoId);
-  if (eq) {
-    eq.status = 'En uso';
-    writeDataFile('equipos.json', equipos);
-  }
-
-  // Sincronizar con reservaciones: marcar reservación vinculada (o Aprobada/Pendiente del mismo equipo) como "En uso"
-  const reservas = ensureDataFile<ReservacionItem[]>('reservaciones.json', initialReservaciones);
-  const matchingReserva = reservas.find(r =>
-    (reservaId && r.id === reservaId) ||
-    ((r.estado === 'Aprobada' || r.estado === 'Pendiente') &&
-      (r.codigoPlaiAsignado?.toLowerCase() === item.codigoPlai.toLowerCase() || r.equipoId === item.equipoId))
-  );
-  if (matchingReserva) {
-    matchingReserva.estado = 'En uso';
-    matchingReserva.codigoPlaiAsignado = item.codigoPlai;
-    matchingReserva.equipoId = item.equipoId;
-    writeDataFile('reservaciones.json', reservas);
+    const client = await pool.connect();
     try {
-      const pool = getPool();
-      await pool.execute('UPDATE reservaciones SET estado = "En uso" WHERE id = ?', [matchingReserva.id]);
-    } catch {}
+      await client.query('BEGIN');
+      await client.query(
+        `
+        INSERT INTO bitacora_uso (
+          id, equipo_id, codigo_plai, equipo_nombre, usuario_nombre,
+          usuario_email, usuario_dependencia, fecha_entrega, fecha_devolucion_estimada,
+          estado_prestamo, condicion_entrega, accesorios_entregados, observaciones_entrega,
+          admin_entrega
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        ON CONFLICT (id) DO NOTHING
+        `,
+        [
+          item.id,
+          item.equipoId,
+          item.codigoPlai,
+          item.equipoNombre,
+          item.usuarioNombre,
+          item.usuarioEmail,
+          item.usuarioDependencia || null,
+          item.fechaEntrega,
+          item.fechaDevolucionEstimada,
+          item.estadoPrestamo || 'Activo',
+          item.condicionEntrega || 'Excelente',
+          item.accesoriosEntregados || 'Equipo completo',
+          item.observacionesEntrega || null,
+          item.adminEntrega || 'Administrador PLAi',
+        ]
+      );
+
+      await client.query(
+        `UPDATE equipos SET estado = 'En uso', updated_at = NOW() WHERE codigo_plai = $1 OR id = $2`,
+        [item.codigoPlai, item.equipoId]
+      );
+
+      if (reservaId) {
+        await client.query(
+          `UPDATE reservaciones SET estado = 'En uso', codigo_plai_asignado = $1, equipo_id = $2, updated_at = NOW() WHERE id = $3`,
+          [item.codigoPlai, item.equipoId, reservaId]
+        );
+      } else {
+        await client.query(
+          `UPDATE reservaciones
+           SET estado = 'En uso', updated_at = NOW()
+           WHERE estado IN ('Aprobada', 'Pendiente')
+             AND (LOWER(codigo_plai_asignado) = LOWER($1) OR equipo_id = $2)`,
+          [item.codigoPlai, item.equipoId]
+        );
+      }
+
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error al registrar entrega en PostgreSQL', { error: String(error) });
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
+  const store = getMemoryStore();
+  store.bitacora.unshift(item);
+  const eq = store.equipos.find(
+    (e) => e.inventoryNumber.toLowerCase() === item.codigoPlai.toLowerCase() || e.id === item.equipoId
+  );
+  if (eq) eq.status = 'En uso';
   return true;
 }
 
@@ -586,41 +578,65 @@ export async function updateBitacoraDevolucionInDB(
     adminRecibe: string;
   }
 ): Promise<boolean> {
-  try {
+  if (env.hasDatabaseConfig) {
     const pool = getPool();
-    const estadoPrestamo = devolucion.incidenciaGenerada ? 'Con Incidencia' : 'Devuelto';
-    await pool.execute(`
-      UPDATE bitacora_uso SET
-        fecha_devolucion_real = ?,
-        condicion_devolucion = ?,
-        accesorios_devoltos = ?,
-        observaciones_devolucion = ?,
-        incidencia_generada = ?,
-        estado_prestamo = ?,
-        admin_recibe = ?
-      WHERE id = ?
-    `.replace('accesorios_devoltos', 'accesorios_devueltos'), [
-      devolucion.fechaDevolucionReal,
-      devolucion.condicionDevolucion || null,
-      devolucion.accesoriosDevueltos,
-      devolucion.observacionesDevolucion || null,
-      devolucion.incidenciaGenerada ? 1 : 0,
-      estadoPrestamo,
-      devolucion.adminRecibe,
-      id
-    ]);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const estadoPrestamo = devolucion.incidenciaGenerada ? 'Con Incidencia' : 'Devuelto';
+      const { rows } = await client.query<{ codigo_plai: string; equipo_id: string }>(
+        `
+        UPDATE bitacora_uso SET
+          fecha_devolucion_real = $1,
+          condicion_devolucion = $2,
+          accesorios_devueltos = $3,
+          observaciones_devolucion = $4,
+          incidencia_generada = $5,
+          estado_prestamo = $6,
+          admin_recibe = $7
+        WHERE id = $8
+        RETURNING codigo_plai, equipo_id
+        `,
+        [
+          devolucion.fechaDevolucionReal,
+          devolucion.condicionDevolucion || null,
+          devolucion.accesoriosDevueltos,
+          devolucion.observacionesDevolucion || null,
+          Boolean(devolucion.incidenciaGenerada),
+          estadoPrestamo,
+          devolucion.adminRecibe,
+          id,
+        ]
+      );
 
-    const [rows] = await pool.query<RowDataPacket[]>('SELECT codigo_plai FROM bitacora_uso WHERE id = ?', [id]);
-    if (rows && rows[0]) {
-      const nuevoEstado = devolucion.incidenciaGenerada ? 'En mantenimiento' : 'Disponible';
-      await pool.execute('UPDATE equipos SET estado = ? WHERE codigo_plai = ?', [nuevoEstado, rows[0].codigo_plai]);
+      if (rows[0]) {
+        const nuevoEstado = devolucion.incidenciaGenerada ? 'En mantenimiento' : 'Disponible';
+        await client.query(
+          'UPDATE equipos SET estado = $1, updated_at = NOW() WHERE codigo_plai = $2 OR id = $3',
+          [nuevoEstado, rows[0].codigo_plai, rows[0].equipo_id]
+        );
+        await client.query(
+          `UPDATE reservaciones
+           SET estado = 'Completada', updated_at = NOW()
+           WHERE estado IN ('En uso', 'Aprobada')
+             AND (LOWER(codigo_plai_asignado) = LOWER($1) OR equipo_id = $2)`,
+          [rows[0].codigo_plai, rows[0].equipo_id]
+        );
+      }
+
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error al actualizar devolución en PostgreSQL', { error: String(error) });
+      throw error;
+    } finally {
+      client.release();
     }
-  } catch (error) {
-    logger.warn('Error al actualizar devolución en MySQL', { error: String(error) });
   }
 
-  const log = ensureDataFile<BitacoraItem[]>('bitacora.json', initialBitacora);
-  const item = log.find(b => b.id === id);
+  const store = getMemoryStore();
+  const item = store.bitacora.find((b) => b.id === id);
   if (item) {
     item.fechaDevolucionReal = devolucion.fechaDevolucionReal;
     item.condicionDevolucion = devolucion.condicionDevolucion;
@@ -629,32 +645,7 @@ export async function updateBitacoraDevolucionInDB(
     item.incidenciaGenerada = devolucion.incidenciaGenerada;
     item.estadoPrestamo = devolucion.incidenciaGenerada ? 'Con Incidencia' : 'Devuelto';
     item.adminRecibe = devolucion.adminRecibe;
-    writeDataFile('bitacora.json', log);
-
-    // Actualizar estado del equipo en respaldo local
-    const equipos = ensureDataFile<DeviceItem[]>('equipos.json', mockDevices);
-    const eq = equipos.find(e => e.inventoryNumber.toLowerCase() === item.codigoPlai.toLowerCase() || e.id === item.equipoId);
-    if (eq) {
-      eq.status = devolucion.incidenciaGenerada ? 'En mantenimiento' : 'Disponible';
-      writeDataFile('equipos.json', equipos);
-    }
-
-    // Sincronizar con reservaciones: marcar reservación en curso de ese equipo como "Completada"
-    const reservas = ensureDataFile<ReservacionItem[]>('reservaciones.json', initialReservaciones);
-    const matchingReserva = reservas.find(r =>
-      (r.estado === 'En uso' || r.estado === 'Aprobada') &&
-      (r.codigoPlaiAsignado?.toLowerCase() === item.codigoPlai.toLowerCase() || r.equipoId === item.equipoId)
-    );
-    if (matchingReserva) {
-      matchingReserva.estado = 'Completada';
-      writeDataFile('reservaciones.json', reservas);
-      try {
-        const pool = getPool();
-        await pool.execute('UPDATE reservaciones SET estado = "Completada" WHERE id = ?', [matchingReserva.id]);
-      } catch {}
-    }
   }
-
   return true;
 }
 
@@ -684,282 +675,204 @@ export interface ReservacionItem {
   createdAt?: string;
 }
 
-const initialReservaciones: ReservacionItem[] = [
-  {
-    id: 'res-001',
-    folio: 'RES-2026-001',
-    categoriaId: 'realidad-virtual',
-    equipoId: 'eq-vr-001',
-    codigoPlaiAsignado: 'PLAI-VR-001',
-    usuarioNombre: 'Ana García Rivera',
-    usuarioEmail: 'ana.garcia@alumnos.udg.mx',
-    usuarioTelefono: '33 1892 4401',
-    usuarioInstitucion: 'Universidad de Guadalajara (CUAAD)',
-    fechaUso: '2026-11-20',
-    horaInicio: '10:00',
-    horaFin: '12:30',
-    actividad: 'Evaluación de proyecto de grado de arquitectura espacial.',
-    estado: 'Aprobada',
-    accesoriosIncluidos: 'Controles Touch Plus y cable Link Box',
-    condicionSalida: 'Excelente',
-    observacionesAdmin: 'Asignado equipo Meta Quest 3 #01',
-  },
-  {
-    id: 'res-002',
-    folio: 'RES-2026-002',
-    categoriaId: 'fabricacion-digital',
-    equipoId: 'eq-fab-001',
-    codigoPlaiAsignado: 'PLAI-FD-001',
-    usuarioNombre: 'Ing. Carlos Rivas',
-    usuarioEmail: 'carlos.rivas@startupjalisco.com',
-    usuarioTelefono: '33 2201 9944',
-    usuarioInstitucion: 'Startup Hub CCD',
-    fechaUso: '2026-11-21',
-    horaInicio: '09:00',
-    horaFin: '14:00',
-    actividad: 'Impresión de carcasa para dispositivo IoT médico. Trae filamento PETG propio.',
-    estado: 'Pendiente',
-    accesoriosIncluidos: 'Placa texturizada PEI y boquilla 0.4mm',
-    condicionSalida: 'Excelente',
-    observacionesAdmin: 'Requiere revisión técnica de archivo STL previo',
-  }
-];
+interface ReservacionRow {
+  id: string;
+  folio: string;
+  categoria_id: string;
+  equipo_id: string | null;
+  codigo_plai_asignado: string | null;
+  usuario_id: string | null;
+  usuario_nombre: string;
+  usuario_email: string;
+  usuario_telefono: string | null;
+  usuario_institucion: string | null;
+  fecha_uso: string | Date;
+  hora_inicio: string;
+  hora_fin: string;
+  actividad: string;
+  estado: ReservacionItem['estado'];
+  accesorios_incluidos: string | null;
+  condicion_salida: string | null;
+  observaciones_admin: string | null;
+  aprobado_por: string | null;
+}
 
-export async function getReservacionesFromDB(): Promise<ReservacionItem[]> {
-  const localReservations = ensureDataFile<ReservacionItem[]>('reservaciones.json', initialReservaciones);
-  const allEquipos = ensureDataFile<DeviceItem[]>('equipos.json', mockDevices);
-
-  try {
-    const pool = getPool();
-    const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM reservaciones ORDER BY created_at DESC');
-    if (rows && rows.length > 0) {
-      const dbReservations: ReservacionItem[] = rows.map(r => {
-        const eqId = r.equipo_id || r.recurso_id || undefined;
-        const matchedEq = eqId ? allEquipos.find(e => e.id === eqId) : undefined;
-        const matchedCatSlug = matchedEq ? (CATEGORY_TO_ID_MAP[matchedEq.category] || 'realidad-virtual') : 'realidad-virtual';
-        return {
-          id: String(r.id),
-          folio: r.folio || String(r.id),
-          categoriaId: r.categoria_id || matchedCatSlug || 'realidad-virtual',
-          equipoId: eqId,
-          codigoPlaiAsignado: r.codigo_plai_asignado || matchedEq?.inventoryNumber || undefined,
-          usuarioNombre: r.usuario_nombre || r.nombre_solicitante || 'Usuario PLAi',
-          usuarioEmail: r.usuario_email || r.email_solicitante || '',
-          usuarioTelefono: r.usuario_telefono || undefined,
-          usuarioInstitucion: r.usuario_institucion || undefined,
-          fechaUso: String(r.fecha_uso || r.fecha || new Date().toISOString().split('T')[0]).split('T')[0],
-          horaInicio: String(r.hora_inicio || '10:00:00').substring(0, 5),
-          horaFin: String(r.hora_fin || '12:00:00').substring(0, 5),
-          actividad: r.actividad || 'Uso de laboratorio',
-          estado: r.estado || 'Pendiente',
-          accesoriosIncluidos: r.accesorios_incluidos || matchedEq?.accessories?.slice(0, 2).join(', ') || undefined,
-          condicionSalida: r.condicion_salida || 'Excelente',
-          observacionesAdmin: r.observaciones_admin || r.notas || undefined,
-          aprobadoPor: r.aprobado_por || undefined,
-        };
-      });
-
-      const mergedMap = new Map<string, ReservacionItem>();
-      for (const dbItem of dbReservations) mergedMap.set(dbItem.id, dbItem);
-      for (const localItem of localReservations) {
-        const existing = mergedMap.get(localItem.id);
-        mergedMap.set(localItem.id, {
-          ...existing,
-          ...localItem,
-          categoriaId: localItem.categoriaId || existing?.categoriaId || 'realidad-virtual',
-          folio: localItem.folio || existing?.folio || localItem.id,
-        });
-      }
-      return Array.from(mergedMap.values());
+export async function getReservacionesFromDB(filterByEmail?: string): Promise<ReservacionItem[]> {
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      const query = filterByEmail
+        ? 'SELECT * FROM reservaciones WHERE LOWER(usuario_email) = LOWER($1) ORDER BY created_at DESC'
+        : 'SELECT * FROM reservaciones ORDER BY created_at DESC';
+      const params = filterByEmail ? [filterByEmail] : [];
+      const { rows } = await pool.query<ReservacionRow>(query, params);
+      return rows.map((r) => ({
+        id: String(r.id),
+        folio: r.folio || String(r.id),
+        categoriaId: r.categoria_id || 'realidad-virtual',
+        equipoId: r.equipo_id || undefined,
+        codigoPlaiAsignado: r.codigo_plai_asignado || undefined,
+        usuarioId: r.usuario_id || undefined,
+        usuarioNombre: r.usuario_nombre,
+        usuarioEmail: r.usuario_email,
+        usuarioTelefono: r.usuario_telefono || undefined,
+        usuarioInstitucion: r.usuario_institucion || undefined,
+        fechaUso:
+          r.fecha_uso instanceof Date
+            ? r.fecha_uso.toISOString().split('T')[0]
+            : String(r.fecha_uso).split('T')[0],
+        horaInicio: String(r.hora_inicio || '10:00').substring(0, 5),
+        horaFin: String(r.hora_fin || '12:00').substring(0, 5),
+        actividad: r.actividad,
+        estado: r.estado || 'Pendiente',
+        accesoriosIncluidos: r.accesorios_incluidos || undefined,
+        condicionSalida: r.condicion_salida || 'Excelente',
+        observacionesAdmin: r.observaciones_admin || undefined,
+        aprobadoPor: r.aprobado_por || undefined,
+      }));
+    } catch (error) {
+      logger.error('Error al consultar reservaciones en PostgreSQL', { error: String(error) });
     }
-  } catch (error) {
-    logger.warn('MySQL no disponible para reservaciones, usando respaldo local', { error: String(error) });
   }
 
-  return localReservations.map(r => ({
-    ...r,
-    categoriaId: r.categoriaId || 'realidad-virtual',
-    folio: r.folio || r.id,
-    fechaUso: r.fechaUso || new Date().toISOString().split('T')[0],
-    horaInicio: r.horaInicio || '10:00',
-    horaFin: r.horaFin || '12:00',
-  }));
+  const list = getMemoryStore().reservaciones;
+  if (filterByEmail) {
+    const norm = filterByEmail.toLowerCase().trim();
+    return list.filter((r) => r.usuarioEmail?.toLowerCase().trim() === norm);
+  }
+  return list;
+}
+
+export async function insertReservacionInDB(item: ReservacionItem): Promise<boolean> {
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      await pool.query(
+        `
+        INSERT INTO reservaciones (
+          id, folio, categoria_id, equipo_id, codigo_plai_asignado,
+          usuario_id, usuario_nombre, usuario_email, usuario_telefono, usuario_institucion,
+          fecha_uso, hora_inicio, hora_fin, actividad, estado,
+          accesorios_incluidos, condicion_salida, observaciones_admin
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        ON CONFLICT (id) DO UPDATE SET
+          estado = EXCLUDED.estado,
+          equipo_id = EXCLUDED.equipo_id,
+          codigo_plai_asignado = EXCLUDED.codigo_plai_asignado,
+          updated_at = NOW()
+        `,
+        [
+          item.id,
+          item.folio || item.id,
+          item.categoriaId || 'realidad-virtual',
+          item.equipoId || null,
+          item.codigoPlaiAsignado || null,
+          item.usuarioId || null,
+          item.usuarioNombre,
+          item.usuarioEmail,
+          item.usuarioTelefono || null,
+          item.usuarioInstitucion || 'Comunidad PLAi',
+          item.fechaUso,
+          item.horaInicio,
+          item.horaFin,
+          item.actividad,
+          item.estado || 'Pendiente',
+          item.accesoriosIncluidos || null,
+          item.condicionSalida || 'Excelente',
+          item.observacionesAdmin || null,
+        ]
+      );
+      return true;
+    } catch (error) {
+      logger.error('Error al guardar reservación en PostgreSQL', { error: String(error) });
+      throw error;
+    }
+  }
+
+  const store = getMemoryStore();
+  const idx = store.reservaciones.findIndex((r) => r.id === item.id);
+  if (idx >= 0) store.reservaciones[idx] = item;
+  else store.reservaciones.unshift(item);
+  return true;
 }
 
 export async function updateReservacionInDB(
   id: string,
   update: Partial<ReservacionItem>
 ): Promise<boolean> {
-  try {
+  if (env.hasDatabaseConfig) {
     const pool = getPool();
+    const client = await pool.connect();
     try {
-      await pool.execute(`
+      await client.query('BEGIN');
+      const { rows } = await client.query<{ equipo_id: string | null; codigo_plai_asignado: string | null }>(
+        `
         UPDATE reservaciones SET
-          estado = COALESCE(?, estado),
-          equipo_id = COALESCE(?, equipo_id),
-          codigo_plai_asignado = COALESCE(?, codigo_plai_asignado),
-          accesorios_incluidos = COALESCE(?, accesorios_incluidos),
-          condicion_salida = COALESCE(?, condicion_salida),
-          observaciones_admin = COALESCE(?, observaciones_admin),
-          aprobado_por = COALESCE(?, aprobado_por)
-        WHERE id = ?
-      `, [
-        update.estado || null,
-        update.equipoId || null,
-        update.codigoPlaiAsignado || null,
-        update.accesoriosIncluidos || null,
-        update.condicionSalida || null,
-        update.observacionesAdmin || null,
-        update.aprobadoPor || null,
-        id
-      ]);
-    } catch {
-      await pool.execute(`
-        UPDATE reservaciones SET
-          estado = COALESCE(?, estado),
-          recurso_id = COALESCE(?, recurso_id),
-          notas = COALESCE(?, notas)
-        WHERE id = ?
-      `, [
-        update.estado || null,
-        update.equipoId || null,
-        update.observacionesAdmin || null,
-        id
-      ]);
-    }
-  } catch (error) {
-    logger.warn('Error al actualizar reservación en MySQL', { error: String(error) });
-  }
+          estado = COALESCE($1, estado),
+          equipo_id = COALESCE($2, equipo_id),
+          codigo_plai_asignado = COALESCE($3, codigo_plai_asignado),
+          accesorios_incluidos = COALESCE($4, accesorios_incluidos),
+          condicion_salida = COALESCE($5, condicion_salida),
+          observaciones_admin = COALESCE($6, observaciones_admin),
+          aprobado_por = COALESCE($7, aprobado_por),
+          usuario_nombre = COALESCE($8, usuario_nombre),
+          fecha_uso = COALESCE($9, fecha_uso),
+          hora_inicio = COALESCE($10, hora_inicio),
+          hora_fin = COALESCE($11, hora_fin),
+          actividad = COALESCE($12, actividad),
+          updated_at = NOW()
+        WHERE id = $13
+        RETURNING equipo_id, codigo_plai_asignado
+        `,
+        [
+          update.estado || null,
+          update.equipoId || null,
+          update.codigoPlaiAsignado || null,
+          update.accesoriosIncluidos ?? null,
+          update.condicionSalida || null,
+          update.observacionesAdmin ?? null,
+          update.aprobadoPor || null,
+          update.usuarioNombre || null,
+          update.fechaUso || null,
+          update.horaInicio || null,
+          update.horaFin || null,
+          update.actividad || null,
+          id,
+        ]
+      );
 
-  const items = ensureDataFile<ReservacionItem[]>('reservaciones.json', initialReservaciones);
-  let item = items.find(r => r.id === id);
-  if (item) {
-    Object.assign(item, update);
-  } else {
-    item = {
-      id,
-      folio: update.folio || id,
-      categoriaId: update.categoriaId || 'realidad-virtual',
-      usuarioNombre: update.usuarioNombre || 'Usuario PLAi',
-      usuarioEmail: update.usuarioEmail || 'user@plai.edu.mx',
-      fechaUso: update.fechaUso || new Date().toISOString().split('T')[0],
-      horaInicio: update.horaInicio || '10:00',
-      horaFin: update.horaFin || '12:00',
-      actividad: update.actividad || 'Solicitud de laboratorio',
-      estado: update.estado || 'Pendiente',
-      ...update,
-    };
-    items.unshift(item);
-  }
-  writeDataFile('reservaciones.json', items);
-
-  // Sincronizar el estado del dispositivo asignado en Inventario
-  const targetCodigo = update.codigoPlaiAsignado || item.codigoPlaiAsignado;
-  const targetEquipoId = update.equipoId || item.equipoId;
-  if (update.estado && (targetCodigo || targetEquipoId)) {
-    const equipos = ensureDataFile<DeviceItem[]>('equipos.json', mockDevices);
-    const eq = equipos.find(e =>
-      (targetCodigo && e.inventoryNumber.toLowerCase() === targetCodigo.toLowerCase()) ||
-      (targetEquipoId && e.id === targetEquipoId)
-    );
-    if (eq) {
-      let newDeviceStatus: DeviceItem['status'] | null = null;
-      if (update.estado === 'Aprobada' && eq.status === 'Disponible') {
-        newDeviceStatus = 'Reservado';
-      } else if (update.estado === 'En uso') {
-        newDeviceStatus = 'En uso';
-      } else if ((update.estado === 'Completada' || update.estado === 'Rechazada') && (eq.status === 'Reservado' || eq.status === 'En uso')) {
-        newDeviceStatus = 'Disponible';
+      const targetEquipoId = update.equipoId || rows[0]?.equipo_id;
+      const targetCodigo = update.codigoPlaiAsignado || rows[0]?.codigo_plai_asignado;
+      if (update.estado && (targetEquipoId || targetCodigo)) {
+        let newDeviceStatus: DeviceItem['status'] | null = null;
+        if (update.estado === 'Aprobada') newDeviceStatus = 'Reservado';
+        else if (update.estado === 'En uso') newDeviceStatus = 'En uso';
+        else if (update.estado === 'Completada' || update.estado === 'Rechazada') {
+          newDeviceStatus = 'Disponible';
+        }
+        if (newDeviceStatus) {
+          await client.query(
+            `UPDATE equipos SET estado = $1, updated_at = NOW()
+             WHERE ($2::text IS NOT NULL AND id = $2) OR ($3::text IS NOT NULL AND LOWER(codigo_plai) = LOWER($3))`,
+            [newDeviceStatus, targetEquipoId || null, targetCodigo || null]
+          );
+        }
       }
-      if (newDeviceStatus) {
-        eq.status = newDeviceStatus;
-        writeDataFile('equipos.json', equipos);
-        try {
-          const pool = getPool();
-          await pool.execute('UPDATE equipos SET estado = ? WHERE id = ? OR codigo_plai = ?', [newDeviceStatus, eq.id, eq.inventoryNumber]);
-        } catch {}
-      }
+
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error al actualizar reservación en PostgreSQL', { error: String(error) });
+      throw error;
+    } finally {
+      client.release();
     }
   }
 
-  return true;
-}
-
-export async function insertReservacionInDB(item: ReservacionItem): Promise<boolean> {
-  try {
-    const pool = getPool();
-    try {
-      await pool.execute(`
-        INSERT INTO reservaciones (
-          id, folio, categoria_id, equipo_id, codigo_plai_asignado,
-          usuario_nombre, usuario_email, usuario_telefono, usuario_institucion,
-          fecha_uso, hora_inicio, hora_fin, actividad, estado,
-          accesorios_incluidos, condicion_salida, observaciones_admin
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-          estado = VALUES(estado),
-          equipo_id = VALUES(equipo_id),
-          codigo_plai_asignado = VALUES(codigo_plai_asignado)
-      `, [
-        item.id,
-        item.folio || item.id,
-        item.categoriaId || 'realidad-virtual',
-        item.equipoId || null,
-        item.codigoPlaiAsignado || null,
-        item.usuarioNombre || 'Usuario Institucional',
-        item.usuarioEmail || 'user@plai.edu.mx',
-        item.usuarioTelefono || null,
-        item.usuarioInstitucion || 'Comunidad PLAi',
-        item.fechaUso || new Date().toISOString().split('T')[0],
-        item.horaInicio || '10:00:00',
-        item.horaFin || '12:00:00',
-        item.actividad || 'Uso de laboratorio',
-        item.estado || 'Pendiente',
-        item.accesoriosIncluidos || null,
-        item.condicionSalida || 'Excelente',
-        item.observacionesAdmin || null,
-      ]);
-    } catch {
-      await pool.execute(`
-        INSERT INTO reservaciones (
-          id, recurso_id, usuario_id, nombre_solicitante, email_solicitante,
-          fecha, hora_inicio, hora_fin, actividad, notas, estado, acepto_privacidad
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-        ON DUPLICATE KEY UPDATE
-          nombre_solicitante = VALUES(nombre_solicitante),
-          email_solicitante = VALUES(email_solicitante),
-          fecha = VALUES(fecha),
-          hora_inicio = VALUES(hora_inicio),
-          hora_fin = VALUES(hora_fin),
-          actividad = VALUES(actividad),
-          notas = VALUES(notas),
-          estado = VALUES(estado)
-      `, [
-        item.id || item.folio || `RES-${Date.now()}`,
-        item.equipoId || 'vr-01',
-        item.usuarioId || 'usr-standard-01',
-        item.usuarioNombre || 'Usuario Institucional',
-        item.usuarioEmail || 'user@plai.edu.mx',
-        item.fechaUso || new Date().toISOString().split('T')[0],
-        item.horaInicio || '10:00:00',
-        item.horaFin || '12:00:00',
-        item.actividad || 'Uso de laboratorio',
-        item.observacionesAdmin || item.actividad || '',
-        item.estado || 'Pendiente',
-      ]);
-    }
-  } catch (error) {
-    logger.warn('Error al guardar reservación en MySQL', { error: String(error) });
-  }
-
-  const items = ensureDataFile<ReservacionItem[]>('reservaciones.json', initialReservaciones);
-  const idx = items.findIndex(r => r.id === item.id);
-  if (idx >= 0) {
-    items[idx] = item;
-  } else {
-    items.unshift(item);
-  }
-  writeDataFile('reservaciones.json', items);
+  const store = getMemoryStore();
+  const item = store.reservaciones.find((r) => r.id === id);
+  if (item) Object.assign(item, update);
   return true;
 }
 
@@ -984,31 +897,31 @@ export interface IncidenciaItem {
   createdAt?: string;
 }
 
-const initialIncidencias: IncidenciaItem[] = [
-  {
-    id: 'inc-001',
-    folio: 'INC-2026-001',
-    equipoId: 'eq-vr-002',
-    codigoPlai: 'PLAI-VR-002',
-    equipoNombre: 'Meta Quest 3 128GB #02',
-    origen: 'Devolución de Préstamo',
-    tipoFalla: 'Calibración',
-    severidad: 'Media',
-    descripcion: 'Controlador derecho pierde tracking espacial intermitentemente al apuntar hacia abajo.',
-    estado: 'En diagnóstico',
-    tecnicoResponsable: 'Ing. Carlos Mendoza',
-    fechaReporte: '2026-10-14 11:20:00',
-    accionesRealizadas: 'Reinstalación de firmware y cambio de batería alcalina.',
-  }
-];
+interface IncidenciaRow {
+  id: string;
+  folio: string;
+  equipo_id: string;
+  codigo_plai: string;
+  equipo_nombre: string;
+  origen: IncidenciaItem['origen'];
+  tipo_falla: IncidenciaItem['tipoFalla'];
+  severidad: IncidenciaItem['severidad'];
+  descripcion: string;
+  estado: IncidenciaItem['estado'];
+  tecnico_responsable: string;
+  fecha_reporte: string | Date;
+  fecha_resolucion: string | Date | null;
+  acciones_realizadas: string | null;
+}
 
 export async function getIncidenciasFromDB(): Promise<IncidenciaItem[]> {
-  const localIncidencias = ensureDataFile<IncidenciaItem[]>('incidencias.json', initialIncidencias);
-  try {
-    const pool = getPool();
-    const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM incidencias_mantenimiento ORDER BY fecha_reporte DESC');
-    if (rows && rows.length > 0) {
-      const dbIncidencias: IncidenciaItem[] = rows.map(r => ({
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      const { rows } = await pool.query<IncidenciaRow>(
+        'SELECT * FROM incidencias_mantenimiento ORDER BY fecha_reporte DESC'
+      );
+      return rows.map((r) => ({
         id: String(r.id),
         folio: r.folio,
         equipoId: r.equipo_id,
@@ -1020,70 +933,65 @@ export async function getIncidenciasFromDB(): Promise<IncidenciaItem[]> {
         descripcion: r.descripcion,
         estado: r.estado,
         tecnicoResponsable: r.tecnico_responsable,
-        fechaReporte: String(r.fecha_reporte),
-        fechaResolucion: r.fecha_resolucion ? String(r.fecha_resolucion) : undefined,
+        fechaReporte: formatTimestamp(r.fecha_reporte),
+        fechaResolucion: r.fecha_resolucion ? formatTimestamp(r.fecha_resolucion) : undefined,
         accionesRealizadas: r.acciones_realizadas || undefined,
       }));
-      const mergedMap = new Map<string, IncidenciaItem>();
-      for (const dbInc of dbIncidencias) mergedMap.set(dbInc.id, dbInc);
-      for (const localInc of localIncidencias) {
-        const existing = mergedMap.get(localInc.id);
-        mergedMap.set(localInc.id, { ...existing, ...localInc });
-      }
-      return Array.from(mergedMap.values());
+    } catch (error) {
+      logger.error('Error al consultar incidencias en PostgreSQL', { error: String(error) });
     }
-  } catch (error) {
-    logger.warn('MySQL no disponible para incidencias, usando respaldo local', { error: String(error) });
   }
-
-  return localIncidencias;
+  return getMemoryStore().incidencias;
 }
 
 export async function insertIncidenciaInDB(incidencia: IncidenciaItem): Promise<boolean> {
-  try {
+  if (env.hasDatabaseConfig) {
     const pool = getPool();
-    const query = `
-      INSERT INTO incidencias_mantenimiento (
-        id, folio, equipo_id, codigo_plai, equipo_nombre, origen,
-        tipo_falla, severidad, descripcion, estado, tecnico_responsable,
-        fecha_reporte, acciones_realizadas
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    const values = [
-      incidencia.id,
-      incidencia.folio,
-      incidencia.equipoId,
-      incidencia.codigoPlai,
-      incidencia.equipoNombre,
-      incidencia.origen,
-      incidencia.tipoFalla,
-      incidencia.severidad,
-      incidencia.descripcion,
-      incidencia.estado,
-      incidencia.tecnicoResponsable,
-      incidencia.fechaReporte,
-      incidencia.accionesRealizadas || null,
-    ];
-
-    await pool.execute(query, values);
-    await pool.execute('UPDATE equipos SET estado = "En mantenimiento" WHERE codigo_plai = ? OR id = ?', [incidencia.codigoPlai, incidencia.equipoId]);
-  } catch (error) {
-    logger.warn('Error al guardar incidencia en MySQL', { error: String(error) });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `
+        INSERT INTO incidencias_mantenimiento (
+          id, folio, equipo_id, codigo_plai, equipo_nombre, origen,
+          tipo_falla, severidad, descripcion, estado, tecnico_responsable,
+          fecha_reporte, acciones_realizadas
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        ON CONFLICT (id) DO NOTHING
+        `,
+        [
+          incidencia.id,
+          incidencia.folio,
+          incidencia.equipoId,
+          incidencia.codigoPlai,
+          incidencia.equipoNombre,
+          incidencia.origen,
+          incidencia.tipoFalla,
+          incidencia.severidad,
+          incidencia.descripcion,
+          incidencia.estado,
+          incidencia.tecnicoResponsable,
+          incidencia.fechaReporte,
+          incidencia.accionesRealizadas || null,
+        ]
+      );
+      await client.query(
+        `UPDATE equipos SET estado = 'En mantenimiento', updated_at = NOW() WHERE codigo_plai = $1 OR id = $2`,
+        [incidencia.codigoPlai, incidencia.equipoId]
+      );
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error al registrar incidencia en PostgreSQL', { error: String(error) });
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
-  const items = ensureDataFile<IncidenciaItem[]>('incidencias.json', initialIncidencias);
-  items.unshift(incidencia);
-  writeDataFile('incidencias.json', items);
-
-  // Actualizar estado del equipo a "En mantenimiento"
-  const equipos = ensureDataFile<DeviceItem[]>('equipos.json', mockDevices);
-  const eq = equipos.find(e => e.inventoryNumber.toLowerCase() === incidencia.codigoPlai.toLowerCase() || e.id === incidencia.equipoId);
-  if (eq) {
-    eq.status = 'En mantenimiento';
-    writeDataFile('equipos.json', equipos);
-  }
-
+  const store = getMemoryStore();
+  store.incidencias.unshift(incidencia);
   return true;
 }
 
@@ -1092,57 +1000,59 @@ export async function updateIncidenciaStatusInDB(
   estado: IncidenciaItem['estado'],
   accionesRealizadas?: string
 ): Promise<boolean> {
-  try {
+  if (env.hasDatabaseConfig) {
     const pool = getPool();
-    const fechaResolucion = estado === 'Resuelta' ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null;
-    await pool.execute(`
-      UPDATE incidencias_mantenimiento SET
-        estado = ?,
-        fecha_resolucion = COALESCE(?, fecha_resolucion),
-        acciones_realizadas = COALESCE(?, acciones_realizadas)
-      WHERE id = ?
-    `, [estado, fechaResolucion, accionesRealizadas || null, id]);
-
-    const [rows] = await pool.query<RowDataPacket[]>('SELECT codigo_plai FROM incidencias_mantenimiento WHERE id = ?', [id]);
-    if (rows && rows[0]) {
-      const nuevoEstado = estado === 'Resuelta' ? 'Disponible' : 'En mantenimiento';
-      await pool.execute('UPDATE equipos SET estado = ? WHERE codigo_plai = ?', [nuevoEstado, rows[0].codigo_plai]);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const fechaResolucion =
+        estado === 'Resuelta' ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null;
+      const { rows } = await client.query<{ codigo_plai: string; equipo_id: string }>(
+        `
+        UPDATE incidencias_mantenimiento SET
+          estado = $1,
+          fecha_resolucion = COALESCE($2, fecha_resolucion),
+          acciones_realizadas = COALESCE($3, acciones_realizadas),
+          updated_at = NOW()
+        WHERE id = $4
+        RETURNING codigo_plai, equipo_id
+        `,
+        [estado, fechaResolucion, accionesRealizadas || null, id]
+      );
+      if (rows[0]) {
+        const nuevoEstado = estado === 'Resuelta' ? 'Disponible' : 'En mantenimiento';
+        await client.query(
+          'UPDATE equipos SET estado = $1, updated_at = NOW() WHERE codigo_plai = $2 OR id = $3',
+          [nuevoEstado, rows[0].codigo_plai, rows[0].equipo_id]
+        );
+      }
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Error al actualizar incidencia en PostgreSQL', { error: String(error) });
+      throw error;
+    } finally {
+      client.release();
     }
-  } catch (error) {
-    logger.warn('Error al actualizar incidencia en MySQL', { error: String(error) });
   }
 
-  const items = ensureDataFile<IncidenciaItem[]>('incidencias.json', initialIncidencias);
-  const inc = items.find(i => i.id === id);
+  const store = getMemoryStore();
+  const inc = store.incidencias.find((i) => i.id === id);
   if (inc) {
     inc.estado = estado;
-    const equipos = ensureDataFile<DeviceItem[]>('equipos.json', mockDevices);
-    const eq = equipos.find(e => e.inventoryNumber.toLowerCase() === inc.codigoPlai.toLowerCase() || e.id === inc.equipoId);
-    if (estado === 'Resuelta') {
-      inc.fechaResolucion = new Date().toISOString();
-      if (eq) {
-        eq.status = 'Disponible';
-        writeDataFile('equipos.json', equipos);
-      }
-    } else if (eq && eq.status !== 'En mantenimiento') {
-      eq.status = 'En mantenimiento';
-      writeDataFile('equipos.json', equipos);
-    }
     if (accionesRealizadas) inc.accionesRealizadas = accionesRealizadas;
-    writeDataFile('incidencias.json', items);
   }
-
   return true;
 }
 
 // ====================================================================
-// 6. USUARIOS INSTITUCIONALES (VINCULADOS CON AUTH Y RESERVACIONES)
+// 6. USUARIOS INSTITUCIONALES (CON HASH CRIPTOGRÁFICO DE CONTRASEÑAS)
 // ====================================================================
 export interface UsuarioItem {
   id: string;
   name: string;
   email: string;
-  password?: string;
   role: 'Administrador' | 'Colaborador' | 'Usuario Final';
   status: 'Activo' | 'Inactivo';
   dependencia?: string;
@@ -1151,134 +1061,248 @@ export interface UsuarioItem {
   reservations: number;
 }
 
-const initialUsuarios: UsuarioItem[] = [
-  {
-    id: 'usr-admin-01',
-    name: 'Administrador General PLAi',
-    email: 'admin@plai.edu.mx',
-    password: '123admin',
-    role: 'Administrador',
-    status: 'Activo',
-    dependencia: 'Dirección de Innovación y Tecnología PLAi',
-    lastLogin: '2026-11-16',
-    reservations: 0,
-  },
-  {
-    id: 'usr-standard-01',
-    name: 'Investigador / Alumno PLAi',
-    email: 'user@plai.edu.mx',
-    password: '123user',
-    role: 'Usuario Final',
-    status: 'Activo',
-    dependencia: 'Centro Universitario de Ciencias Exactas e Ingenierías (CUCEI)',
-    lastLogin: '2026-11-16',
-    reservations: 1,
-  },
-  {
-    id: 'usr-colab-01',
-    name: 'Coordinador de Talleres PLAi',
-    email: 'tallerista@plai.edu.mx',
-    password: '123colab',
-    role: 'Colaborador',
-    status: 'Activo',
-    dependencia: 'Laboratorio Maker Ciudad Creativa Digital',
-    lastLogin: '2026-11-15',
-    reservations: 2,
-  },
-  {
-    id: 'usr-user-02',
-    name: 'Ana García Rivera',
-    email: 'ana.garcia@alumnos.udg.mx',
-    password: '123user',
-    role: 'Usuario Final',
-    status: 'Activo',
-    dependencia: 'Universidad de Guadalajara (CUAAD)',
-    lastLogin: '2026-11-14',
-    reservations: 1,
-  },
-  {
-    id: 'usr-colab-02',
-    name: 'Ing. Carlos Rivas',
-    email: 'carlos.rivas@startupjalisco.com',
-    password: '123colab',
-    role: 'Colaborador',
-    status: 'Activo',
-    dependencia: 'Startup Hub CCD',
-    lastLogin: '2026-11-14',
-    reservations: 1,
-  },
-  {
-    id: 'usr-user-03',
-    name: 'Lic. Mariana Torres',
-    email: 'mariana.torres@cudi.edu.mx',
-    password: '123user',
-    role: 'Usuario Final',
-    status: 'Activo',
-    dependencia: 'Universidad de Guadalajara',
-    lastLogin: '2026-10-10',
-    reservations: 1,
-  },
-];
-
-export async function getUsuariosFromDB(): Promise<UsuarioItem[]> {
-  const localUsers = ensureDataFile<UsuarioItem[]>('usuarios.json', initialUsuarios);
-  const allReservas = await getReservacionesFromDB();
-  const allBitacora = await getBitacoraFromDB();
-
-  return localUsers.map(u => {
-    const emailNorm = u.email.toLowerCase().trim();
-    const resCount = allReservas.filter(r => r.usuarioEmail?.toLowerCase().trim() === emailNorm).length;
-    const bitCount = allBitacora.filter(b => b.usuarioEmail?.toLowerCase().trim() === emailNorm).length;
-    return {
-      ...u,
-      reservations: Math.max(resCount + bitCount, resCount),
-    };
-  });
+export interface UsuarioAuthRecord {
+  id: string;
+  name: string;
+  email: string;
+  passwordHash: string;
+  role: 'admin' | 'colaborador' | 'usuario';
+  status: 'Activo' | 'Inactivo' | 'Suspendido';
 }
 
-export async function upsertUsuarioInDB(user: UsuarioItem): Promise<UsuarioItem> {
-  const users = ensureDataFile<UsuarioItem[]>('usuarios.json', initialUsuarios);
-  const idx = users.findIndex(u => u.id === user.id || u.email.toLowerCase() === user.email.toLowerCase());
-  if (idx >= 0) {
-    users[idx] = {
-      ...users[idx],
-      ...user,
-      password: user.password || users[idx].password || '123user',
-    };
-  } else {
-    users.push({
-      ...user,
-      password: user.password || '123user',
-    });
-  }
-  writeDataFile('usuarios.json', users);
+interface UsuarioRecord extends UsuarioItem {
+  passwordHash: string;
+}
 
+interface UsuarioRow {
+  id: string;
+  nombre: string;
+  email: string;
+  password_hash: string;
+  rol: 'admin' | 'colaborador' | 'usuario';
+  estado: 'Activo' | 'Inactivo' | 'Suspendido';
+  telefono: string | null;
+  dependencia: string | null;
+  ultimo_login: string | Date | null;
+  created_at: string | Date | null;
+}
+
+function mapDbRoleToLabel(rol: string): UsuarioItem['role'] {
+  if (rol === 'admin') return 'Administrador';
+  if (rol === 'colaborador') return 'Colaborador';
+  return 'Usuario Final';
+}
+
+function mapLabelToDbRole(role: UsuarioItem['role']): 'admin' | 'colaborador' | 'usuario' {
+  if (role === 'Administrador') return 'admin';
+  if (role === 'Colaborador') return 'colaborador';
+  return 'usuario';
+}
+
+export async function getUsuarioByEmailForAuth(email: string): Promise<UsuarioAuthRecord | null> {
+  const normalized = email.trim().toLowerCase();
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      const { rows } = await pool.query<UsuarioRow>(
+        'SELECT id, nombre, email, password_hash, rol, estado FROM usuarios WHERE LOWER(email) = $1 LIMIT 1',
+        [normalized]
+      );
+      if (!rows[0]) return null;
+      return {
+        id: rows[0].id,
+        name: rows[0].nombre,
+        email: rows[0].email,
+        passwordHash: rows[0].password_hash,
+        role: rows[0].rol,
+        status: rows[0].estado,
+      };
+    } catch (error) {
+      logger.error('Error al consultar usuario para autenticación en PostgreSQL', { error: String(error) });
+      return null;
+    }
+  }
+
+  const found = getMemoryStore().usuarios.find((u) => u.email.toLowerCase() === normalized);
+  if (!found) return null;
+  return {
+    id: found.id,
+    name: found.name,
+    email: found.email,
+    passwordHash: found.passwordHash,
+    role: mapLabelToDbRole(found.role),
+    status: found.status,
+  };
+}
+
+export async function updateUsuarioLastLogin(userId: string): Promise<void> {
+  if (!env.hasDatabaseConfig) return;
   try {
     const pool = getPool();
-    const dbRol = user.role === 'Administrador' ? 'admin' : user.role === 'Colaborador' ? 'colaborador' : 'usuario';
-    await pool.execute(`
-      INSERT INTO usuarios (id, nombre, email, password, rol, estado, dependencia)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        nombre = VALUES(nombre),
-        email = VALUES(email),
-        rol = VALUES(rol),
-        estado = VALUES(estado),
-        dependencia = VALUES(dependencia)
-    `, [
-      user.id,
-      user.name,
-      user.email,
-      user.password || '123user',
-      dbRol,
-      user.status,
-      user.dependencia || 'Comunidad PLAi',
+    await pool.query('UPDATE usuarios SET ultimo_login = NOW(), updated_at = NOW() WHERE id = $1', [
+      userId,
     ]);
   } catch (error) {
-    logger.warn('No se pudo sincronizar usuario en MySQL, persistido en usuarios.json', { error: String(error) });
+    logger.warn('No se pudo actualizar último acceso del usuario', { userId, error: String(error) });
+  }
+}
+
+export async function getUsuariosFromDB(): Promise<UsuarioItem[]> {
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      const { rows } = await pool.query<UsuarioRow & { total_reservas: string }>(`
+        SELECT
+          u.id, u.nombre, u.email, u.rol, u.estado, u.telefono, u.dependencia, u.ultimo_login, u.created_at,
+          (
+            SELECT COUNT(*) FROM reservaciones r WHERE LOWER(r.usuario_email) = LOWER(u.email)
+          ) AS total_reservas
+        FROM usuarios u
+        ORDER BY u.created_at DESC, u.nombre ASC
+      `);
+      return rows.map((r) => ({
+        id: r.id,
+        name: r.nombre,
+        email: r.email,
+        role: mapDbRoleToLabel(r.rol),
+        status: r.estado === 'Activo' ? 'Activo' : 'Inactivo',
+        dependencia: r.dependencia || 'Comunidad PLAi',
+        telefono: r.telefono || undefined,
+        lastLogin: r.ultimo_login
+          ? formatTimestamp(r.ultimo_login).split(' ')[0]
+          : r.created_at
+          ? formatTimestamp(r.created_at).split(' ')[0]
+          : 'Sin registro',
+        reservations: Number(r.total_reservas || 0),
+      }));
+    } catch (error) {
+      logger.error('Error al consultar usuarios en PostgreSQL', { error: String(error) });
+    }
   }
 
-  return user;
+  return getMemoryStore().usuarios.map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    status: u.status,
+    dependencia: u.dependencia,
+    telefono: u.telefono,
+    lastLogin: u.lastLogin,
+    reservations: u.reservations,
+  }));
+}
+
+export async function upsertUsuarioInDB(
+  user: UsuarioItem & { password?: string }
+): Promise<UsuarioItem> {
+  const dbRol = mapLabelToDbRole(user.role);
+  const hashed = user.password && user.password.trim().length > 0 ? hashPassword(user.password.trim()) : null;
+
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      if (hashed) {
+        await pool.query(
+          `
+          INSERT INTO usuarios (id, nombre, email, password_hash, rol, estado, telefono, dependencia)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          ON CONFLICT (id) DO UPDATE SET
+            nombre = EXCLUDED.nombre,
+            email = EXCLUDED.email,
+            password_hash = EXCLUDED.password_hash,
+            rol = EXCLUDED.rol,
+            estado = EXCLUDED.estado,
+            telefono = EXCLUDED.telefono,
+            dependencia = EXCLUDED.dependencia,
+            updated_at = NOW()
+          `,
+          [
+            user.id,
+            user.name,
+            user.email.toLowerCase(),
+            hashed,
+            dbRol,
+            user.status,
+            user.telefono || null,
+            user.dependencia || 'Comunidad PLAi',
+          ]
+        );
+      } else {
+        // Actualización sin modificar password_hash existente
+        const updated = await pool.query(
+          `
+          UPDATE usuarios SET
+            nombre = $1,
+            email = $2,
+            rol = $3,
+            estado = $4,
+            telefono = $5,
+            dependencia = $6,
+            updated_at = NOW()
+          WHERE id = $7
+          `,
+          [
+            user.name,
+            user.email.toLowerCase(),
+            dbRol,
+            user.status,
+            user.telefono || null,
+            user.dependencia || 'Comunidad PLAi',
+            user.id,
+          ]
+        );
+        if ((updated.rowCount ?? 0) === 0) {
+          throw new Error('Se requiere una contraseña para registrar un nuevo usuario.');
+        }
+      }
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email.toLowerCase(),
+        role: user.role,
+        status: user.status,
+        dependencia: user.dependencia,
+        telefono: user.telefono,
+        lastLogin: user.lastLogin,
+        reservations: user.reservations,
+      };
+    } catch (error) {
+      logger.error('Error al guardar usuario en PostgreSQL', { error: String(error) });
+      throw error;
+    }
+  }
+
+  const store = getMemoryStore();
+  const idx = store.usuarios.findIndex(
+    (u) => u.id === user.id || u.email.toLowerCase() === user.email.toLowerCase()
+  );
+  if (idx >= 0) {
+    store.usuarios[idx] = {
+      ...store.usuarios[idx],
+      ...user,
+      passwordHash: hashed || store.usuarios[idx].passwordHash,
+    };
+  } else {
+    if (!hashed) {
+      throw new Error('Se requiere una contraseña para registrar un nuevo usuario.');
+    }
+    store.usuarios.push({
+      ...user,
+      passwordHash: hashed,
+    });
+  }
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email.toLowerCase(),
+    role: user.role,
+    status: user.status,
+    dependencia: user.dependencia,
+    telefono: user.telefono,
+    lastLogin: user.lastLogin,
+    reservations: user.reservations,
+  };
 }
 
 // ====================================================================
@@ -1301,67 +1325,102 @@ export interface CursoAgendaItem {
   institucion?: string;
 }
 
-const initialCursos: CursoAgendaItem[] = [
-  {
-    id: 'CUR-101',
-    titulo: 'Taller de Fabricación Digital e Impresión 3D',
-    tipo: 'Presencial · Laboratorio Maker',
-    fecha: '2026-11-20',
-    hora: '10:00 - 14:00',
-    lugar: 'Aula Maker · Edificio C, Ciudad Creativa Digital',
-    asistentes: 25,
-    estado: 'Confirmado',
-    icon: '🖨️',
-    instructor: 'Ing. Carlos Mendoza (PLAi Jalisco)',
-    descripcion: 'Capacitación práctica en modelado CAD, laminado en slicer y operación de impresoras 3D Bambu Lab y Prusa.',
-    solicitanteEmail: 'user@plai.edu.mx',
-  },
-  {
-    id: 'CUR-102',
-    titulo: 'Introducción a Robótica Educativa con Dobot',
-    tipo: 'Práctica Guiada',
-    fecha: '2026-11-24',
-    hora: '09:00 - 13:00',
-    lugar: 'Laboratorio de Robótica y STEAM',
-    asistentes: 30,
-    estado: 'Confirmado',
-    icon: '🤖',
-    instructor: 'Dra. Laura Morales',
-    descripcion: 'Programación por bloques y Python para brazos robóticos de 4 ejes en ambientes colaborativos de prototipado.',
-    solicitanteEmail: 'user@plai.edu.mx',
-  },
-  {
-    id: 'CUR-103',
-    titulo: 'Inmersión en Realidad Virtual y Espacios Educativos',
-    tipo: 'Workshop VR',
-    fecha: '2026-11-28',
-    hora: '11:00 - 13:30',
-    lugar: 'Sala Inmersiva Meta Quest 3',
-    asistentes: 18,
-    estado: 'Confirmado',
-    icon: '🥽',
-    instructor: 'Mtro. Fernando Tapia',
-    descripcion: 'Pruebas de passthrough, hand-tracking y aplicaciones científicas para estudiantes en Meta Quest 3.',
-    solicitanteEmail: 'user@plai.edu.mx',
-  },
-];
+interface CursoRow {
+  id: string;
+  titulo: string;
+  tipo: string;
+  fecha: string | Date;
+  hora: string;
+  lugar: string;
+  asistentes: number;
+  estado: CursoAgendaItem['estado'];
+  icon: string;
+  instructor: string;
+  descripcion: string;
+  solicitante_nombre: string | null;
+  solicitante_email: string | null;
+  institucion: string | null;
+}
 
 export async function getCursosFromDB(): Promise<CursoAgendaItem[]> {
-  return ensureDataFile<CursoAgendaItem[]>('cursos.json', initialCursos);
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      const { rows } = await pool.query<CursoRow>(
+        'SELECT * FROM cursos_agenda ORDER BY fecha ASC, created_at DESC'
+      );
+      return rows.map((r) => ({
+        id: r.id,
+        titulo: r.titulo,
+        tipo: r.tipo,
+        fecha:
+          r.fecha instanceof Date ? r.fecha.toISOString().split('T')[0] : String(r.fecha).split('T')[0],
+        hora: r.hora,
+        lugar: r.lugar,
+        asistentes: Number(r.asistentes || 1),
+        estado: r.estado,
+        icon: r.icon || '🎓',
+        instructor: r.instructor,
+        descripcion: r.descripcion,
+        solicitanteNombre: r.solicitante_nombre || undefined,
+        solicitanteEmail: r.solicitante_email || undefined,
+        institucion: r.institucion || undefined,
+      }));
+    } catch (error) {
+      logger.error('Error al consultar cursos en PostgreSQL', { error: String(error) });
+    }
+  }
+  return getMemoryStore().cursos;
 }
 
 export async function insertCursoInDB(curso: CursoAgendaItem): Promise<CursoAgendaItem> {
-  const cursos = ensureDataFile<CursoAgendaItem[]>('cursos.json', initialCursos);
-  cursos.unshift(curso);
-  writeDataFile('cursos.json', cursos);
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      await pool.query(
+        `
+        INSERT INTO cursos_agenda (
+          id, titulo, tipo, fecha, hora, lugar, asistentes, estado, icon,
+          instructor, descripcion, solicitante_nombre, solicitante_email, institucion
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        ON CONFLICT (id) DO NOTHING
+        `,
+        [
+          curso.id,
+          curso.titulo,
+          curso.tipo,
+          curso.fecha,
+          curso.hora,
+          curso.lugar,
+          curso.asistentes,
+          curso.estado,
+          curso.icon,
+          curso.instructor,
+          curso.descripcion,
+          curso.solicitanteNombre || null,
+          curso.solicitanteEmail || null,
+          curso.institucion || null,
+        ]
+      );
+    } catch (error) {
+      logger.error('Error al guardar curso en PostgreSQL', { error: String(error) });
+      throw error;
+    }
+  } else {
+    getMemoryStore().cursos.unshift(curso);
+  }
 
-  // Registrar también en Reservaciones para que el Administrador pueda aprobar/gestionar la visita o taller
+  // Vincular solicitud de curso/visita en reservaciones para aprobación administrativa
   await insertReservacionInDB({
     id: `res-${Date.now()}`,
     folio: curso.id,
-    categoriaId: curso.titulo.toLowerCase().includes('rob') ? 'robotica' : curso.titulo.toLowerCase().includes('impres') ? 'fabricacion-digital' : 'realidad-virtual',
+    categoriaId: curso.titulo.toLowerCase().includes('rob')
+      ? 'robotica'
+      : curso.titulo.toLowerCase().includes('impres')
+      ? 'fabricacion-digital'
+      : 'realidad-virtual',
     usuarioNombre: curso.solicitanteNombre || 'Solicitante Institucional',
-    usuarioEmail: curso.solicitanteEmail || 'user@plai.edu.mx',
+    usuarioEmail: curso.solicitanteEmail || '',
     usuarioInstitucion: curso.institucion || curso.tipo,
     fechaUso: curso.fecha,
     horaInicio: '10:00',
@@ -1392,7 +1451,7 @@ export interface SystemConfig {
 const initialSystemConfig: SystemConfig = {
   labName: 'PLAi — Laboratorio de Innovación, Robótica y Tecnologías Inmersivas',
   labLocation: 'Torre C, Ciudad Creativa Digital, Guadalajara, Jalisco',
-  adminEmail: 'admin@plai.edu.mx',
+  adminEmail: 'plai.ayuda@plai.mx',
   maintenanceAlertDays: 30,
   allowPublicView: true,
   requireApproval: true,
@@ -1407,11 +1466,44 @@ const initialSystemConfig: SystemConfig = {
   ],
 };
 
-export function getSystemConfigFromDB(): SystemConfig {
-  return ensureDataFile<SystemConfig>('configuracion.json', initialSystemConfig);
+export async function getSystemConfigFromDB(): Promise<SystemConfig> {
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      const { rows } = await pool.query<{ valor: SystemConfig }>(
+        `SELECT valor FROM configuracion_sistema WHERE clave = 'general' LIMIT 1`
+      );
+      if (rows[0]?.valor) {
+        return { ...initialSystemConfig, ...rows[0].valor };
+      }
+    } catch (error) {
+      logger.error('Error al consultar configuración en PostgreSQL', { error: String(error) });
+    }
+  }
+  return getMemoryStore().config;
 }
 
-export function saveSystemConfigInDB(cfg: SystemConfig): SystemConfig {
-  writeDataFile('configuracion.json', cfg);
+export async function saveSystemConfigInDB(cfg: SystemConfig): Promise<SystemConfig> {
+  if (env.hasDatabaseConfig) {
+    try {
+      const pool = getPool();
+      await pool.query(
+        `
+        INSERT INTO configuracion_sistema (clave, valor, updated_at)
+        VALUES ('general', $1::jsonb, NOW())
+        ON CONFLICT (clave) DO UPDATE SET
+          valor = EXCLUDED.valor,
+          updated_at = NOW()
+        `,
+        [JSON.stringify(cfg)]
+      );
+      return cfg;
+    } catch (error) {
+      logger.error('Error al guardar configuración en PostgreSQL', { error: String(error) });
+      throw error;
+    }
+  }
+
+  getMemoryStore().config = cfg;
   return cfg;
 }
