@@ -57,10 +57,26 @@ export const env = {
     return process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
   },
   get directusUrl(): string {
-    return process.env.DIRECTUS_URL || '';
+    return process.env.DIRECTUS_URL || 'https://admin.plai.mx';
   },
   get directusToken(): string {
     return getEnvSecret('DIRECTUS_TOKEN');
+  },
+  // Keycloak OIDC / SSO Institucional PLAi
+  get keycloakClientId(): string {
+    return getEnvSecret('KEYCLOAK_ID') || getEnvSecret('KEYCLOAK_CLIENT_ID') || 'plai-recursos';
+  },
+  get keycloakClientSecret(): string {
+    return getEnvSecret('KEYCLOAK_SECRET') || getEnvSecret('KEYCLOAK_CLIENT_SECRET');
+  },
+  get keycloakIssuer(): string {
+    return process.env.KEYCLOAK_ISSUER || 'https://auth.plai.mx/realms/plai';
+  },
+  get isKeycloakConfigured(): boolean {
+    return Boolean(
+      (process.env.KEYCLOAK_ISSUER || process.env.KEYCLOAK_ID || process.env.KEYCLOAK_ID_FILE) &&
+      (this.keycloakClientSecret || !this.isProduction)
+    );
   },
   get nextAuthUrl(): string {
     return process.env.NEXTAUTH_URL || 'http://localhost:3000';
@@ -71,7 +87,9 @@ export const env = {
       return configured;
     }
     if (this.isProduction) {
-      return '';
+      throw new Error(
+        'CRÍTICO: NEXTAUTH_SECRET es obligatorio en producción (usar Docker secret /run/secrets/nextauth_secret o NEXTAUTH_SECRET_FILE).'
+      );
     }
     return 'plai-local-development-secret-only-change-in-production';
   },

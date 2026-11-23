@@ -1,11 +1,59 @@
 # Stack de Docker Swarm (Estándar PLAi v1.0, Sección 5.2)
 # Despliegue: docker stack deploy -c docker-compose.yml plai-recursos
-# PLAi construye y publica la imagen en su registro privado; 'build' no se usa en Swarm.
-# Sustituir los valores marcados como EJEMPLO por los asignados por Tecnología PLAi.
+# Incluye arquitectura de red de doble capa:
+#   1. plai_public: donde escucha NGINX (conectado a Traefik institucional).
+#   2. plai_isolated_backend (internal: true): red privada y aislada donde vive la app Next.js.
 services:
+  nginx:
+    image: registry.example.plai.mx/plai-recursos-nginx:1.0.0
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - type: tmpfs
+        target: /var/cache/nginx
+      - type: tmpfs
+        target: /var/run
+      - type: tmpfs
+        target: /tmp
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+      restart_policy:
+        condition: on-failure
+      labels:
+        # Entrada pública institucional vía Traefik v3
+        - traefik.enable=true
+        - traefik.http.routers.plai-recursos.rule=Host(`recursos.example.plai.mx`)
+        - traefik.http.routers.plai-recursos.entrypoints=websecure
+        - traefik.http.routers.plai-recursos.tls=true
+        - traefik.http.services.plai-recursos.loadbalancer.server.port=80
+    networks:
+      - plai_public
+      - plai_isolated_backend
+
   app:
-    # Versión fija, nunca :latest
     image: registry.example.plai.mx/plai-recursos-espacios:1.0.0
+    build:
+      context: .
+      dockerfile: Dockerfile
     read_only: true
     cap_drop:
       - ALL
@@ -14,16 +62,24 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3000"
+      HOSTNAME: "0.0.0.0"
       NEXT_TELEMETRY_DISABLED: "1"
-      NEXT_PUBLIC_SITE_URL: https://recursos.example.plai.mx   # EJEMPLO
-      NEXTAUTH_URL: https://recursos.example.plai.mx           # EJEMPLO
+      NEXT_PUBLIC_SITE_URL: https://recursos.example.plai.mx
+      NEXTAUTH_URL: https://recursos.example.plai.mx
       NEXTAUTH_SECRET_FILE: /run/secrets/nextauth_secret
       DATABASE_URL_FILE: /run/secrets/database_url
+      KEYCLOAK_ID_FILE: /run/secrets/keycloak_id
+      KEYCLOAK_SECRET_FILE: /run/secrets/keycloak_secret
+      KEYCLOAK_ISSUER: https://auth.plai.mx/realms/plai
+      DIRECTUS_URL: https://admin.plai.mx
+      DIRECTUS_TOKEN_FILE: /run/secrets/directus_token
     secrets:
       - nextauth_secret
       - database_url
+      - keycloak_id
+      - keycloak_secret
+      - directus_token
     volumes:
-      # Único espacio escribible (sistema de archivos de solo lectura)
       - type: tmpfs
         target: /tmp
       - type: tmpfs
@@ -47,23 +103,27 @@ services:
           memory: 128M
       restart_policy:
         condition: on-failure
-      labels:
-        # Entrada única por Traefik v3 (TLS y dominios los administra PLAi). EJEMPLO de dominio.
-        - traefik.enable=true
-        - traefik.http.routers.plai-recursos.rule=Host(`recursos.example.plai.mx`)
-        - traefik.http.routers.plai-recursos.entrypoints=websecure
-        - traefik.http.routers.plai-recursos.tls=true
-        - traefik.http.services.plai-recursos.loadbalancer.server.port=3000
     networks:
-      - plai_internal
-    # Sin 'ports:' publicados: el acceso entra por Traefik a través de la red overlay.
+      - plai_isolated_backend
+    # La aplicación NO publica puertos al exterior; solo NGINX se comunica con ella por plai_isolated_backend.
 
 networks:
-  plai_internal:
-    external: true   # Red overlay cifrada existente (nombre EJEMPLO)
+  # Red pública compartida con el balanceador/Traefik
+  plai_public:
+    external: true
+  # Red privada interna y aislada (sin exposición al exterior)
+  plai_isolated_backend:
+    driver: overlay
+    internal: true
 
 secrets:
   nextauth_secret:
     external: true
   database_url:
+    external: true
+  keycloak_id:
+    external: true
+  keycloak_secret:
+    external: true
+  directus_token:
     external: true

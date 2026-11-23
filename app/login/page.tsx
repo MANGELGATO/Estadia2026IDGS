@@ -20,6 +20,20 @@ function LoginFormContent() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [keycloakLoading, setKeycloakLoading] = useState(false);
+  const [showCredentialsForm, setShowCredentialsForm] = useState(false);
+
+  const handleKeycloakLogin = async () => {
+    setKeycloakLoading(true);
+    setError(null);
+    try {
+      const destination = callbackUrl && isSafeRelativePath(callbackUrl) ? callbackUrl : '/admin';
+      await signIn('keycloak', { callbackUrl: destination });
+    } catch {
+      setError('No fue posible conectar con el servidor Keycloak SSO de PLAi.');
+      setKeycloakLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,73 +120,117 @@ function LoginFormContent() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label
-              htmlFor="login-email"
-              className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-700"
-            >
-              Correo Institucional
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-              <input
-                id="login-email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="nombre.apellido@plai.mx"
-                required
-                disabled={loading}
-                className="w-full rounded-xl border border-gray-300 py-2.5 pl-11 pr-4 text-sm text-gray-800 transition focus:border-[#1B365D] focus:outline-none focus:ring-2 focus:ring-[#1B365D]/20 disabled:bg-gray-100"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="login-password"
-              className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-700"
-            >
-              Contraseña
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-              <input
-                id="login-password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••••"
-                required
-                disabled={loading}
-                className="w-full rounded-xl border border-gray-300 py-2.5 pl-11 pr-4 text-sm text-gray-800 transition focus:border-[#1B365D] focus:outline-none focus:ring-2 focus:ring-[#1B365D]/20 disabled:bg-gray-100"
-              />
-            </div>
-          </div>
-
+        {/* Botón Principal: Acceso SSO Institucional PLAi con Keycloak */}
+        <div className="mb-6 space-y-3">
           <button
-            type="submit"
-            disabled={loading}
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#ed8d1b] py-3 text-sm font-semibold text-white shadow-md transition hover:bg-[#d67a10] active:scale-[0.99] disabled:opacity-60"
+            type="button"
+            onClick={handleKeycloakLogin}
+            disabled={keycloakLoading || loading}
+            className="flex w-full items-center justify-center gap-3 rounded-2xl bg-[#1B365D] py-3.5 px-4 text-sm font-semibold text-white shadow-lg shadow-[#1B365D]/20 transition hover:bg-[#152a48] active:scale-[0.99] disabled:opacity-60"
           >
-            {loading ? (
+            {keycloakLoading ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Verificando credenciales...</span>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span>Redirigiendo a Keycloak SSO...</span>
               </>
             ) : (
               <>
-                <span>Iniciar Sesión</span>
-                <ArrowRight className="h-4 w-4" />
+                <ShieldCheck className="h-5 w-5 text-[#ed8d1b]" />
+                <span>Iniciar sesión con cuenta PLAi (SSO)</span>
               </>
             )}
           </button>
-        </form>
+          <p className="text-center text-xs text-gray-500">
+            Autenticación unificada mediante el servidor Keycloak institucional
+          </p>
+        </div>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-200" />
+          </div>
+          <div className="relative flex justify-center text-xs">
+            <button
+              type="button"
+              onClick={() => setShowCredentialsForm(!showCredentialsForm)}
+              className="bg-white px-3 text-gray-500 hover:text-gray-700 font-medium transition"
+            >
+              {showCredentialsForm
+                ? '▲ Ocultar acceso por credenciales'
+                : '▼ O ingresar con credenciales locales'}
+            </button>
+          </div>
+        </div>
+
+        {showCredentialsForm && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label
+                htmlFor="login-email"
+                className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-700"
+              >
+                Correo Institucional
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                <input
+                  id="login-email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="nombre.apellido@plai.mx"
+                  required
+                  disabled={loading}
+                  className="w-full rounded-xl border border-gray-300 py-2.5 pl-11 pr-4 text-sm text-gray-800 transition focus:border-[#1B365D] focus:outline-none focus:ring-2 focus:ring-[#1B365D]/20 disabled:bg-gray-100"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label
+                htmlFor="login-password"
+                className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-700"
+              >
+                Contraseña
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                <input
+                  id="login-password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  required
+                  disabled={loading}
+                  className="w-full rounded-xl border border-gray-300 py-2.5 pl-11 pr-4 text-sm text-gray-800 transition focus:border-[#1B365D] focus:outline-none focus:ring-2 focus:ring-[#1B365D]/20 disabled:bg-gray-100"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#ed8d1b] py-3 text-sm font-semibold text-white shadow-md transition hover:bg-[#d67a10] active:scale-[0.99] disabled:opacity-60"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Verificando credenciales...</span>
+                </>
+              ) : (
+                <>
+                  <span>Iniciar Sesión Local</span>
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
+            </button>
+          </form>
+        )}
 
         <div className="mt-6 flex items-start gap-2.5 rounded-xl border border-gray-100 bg-[#F8FAFC] p-3.5 text-xs text-plai-muted">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#1e5ca7]" />

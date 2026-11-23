@@ -42,6 +42,31 @@ export async function proxy(request: NextRequest) {
     request.method === 'POST' &&
     (pathname === '/api/reservas' || pathname === '/api/solicitudes-espacios')
   ) {
+    // 1.1 Protección CSRF: validación de origen contra el host de la petición
+    const origin = request.headers.get('origin');
+    const host = request.headers.get('host');
+    if (origin && host) {
+      try {
+        const originHost = new URL(origin).host;
+        if (originHost !== host) {
+          logger.warn('Intento de mutación con origen cruzado no autorizado (posible CSRF)', {
+            path: pathname,
+            origin,
+            host,
+          });
+          return NextResponse.json(
+            { success: false, message: 'Origen de petición no autorizado (protección CSRF activa).' },
+            { status: 403 }
+          );
+        }
+      } catch {
+        return NextResponse.json(
+          { success: false, message: 'Cabecera de origen malformada.' },
+          { status: 400 }
+        );
+      }
+    }
+
     const rate = checkRateLimit(`mutations:${ip}`, RATE_LIMIT_MUTATION);
     if (!rate.success) {
       logger.warn('Rate limit excedido en formulario público', {

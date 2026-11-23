@@ -162,4 +162,17 @@ describe('NextAuth.js & Password Security (PLAi Standard v1.0)', () => {
     expect(enrichedUser?.id).toBe('usr-123');
     expect(enrichedUser?.role).toBe('admin');
   });
+
+  it('mapea correctamente roles de Keycloak (realm_access y resource_access)', async () => {
+    const { extractKeycloakRole } = await import('./auth');
+    
+    // Admin en realm
+    expect(extractKeycloakRole({ realm_access: { roles: ['default-roles-plai', 'admin'] } }, 'plai-recursos')).toBe('admin');
+    
+    // Colaborador en client roles
+    expect(extractKeycloakRole({ resource_access: { 'plai-recursos': { roles: ['colaborador'] } } }, 'plai-recursos')).toBe('colaborador');
+    
+    // Usuario estándar por defecto
+    expect(extractKeycloakRole({ realm_access: { roles: ['offline_access'] } }, 'plai-recursos')).toBe('usuario');
+  });
 });
