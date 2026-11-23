@@ -21,8 +21,8 @@ const mulish = Mulish({
 });
 
 export const metadata: Metadata = {
-  title: "PLAi - Aprender | Dashboard de Equipos",
-  description: "Plataforma Abierta de Innovación. Laboratorio de Innovación, Robótica y Tecnologías Inmersivas.",
+  title: "SOLUCIONES PLAi | Recursos y Espacios Tecnológicos",
+  description: "SOLUCIONES PLAi — Plataforma Abierta de Innovación. Catálogo de equipamiento tecnológico, aplicaciones inmersivas y espacios especializados.",
 };
 
 export default function RootLayout({

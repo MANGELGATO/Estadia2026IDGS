@@ -15,23 +15,23 @@ export default function Footer() {
       <div className="mx-auto max-w-[1240px] px-6 pt-14 pb-10">
         {/* Fila Superior: 3 Columnas */}
         <div className="grid grid-cols-1 gap-10 md:grid-cols-[1.5fr_1fr_1.5fr] md:gap-14">
-          {/* Columna 1: Aprender / Marca Editorial y Redes Sociales */}
+          {/* Columna 1: SOLUCIONES PLAi / Marca Editorial y Redes Sociales */}
           <div>
             <div className="mb-3 flex items-center gap-3">
               <Image
                 src="/images/FOOTERIMG/logo-solo-BDfajDsx.svg"
-                alt="Logo Aprender"
+                alt="Logo SOLUCIONES PLAi"
                 width={40}
                 height={26}
                 className="h-8 w-auto object-contain"
               />
               <span className="font-heading text-2xl font-bold tracking-tight text-white">
-                Aprender
+                SOLUCIONES PLAi
               </span>
             </div>
 
             <p className="mb-2 max-w-[360px] text-[0.88rem] leading-[1.65] text-white/85">
-              Formación para la era digital enfocada en desarrollar talento para las empresas tecnológicas modernas.
+              Soluciones tecnológicas, equipamiento especializado y espacios de innovación para impulsar proyectos de alto impacto en Jalisco.
             </p>
 
             {/* Leyenda de modificación solicitada */}
@@ -250,7 +250,7 @@ export default function Footer() {
           <div className="flex flex-col items-center justify-between gap-6 text-center md:flex-row md:items-start md:text-left">
             {/* Copyright */}
             <span className="text-[0.84rem] text-white/70">
-              © 2025 Aprender. Todos los derechos reservados.
+              © 2026 SOLUCIONES PLAi. Todos los derechos reservados.
             </span>
 
             {/* Aviso de Privacidad con enlace oficial de PLAi */}

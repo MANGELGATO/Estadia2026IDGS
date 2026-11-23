@@ -42,10 +42,10 @@ describe('Navbar Component', () => {
 });
 
 describe('Footer Component', () => {
-  it('renderiza la marca Aprender, la leyenda editable y redes sociales', () => {
+  it('renderiza la marca SOLUCIONES PLAi, la leyenda editable y redes sociales', () => {
     render(<Footer />);
 
-    expect(screen.getByText('Aprender')).toBeInTheDocument();
+    expect(screen.getByText('SOLUCIONES PLAi')).toBeInTheDocument();
     expect(screen.getByText(/Sección \/ Leyenda sujeta a edición institucional de PLAi/i)).toBeInTheDocument();
 
     // Redes sociales
