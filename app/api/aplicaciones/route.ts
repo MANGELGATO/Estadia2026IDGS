@@ -7,6 +7,8 @@ import {
 import { AppItem } from '../../../lib/mockData';
 import { requireSession } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
+import { generateEntityId } from '../../../lib/folio';
+import { aplicacionSchema } from '../../../lib/validations/schemas';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,28 +34,35 @@ export async function POST(req: NextRequest) {
   if (auth.errorResponse) return auth.errorResponse;
 
   try {
-    const body = (await req.json()) as AppItem;
+    const body = await req.json();
+    const parsed = aplicacionSchema.safeParse(body);
 
-    if (!body.name || !body.category || !body.platform) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { success: false, message: 'Faltan campos obligatorios: nombre, categoría o plataforma' },
+        {
+          success: false,
+          message: 'Datos de aplicación inválidos.',
+          errors: parsed.error.flatten().fieldErrors,
+        },
         { status: 400 }
       );
     }
 
+    const d = parsed.data;
+    const resolvedImg = d.imageUrl || d.iconUrl || '/images/apps/beat-saber.png';
     const appToSave: AppItem = {
-      id: body.id || `app-${Date.now()}`,
-      name: body.name.trim(),
-      developer: body.developer?.trim() || 'Desarrollador Oficial',
-      version: body.version?.trim() || '1.0',
-      category: body.category,
-      platform: body.platform,
-      ageRating: body.ageRating || 'Todas las edades',
-      description: body.description?.trim() || 'Sin descripción',
-      imageUrl: body.imageUrl?.trim() || body.iconUrl?.trim() || '/images/apps/beat-saber.png',
-      iconUrl: body.iconUrl?.trim() || body.imageUrl?.trim() || '/images/apps/beat-saber.png',
-      devicesInstalled: Number(body.devicesInstalled || 1),
-      status: body.status || 'Activa',
+      id: d.id || generateEntityId('app'),
+      name: d.name,
+      developer: d.developer,
+      version: d.version,
+      category: d.category,
+      platform: d.platform,
+      ageRating: d.ageRating,
+      description: d.description,
+      imageUrl: resolvedImg,
+      iconUrl: resolvedImg,
+      devicesInstalled: d.devicesInstalled,
+      status: d.status,
     };
 
     await insertAplicacionInDB(appToSave);
@@ -66,7 +75,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: 'Aplicación registrada correctamente en la base de datos',
+        message: 'Aplicación registrada correctamente en Directus',
         data: appToSave,
       },
       { status: 201 }
@@ -86,11 +95,11 @@ export async function DELETE(req: NextRequest) {
 
   try {
     const { searchParams } = new URL(req.url);
-    const id = searchParams.get('id');
+    const id = searchParams.get('id')?.trim();
 
-    if (!id) {
+    if (!id || id.length > 64) {
       return NextResponse.json(
-        { success: false, message: 'Parámetro id es obligatorio' },
+        { success: false, message: 'Parámetro id es obligatorio y válido' },
         { status: 400 }
       );
     }
@@ -100,7 +109,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Aplicación eliminada de la base de datos',
+      message: 'Aplicación eliminada de Directus',
     });
   } catch (error) {
     logger.error('Error al eliminar aplicación', { path: '/api/aplicaciones' }, error);

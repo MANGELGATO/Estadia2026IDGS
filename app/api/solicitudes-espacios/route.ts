@@ -3,6 +3,7 @@ import { spaceRequestSchema } from '../../../lib/validations/schemas';
 import { logger } from '../../../lib/logger';
 import { insertReservacionInDB, ReservacionItem } from '../../../lib/db';
 import { requireSession, isStaffRole } from '../../../lib/authGuard';
+import { generateEntityId, generateFolio } from '../../../lib/folio';
 import {
   checkRateLimit,
   getClientIp,
@@ -59,8 +60,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const timestamp = Date.now();
-    const folio = `ESP-${timestamp.toString().slice(-4)}`;
+    const folio = generateFolio('ESP');
     const espacioNombre = ESPACIO_NAMES[parsed.data.espacioId] || parsed.data.espacioId;
     const catSlug = parsed.data.espacioId.includes('robot')
       ? 'robotica'
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       : auth.user.email;
 
     const nuevaReservaEspacio: ReservacionItem = {
-      id: `esp-${timestamp}`,
+      id: generateEntityId('esp'),
       folio,
       categoriaId: catSlug,
       codigoPlaiAsignado: `ESPACIO-${parsed.data.espacioId.toUpperCase()}`,

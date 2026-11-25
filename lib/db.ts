@@ -1,4 +1,5 @@
 import { directus } from './directus';
+import { generateEntityId } from './folio';
 import type { DeviceItem, AppItem } from './mockData';
 
 export type { DeviceItem };
@@ -749,23 +750,36 @@ export async function syncKeycloakUserInDB(params: {
   name: string;
   email: string;
   role: 'admin' | 'colaborador' | 'usuario';
-}): Promise<{ allowed: boolean; status: 'Activo' | 'Inactivo' }> {
+  emailVerified?: boolean;
+}): Promise<{ allowed: boolean; status: 'Activo' | 'Inactivo'; reason?: 'inactive' | 'email_unverified' }> {
   const normalizedEmail = params.email.trim().toLowerCase();
   const nowIso = new Date().toISOString();
 
-  // Buscar por ID (sub de Keycloak) o por correo si fue pre-registrado manualmente
+  // 1. Buscar primero por ID exacto (`sub` de Keycloak)
   let existing = await directus.getItemById<UsuarioRow>('usuarios', params.id);
+
+  // 2. Si no existe por `sub`, comprobar si existe un perfil pre-registrado por correo.
+  //    Seguridad: solo se vincula si Keycloak confirmó `email_verified: true`.
   if (!existing) {
     const byEmail = await directus.getItems<UsuarioRow>('usuarios', {
       'filter[email][_eq]': normalizedEmail,
       limit: 1,
     });
-    existing = byEmail[0] ?? null;
+    const preRegistered = byEmail[0] ?? null;
+    if (preRegistered) {
+      if (preRegistered.estado === 'Inactivo') {
+        return { allowed: false, status: 'Inactivo', reason: 'inactive' };
+      }
+      if (!params.emailVerified) {
+        return { allowed: false, status: 'Inactivo', reason: 'email_unverified' };
+      }
+      existing = preRegistered;
+    }
   }
 
   if (existing) {
     if (existing.estado === 'Inactivo') {
-      return { allowed: false, status: 'Inactivo' };
+      return { allowed: false, status: 'Inactivo', reason: 'inactive' };
     }
     await directus.updateItem<UsuarioRow>('usuarios', existing.id, {
       nombre: params.name,
@@ -884,7 +898,7 @@ export async function insertCursoInDB(curso: CursoAgendaItem): Promise<CursoAgen
   });
 
   await insertReservacionInDB({
-    id: `res-${Date.now()}`,
+    id: generateEntityId('res'),
     folio: curso.id,
     categoriaId: curso.titulo.toLowerCase().includes('rob')
       ? 'robotica'

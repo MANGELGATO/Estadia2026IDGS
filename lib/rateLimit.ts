@@ -126,24 +126,27 @@ export function checkRateLimit(key: string, options: RateLimitOptions): RateLimi
 }
 
 /**
- * Extrae la dirección IP del cliente a partir de los encabezados del proxy o socket.
- * Compatible con la topología de red de PLAi: Traefik v3 -> Nginx -> Next.js.
+ * Extrae la dirección IP real del cliente desde la fuente confiable inyectada por NGINX.
+ * Seguridad contra spoofing de Rate Limit:
+ * - Prioriza `x-real-ip`, que NGINX fija exclusivamente con `$remote_addr` (descartando
+ *   cualquier cabecera enviada por el cliente).
+ * - Si se usa `x-forwarded-for`, toma el ÚLTIMO salto confiable (agregado por el proxy),
+ *   NUNCA el primero, ya que un atacante puede inyectar IPs falsas al inicio de la lista.
  */
 export function getClientIp(request: Request | NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) {
-    const firstIp = forwarded.split(',')[0].trim();
-    if (firstIp) return firstIp;
-  }
-
   const realIp = request.headers.get('x-real-ip');
   if (realIp && realIp.trim()) {
     return realIp.trim();
   }
 
-  const cfConnectingIp = request.headers.get('cf-connecting-ip');
-  if (cfConnectingIp && cfConnectingIp.trim()) {
-    return cfConnectingIp.trim();
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) {
+    const hops = forwarded
+      .split(',')
+      .map((h) => h.trim())
+      .filter(Boolean);
+    const trustedHop = hops[hops.length - 1];
+    if (trustedHop) return trustedHop;
   }
 
   if ('ip' in request && typeof (request as unknown as { ip?: string }).ip === 'string') {

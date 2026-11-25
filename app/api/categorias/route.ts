@@ -6,6 +6,7 @@ import {
 } from '../../../lib/categoriesConfig';
 import { requireSession } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
+import { categoryUpdateSchema } from '../../../lib/validations/schemas';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,31 +49,30 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, name, description, plaiUsage, videoUrl, benefits, successCases } = body;
+    const parsed = categoryUpdateSchema.safeParse(body);
 
-    if (!id || typeof id !== 'string') {
+    if (!parsed.success) {
       return NextResponse.json(
-        { success: false, message: 'El identificador (id/slug) de la categoría es requerido' },
+        {
+          success: false,
+          message: 'Los datos de configuración de categoría no son válidos.',
+          errors: parsed.error.flatten().fieldErrors,
+        },
         { status: 400 }
       );
     }
 
+    const { id, name, description, plaiUsage, videoUrl, color, benefits, successCases } =
+      parsed.data;
+
     const updated = await updateCategoryConfig(id, {
-      name: typeof name === 'string' ? name.trim() : undefined,
-      description: typeof description === 'string' ? description.trim() : undefined,
-      plaiUsage: typeof plaiUsage === 'string' ? plaiUsage.trim() : undefined,
-      videoUrl: typeof videoUrl === 'string' ? videoUrl.trim() : undefined,
-      benefits: Array.isArray(benefits)
-        ? benefits.map((b: string) => String(b).trim()).filter(Boolean)
-        : undefined,
-      successCases: Array.isArray(successCases)
-        ? successCases
-            .map((c: { title?: string; desc?: string }) => ({
-              title: String(c.title || '').trim(),
-              desc: String(c.desc || '').trim(),
-            }))
-            .filter((c) => c.title.length > 0)
-        : undefined,
+      name,
+      description,
+      plaiUsage,
+      videoUrl,
+      color,
+      benefits,
+      successCases,
     });
 
     logger.info('Configuración de categoría actualizada mediante API', {

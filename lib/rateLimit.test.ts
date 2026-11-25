@@ -93,25 +93,28 @@ describe('Rate Limiter Module (Estándar PLAi - Sección 7.3)', () => {
   });
 
   describe('getClientIp', () => {
-    it('obtiene la primera IP de la cabecera x-forwarded-for en proxies inversos', () => {
+    it('prioriza x-real-ip inyectada por NGINX sobre un x-forwarded-for falsificado por el cliente', () => {
       const req = new NextRequest('http://localhost:3000/api/reservas', {
-        headers: { 'x-forwarded-for': '187.189.12.34, 10.0.0.1, 10.0.0.2' },
-      });
-      expect(getClientIp(req)).toBe('187.189.12.34');
-    });
-
-    it('obtiene la IP desde x-real-ip si x-forwarded-for está ausente', () => {
-      const req = new NextRequest('http://localhost:3000/api/reservas', {
-        headers: { 'x-real-ip': '201.120.45.67' },
+        headers: {
+          'x-forwarded-for': '1.2.3.4, 201.120.45.67',
+          'x-real-ip': '201.120.45.67',
+        },
       });
       expect(getClientIp(req)).toBe('201.120.45.67');
     });
 
-    it('obtiene la IP desde cf-connecting-ip si está presente', () => {
+    it('toma el último salto de x-forwarded-for (no el primero controlable por el cliente) si x-real-ip está ausente', () => {
       const req = new NextRequest('http://localhost:3000/api/reservas', {
-        headers: { 'cf-connecting-ip': '189.200.10.5' },
+        headers: { 'x-forwarded-for': '9.9.9.9, 187.189.12.34' },
       });
-      expect(getClientIp(req)).toBe('189.200.10.5');
+      expect(getClientIp(req)).toBe('187.189.12.34');
+    });
+
+    it('obtiene la IP desde x-real-ip cuando está presente sola', () => {
+      const req = new NextRequest('http://localhost:3000/api/reservas', {
+        headers: { 'x-real-ip': '201.120.45.67' },
+      });
+      expect(getClientIp(req)).toBe('201.120.45.67');
     });
 
     it('devuelve 127.0.0.1 por defecto si no existen cabeceras de proxy', () => {

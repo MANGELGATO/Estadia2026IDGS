@@ -8,6 +8,11 @@ import {
 } from '../../../lib/db';
 import { requireSession } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
+import { generateEntityId, generateFolio } from '../../../lib/folio';
+import {
+  incidenciaCreateSchema,
+  incidenciaUpdateSchema,
+} from '../../../lib/validations/schemas';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,39 +42,45 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+    const parsed = incidenciaCreateSchema.safeParse(body);
 
-    if (!body.codigoPlai || !body.descripcion || !body.tipoFalla) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { success: false, message: 'Código PLAi, tipo de falla y descripción son requeridos' },
+        {
+          success: false,
+          message: 'Datos de incidencia inválidos.',
+          errors: parsed.error.flatten().fieldErrors,
+        },
         { status: 400 }
       );
     }
 
-    const equipo = await getEquipoByCodigoPLAi(body.codigoPlai);
+    const data = parsed.data;
+    const equipo = await getEquipoByCodigoPLAi(data.codigoPlai);
     if (!equipo) {
       return NextResponse.json(
         {
           success: false,
-          message: `No se encontró ningún equipo registrado con el código: ${body.codigoPlai}`,
+          message: `No se encontró ningún equipo registrado con el código: ${data.codigoPlai}`,
         },
         { status: 404 }
       );
     }
 
     const incidencia: IncidenciaItem = {
-      id: `inc-${Date.now()}`,
-      folio: `INC-${Date.now().toString().slice(-4)}`,
+      id: generateEntityId('inc'),
+      folio: generateFolio('INC'),
       equipoId: equipo.id,
       codigoPlai: equipo.inventoryNumber,
       equipoNombre: equipo.name,
-      origen: body.origen || 'Revisión Periódica',
-      tipoFalla: body.tipoFalla,
-      severidad: body.severidad || 'Media',
-      descripcion: body.descripcion.trim(),
-      estado: body.estado || 'Reportada',
-      tecnicoResponsable: body.tecnicoResponsable?.trim() || auth.user.name,
-      fechaReporte: body.fechaReporte || new Date().toISOString().slice(0, 19).replace('T', ' '),
-      accionesRealizadas: body.accionesRealizadas?.trim() || undefined,
+      origen: data.origen,
+      tipoFalla: data.tipoFalla,
+      severidad: data.severidad,
+      descripcion: data.descripcion,
+      estado: data.estado,
+      tecnicoResponsable: data.tecnicoResponsable || auth.user.name,
+      fechaReporte: data.fechaReporte || new Date().toISOString().slice(0, 19).replace('T', ' '),
+      accionesRealizadas: data.accionesRealizadas || undefined,
     };
 
     await insertIncidenciaInDB(incidencia);
@@ -102,15 +113,20 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, estado, accionesRealizadas } = body;
+    const parsed = incidenciaUpdateSchema.safeParse(body);
 
-    if (!id || !estado) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { success: false, message: 'ID y nuevo estado son obligatorios' },
+        {
+          success: false,
+          message: 'ID o estado de incidencia inválidos.',
+          errors: parsed.error.flatten().fieldErrors,
+        },
         { status: 400 }
       );
     }
 
+    const { id, estado, accionesRealizadas } = parsed.data;
     await updateIncidenciaStatusInDB(id, estado, accionesRealizadas);
     logger.info('Estado de incidencia actualizado', { id, estado, actor: auth.user.email });
 

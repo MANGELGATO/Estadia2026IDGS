@@ -18,6 +18,14 @@
  */
 
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const CLI_ARGS = process.argv.slice(2);
+function getArgValue(flag) {
+  const idx = CLI_ARGS.indexOf(flag);
+  return idx >= 0 && CLI_ARGS[idx + 1] ? CLI_ARGS[idx + 1] : '';
+}
 
 const DIRECTUS_URL = (process.env.DIRECTUS_URL || '').replace(/\/+$/, '');
 const DIRECTUS_ADMIN_TOKEN = process.env.DIRECTUS_ADMIN_TOKEN || '';
@@ -26,6 +34,12 @@ const SERVICE_ROLE_NAME = process.env.DIRECTUS_SERVICE_ROLE || `${PREFIX}service
 const SERVICE_POLICY_NAME = process.env.DIRECTUS_SERVICE_POLICY || `${PREFIX}service_policy`;
 const SERVICE_USER_EMAIL = process.env.DIRECTUS_SERVICE_EMAIL || 'svc-lab-recursos@plai.mx';
 const SKIP_SERVICE_ACCOUNT = process.env.SKIP_SERVICE_ACCOUNT === 'true';
+const ROTATE_TOKEN =
+  CLI_ARGS.includes('--rotate-token') || process.env.ROTATE_SERVICE_TOKEN === 'true';
+const TOKEN_OUT_FILE =
+  getArgValue('--token-out') ||
+  process.env.SERVICE_TOKEN_OUT_FILE ||
+  path.resolve(process.cwd(), '.directus-service-token.tmp');
 
 if (!DIRECTUS_URL || !DIRECTUS_ADMIN_TOKEN) {
   console.error(
@@ -484,6 +498,51 @@ async function syncMissingFields(col) {
   }
 }
 
+// Colecciones donde la app realmente ejecuta deleteItem (mínimo privilegio)
+const DELETABLE_COLLECTIONS = new Set([c('equipos'), c('aplicaciones')]);
+
+function assertOk(res, context) {
+  if (!res.ok) {
+    console.error(
+      `  [ERROR] Falló ${context} (HTTP ${res.status}):`,
+      JSON.stringify(res.json)
+    );
+    process.exit(1);
+  }
+}
+
+function writeTokenSecurely(token) {
+  const dir = path.dirname(TOKEN_OUT_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  }
+  fs.writeFileSync(TOKEN_OUT_FILE, token, { encoding: 'utf8', mode: 0o600 });
+  try {
+    fs.chmodSync(TOKEN_OUT_FILE, 0o600);
+  } catch {
+    // En Windows NTFS chmod puede no aplicar igual que POSIX
+  }
+}
+
+async function verifyServiceToken(token) {
+  const testCollection = c('equipos');
+  const res = await fetch(`${DIRECTUS_URL}/items/${encodeURIComponent(testCollection)}?limit=1`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) {
+    console.error(
+      `  [ERROR] Prueba de humo falló: el token de servicio recibió HTTP ${res.status} al leer ${testCollection}.`
+    );
+    console.error('          Verifica el vínculo en directus_access (rol <-> policy) y permisos.');
+    process.exit(1);
+  }
+  console.log(`  [VERIFY]  Token de servicio verificado: GET /items/${testCollection} -> HTTP 200 OK.`);
+}
+
 async function provisionServiceAccount() {
   console.log(`\nConfigurando cuenta de servicio con permisos mínimos (${SERVICE_ROLE_NAME})...`);
 
@@ -492,16 +551,15 @@ async function provisionServiceAccount() {
     'GET',
     `/roles?filter[name][_eq]=${encodeURIComponent(SERVICE_ROLE_NAME)}&limit=1`
   );
+  assertOk(roleCheck, `GET /roles (${SERVICE_ROLE_NAME})`);
+
   let roleId = roleCheck.json?.data?.[0]?.id;
   if (!roleId) {
     const roleCreated = await api('POST', '/roles', {
       name: SERVICE_ROLE_NAME,
       description: `Rol de servicio mínimo para ${PREFIX}* (sin acceso administrativo ni app Directus)`,
     });
-    if (!roleCreated.ok) {
-      console.error(`  [ERROR] No se pudo crear el rol "${SERVICE_ROLE_NAME}" (HTTP ${roleCreated.status}):`, JSON.stringify(roleCreated.json));
-      process.exit(1);
-    }
+    assertOk(roleCreated, `POST /roles (${SERVICE_ROLE_NAME})`);
     roleId = roleCreated.json?.data?.id;
     console.log(`  [ROL]     Creado rol "${SERVICE_ROLE_NAME}" (${roleId})`);
   } else {
@@ -509,44 +567,71 @@ async function provisionServiceAccount() {
   }
 
   // 2. Policy de permisos mínimos (Directus 11 Access Policies)
+  // IMPORTANTE: En Directus 11, el vínculo rol <-> policy se almacena en la tabla intermedia
+  // `directus_access` mediante el endpoint `/access` (NO pasando `roles: [roleId]` en /policies).
   const policyCheck = await api(
     'GET',
     `/policies?filter[name][_eq]=${encodeURIComponent(SERVICE_POLICY_NAME)}&limit=1`
   );
+  assertOk(policyCheck, `GET /policies (${SERVICE_POLICY_NAME})`);
+
   let policyId = policyCheck.json?.data?.[0]?.id;
   if (!policyId) {
     const policyCreated = await api('POST', '/policies', {
       name: SERVICE_POLICY_NAME,
-      description: `Acceso CRUD restringido exclusivamente a colecciones ${PREFIX}*`,
+      description: `Acceso mínimo restringido exclusivamente a colecciones ${PREFIX}*`,
       app_access: false,
       admin_access: false,
-      roles: [roleId],
     });
-    if (!policyCreated.ok) {
-      console.error(`  [ERROR] No se pudo crear la policy "${SERVICE_POLICY_NAME}" (HTTP ${policyCreated.status}):`, JSON.stringify(policyCreated.json));
-      process.exit(1);
-    }
+    assertOk(policyCreated, `POST /policies (${SERVICE_POLICY_NAME})`);
     policyId = policyCreated.json?.data?.id;
     console.log(`  [POLICY]  Creada policy "${SERVICE_POLICY_NAME}" (${policyId})`);
   } else {
     console.log(`  [POLICY]  Policy "${SERVICE_POLICY_NAME}" ya existe (${policyId})`);
   }
 
-  // 3. Permisos CRUD exclusivamente sobre las 10 colecciones <prefix>*
-  const actions = ['create', 'read', 'update', 'delete'];
+  // 2.1 Vínculo explícito rol <-> policy en directus_access (/access)
+  const accessCheck = await api(
+    'GET',
+    `/access?filter[role][_eq]=${encodeURIComponent(roleId)}&filter[policy][_eq]=${encodeURIComponent(policyId)}&limit=1`
+  );
+  assertOk(accessCheck, 'GET /access (verificación de vínculo rol <-> policy)');
+
+  const existingAccess = accessCheck.json?.data?.[0];
+  if (!existingAccess) {
+    const accessCreated = await api('POST', '/access', {
+      role: roleId,
+      policy: policyId,
+    });
+    assertOk(accessCreated, 'POST /access (vincular rol con policy en directus_access)');
+    console.log(`  [ACCESS]  Vínculo rol (${roleId}) <-> policy (${policyId}) creado en directus_access.`);
+  } else {
+    console.log(`  [ACCESS]  Vínculo rol <-> policy ya existe (${existingAccess.id}).`);
+  }
+
+  // 3. Permisos de mínimo privilegio exclusivamente sobre las colecciones <prefix>*
+  //    Solo `equipos` y `aplicaciones` reciben `delete`; el resto recibe `create`, `read`, `update`.
   const existingPermsRes = await api(
     'GET',
     `/permissions?filter[policy][_eq]=${encodeURIComponent(policyId)}&limit=-1`
   );
-  const existingPerms = new Set(
-    (existingPermsRes.json?.data || []).map((p) => `${p.collection}:${p.action}`)
+  assertOk(existingPermsRes, 'GET /permissions');
+
+  const existingPermsList = existingPermsRes.json?.data || [];
+  const existingPermsMap = new Map(
+    existingPermsList.map((p) => [`${p.collection}:${p.action}`, p])
   );
 
   let permsCreated = 0;
+  let permsRevoked = 0;
   for (const col of COLLECTIONS) {
-    for (const action of actions) {
+    const allowedActions = DELETABLE_COLLECTIONS.has(col.collection)
+      ? ['create', 'read', 'update', 'delete']
+      : ['create', 'read', 'update'];
+
+    for (const action of allowedActions) {
       const key = `${col.collection}:${action}`;
-      if (existingPerms.has(key)) continue;
+      if (existingPermsMap.has(key)) continue;
 
       const permRes = await api('POST', '/permissions', {
         policy: policyId,
@@ -554,24 +639,34 @@ async function provisionServiceAccount() {
         action,
         fields: ['*'],
       });
-      if (!permRes.ok) {
-        console.error(
-          `  [ERROR] No se pudo crear permiso ${key} (HTTP ${permRes.status}):`,
-          JSON.stringify(permRes.json)
-        );
-        process.exit(1);
-      }
+      assertOk(permRes, `POST /permissions (${key})`);
       permsCreated += 1;
     }
-  }
-  console.log(`  [PERMS]   Permisos verificados para ${COLLECTIONS.length} colecciones (${permsCreated} nuevos).`);
 
-  // 4. Usuario de servicio dedicado
+    // Revocar permiso `delete` sobrante en colecciones donde la app nunca borra registros
+    if (!DELETABLE_COLLECTIONS.has(col.collection)) {
+      const excessDelete = existingPermsMap.get(`${col.collection}:delete`);
+      if (excessDelete?.id) {
+        const delRes = await api('DELETE', `/permissions/${encodeURIComponent(excessDelete.id)}`);
+        assertOk(delRes, `DELETE /permissions/${excessDelete.id} (revocar delete innecesario)`);
+        permsRevoked += 1;
+      }
+    }
+  }
+  console.log(
+    `  [PERMS]   Permisos mínimos verificados para ${COLLECTIONS.length} colecciones (${permsCreated} nuevos, ${permsRevoked} revocados).`
+  );
+
+  // 4. Usuario de servicio dedicado (verifica rol/estado y soporta rotación con --rotate-token)
   const userCheck = await api(
     'GET',
     `/users?filter[email][_eq]=${encodeURIComponent(SERVICE_USER_EMAIL)}&limit=1`
   );
+  assertOk(userCheck, `GET /users (${SERVICE_USER_EMAIL})`);
+
   const existingUser = userCheck.json?.data?.[0];
+  let activeServiceToken = null;
+
   if (!existingUser) {
     const generatedToken = crypto.randomBytes(32).toString('base64url');
     const userCreated = await api('POST', '/users', {
@@ -582,18 +677,44 @@ async function provisionServiceAccount() {
       status: 'active',
       token: generatedToken,
     });
-    if (!userCreated.ok) {
-      console.error(
-        `  [ERROR] No se pudo crear usuario de servicio "${SERVICE_USER_EMAIL}" (HTTP ${userCreated.status}):`,
-        JSON.stringify(userCreated.json)
-      );
-      process.exit(1);
-    }
+    assertOk(userCreated, `POST /users (${SERVICE_USER_EMAIL})`);
+    activeServiceToken = generatedToken;
+    writeTokenSecurely(generatedToken);
     console.log(`  [USER]    Usuario de servicio creado: ${SERVICE_USER_EMAIL}`);
-    console.log('  [TOKEN]   Guarda el siguiente token en el Docker secret `plai_recursos_directus_token` (no se volverá a mostrar):');
-    console.log(`            ${generatedToken}`);
+    console.log(`  [TOKEN]   Token guardado con permisos 0600 en: ${TOKEN_OUT_FILE}`);
+    console.log('            Crea el Docker secret sin imprimirlo en consola y luego elimina el archivo:');
+    console.log(`            docker secret create plai_recursos_directus_token "${TOKEN_OUT_FILE}" && shred -u "${TOKEN_OUT_FILE}"`);
   } else {
-    console.log(`  [USER]    Usuario de servicio "${SERVICE_USER_EMAIL}" ya existe (token conservado).`);
+    const patchBody = {};
+    if (existingUser.role !== roleId) patchBody.role = roleId;
+    if (existingUser.status !== 'active') patchBody.status = 'active';
+    if (ROTATE_TOKEN) {
+      activeServiceToken = crypto.randomBytes(32).toString('base64url');
+      patchBody.token = activeServiceToken;
+    }
+
+    if (Object.keys(patchBody).length > 0) {
+      const patched = await api('PATCH', `/users/${encodeURIComponent(existingUser.id)}`, patchBody);
+      assertOk(patched, `PATCH /users/${existingUser.id}`);
+      if (activeServiceToken) {
+        writeTokenSecurely(activeServiceToken);
+        console.log(`  [USER]    Usuario "${SERVICE_USER_EMAIL}" verificado y token ROTADO.`);
+        console.log(`  [TOKEN]   Nuevo token guardado con permisos 0600 en: ${TOKEN_OUT_FILE}`);
+        console.log('            Actualiza el Docker secret y elimina el archivo temporal con shred -u.');
+      } else {
+        console.log(`  [USER]    Usuario "${SERVICE_USER_EMAIL}" reparado (rol/estado verificados).`);
+      }
+    } else {
+      console.log(
+        `  [USER]    Usuario "${SERVICE_USER_EMAIL}" ya existe con rol y estado correctos (usa --rotate-token para rotar su token).`
+      );
+    }
+  }
+
+  // 5. Prueba de humo contra la API con el token generado/rotado (o VERIFY_SERVICE_TOKEN si se provee)
+  const tokenToVerify = activeServiceToken || process.env.VERIFY_SERVICE_TOKEN || '';
+  if (tokenToVerify) {
+    await verifyServiceToken(tokenToVerify);
   }
 }
 

@@ -3,6 +3,7 @@ import { reservationSchema } from '../../../lib/validations/schemas';
 import { logger } from '../../../lib/logger';
 import { getEquiposFromDB, insertReservacionInDB, ReservacionItem } from '../../../lib/db';
 import { requireSession, isStaffRole } from '../../../lib/authGuard';
+import { generateEntityId, generateFolio } from '../../../lib/folio';
 import {
   checkRateLimit,
   getClientIp,
@@ -66,9 +67,8 @@ export async function POST(req: NextRequest) {
       ? categorySlugMap[device.category] || 'realidad-virtual'
       : 'realidad-virtual';
 
-    const timestamp = Date.now();
-    const id = `res-${timestamp}`;
-    const folio = `RES-${timestamp.toString().slice(-4)}`;
+    const id = generateEntityId('res');
+    const folio = generateFolio('RES');
 
     // Vincular correo e ID del usuario autenticado (evita suplantación por usuarios estándar)
     const authoritativeEmail = isStaffRole(auth.user.role)

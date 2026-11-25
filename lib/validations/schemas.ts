@@ -109,3 +109,197 @@ export const spaceRequestSchema = z.object({
 });
 
 export type SpaceRequestInput = z.infer<typeof spaceRequestSchema>;
+
+const SAFE_URL_SCHEMA = z
+  .string()
+  .trim()
+  .max(255, 'La URL no puede exceder 255 caracteres')
+  .refine(
+    (val) => val === '' || val.startsWith('/') || /^https?:\/\//i.test(val),
+    'La URL debe ser una ruta relativa (/) o iniciar con http:// o https://'
+  );
+
+/**
+ * Validación de POST /api/cursos (acepta formato de agenda o formato courseRequestSchema)
+ */
+export const cursoPayloadSchema = z.object({
+  titulo: z.string().trim().min(2).max(200).optional(),
+  tipo: z.string().trim().min(2).max(100).optional(),
+  fecha: z.string().regex(DATE_REGEX, 'La fecha debe tener formato YYYY-MM-DD'),
+  hora: z.string().trim().min(3).max(40).optional(),
+  lugar: z.string().trim().min(2).max(180).optional(),
+  asistentes: z.coerce.number().int().min(1).max(200).optional(),
+  descripcion: z.string().trim().max(1000).optional(),
+  solicitanteNombre: z.string().trim().min(2, 'El nombre del solicitante es obligatorio').max(120),
+  solicitanteEmail: z.string().trim().email('Correo electrónico inválido').optional().or(z.literal('')),
+  institucion: z.string().trim().max(150).optional(),
+  icon: z.string().trim().max(20).optional(),
+});
+
+/**
+ * Validación de POST /api/equipos
+ */
+export const equipoSchema = z.object({
+  id: z.string().trim().min(1).max(64).optional(),
+  name: z.string().trim().min(2, 'El nombre del equipo es obligatorio').max(150),
+  category: z.enum([
+    'Realidad Virtual',
+    'Robótica',
+    'Cómputo',
+    'Drones',
+    'Fabricación digital',
+  ]),
+  brand: z.string().trim().min(1).max(100).default('Genérico'),
+  model: z.string().trim().min(1).max(100).default('Estándar'),
+  inventoryNumber: z.string().trim().min(2, 'El código PLAi es obligatorio').max(80),
+  serialNumber: z.string().trim().max(100).optional().default('N/A'),
+  storage: z.string().trim().max(80).optional().default('N/A'),
+  status: z
+    .enum([
+      'Disponible',
+      'Reservado',
+      'En uso',
+      'En mantenimiento',
+      'Fuera de servicio',
+      'No disponible',
+    ])
+    .default('Disponible'),
+  location: z.string().trim().min(2).max(150).default('Laboratorio de Innovación PLAi'),
+  specs: z.array(z.string().trim().max(200)).max(30).optional().default([]),
+  accessories: z.array(z.string().trim().max(200)).max(30).optional().default([]),
+  imageEmoji: z.string().trim().max(20).optional().default('📦'),
+  imageUrl: SAFE_URL_SCHEMA.optional(),
+  responsible: z.string().trim().max(120).optional().default('Laboratorio de Innovación PLAi'),
+  observations: z.string().trim().max(1000).optional(),
+  dateAdded: z.string().trim().max(40).optional(),
+});
+
+/**
+ * Validación de POST /api/aplicaciones
+ */
+export const aplicacionSchema = z.object({
+  id: z.string().trim().min(1).max(64).optional(),
+  name: z.string().trim().min(2, 'El nombre de la aplicación es obligatorio').max(150),
+  developer: z.string().trim().max(120).optional().default('Desarrollador Oficial'),
+  version: z.string().trim().max(50).optional().default('1.0'),
+  category: z.string().trim().min(2, 'La categoría es obligatoria').max(60),
+  platform: z.enum(['Meta Quest', 'PC', 'Meta Quest + PC']),
+  ageRating: z.string().trim().max(40).optional().default('Todas las edades'),
+  description: z.string().trim().max(1000).optional().default('Sin descripción'),
+  imageUrl: SAFE_URL_SCHEMA.optional(),
+  iconUrl: SAFE_URL_SCHEMA.optional(),
+  devicesInstalled: z.coerce.number().int().min(0).max(500).optional().default(1),
+  status: z.enum(['Activa', 'Inactiva']).optional().default('Activa'),
+});
+
+/**
+ * Validación de POST y PUT /api/bitacora
+ */
+export const bitacoraEntregaSchema = z.object({
+  codigoPlai: z.string().trim().min(2, 'El código PLAi es obligatorio').max(80),
+  usuarioNombre: z.string().trim().min(2, 'El nombre del usuario es obligatorio').max(120),
+  usuarioEmail: z.string().trim().email('Correo electrónico inválido').optional().or(z.literal('')),
+  usuarioDependencia: z.string().trim().max(150).optional(),
+  fechaEntrega: z.string().trim().min(8).max(40),
+  fechaDevolucionEstimada: z.string().trim().min(8).max(40),
+  condicionEntrega: z.enum(['Excelente', 'Bueno', 'Regular']).optional().default('Excelente'),
+  accesoriosEntregados: z.string().trim().max(500).optional(),
+  observacionesEntrega: z.string().trim().max(1000).optional(),
+  reservaId: z.string().trim().max(64).optional(),
+});
+
+export const bitacoraDevolucionSchema = z.object({
+  id: z.string().trim().min(1, 'El ID de bitácora es obligatorio').max(64),
+  fechaDevolucionReal: z.string().trim().min(8).max(40),
+  condicionDevolucion: z.enum(['Excelente', 'Bueno', 'Observación', 'En revisión', 'Dañado']),
+  accesoriosDevueltos: z.string().trim().max(500).optional().default('Completos'),
+  observacionesDevolucion: z.string().trim().max(1000).optional(),
+  incidenciaGenerada: z.boolean().optional().default(false),
+  descripcionIncidencia: z.string().trim().max(1000).optional(),
+});
+
+/**
+ * Validación de POST y PUT /api/mantenimiento
+ */
+export const incidenciaCreateSchema = z.object({
+  codigoPlai: z.string().trim().min(2, 'El código PLAi es obligatorio').max(80),
+  origen: z
+    .enum(['Devolución de Préstamo', 'Revisión Periódica', 'Reporte de Usuario', 'Falla Operativa'])
+    .optional()
+    .default('Revisión Periódica'),
+  tipoFalla: z.enum([
+    'Hardware',
+    'Software',
+    'Calibración',
+    'Daño Físico',
+    'Accesorio Faltante',
+    'Limpieza y Óptica',
+  ]),
+  severidad: z.enum(['Baja', 'Media', 'Alta', 'Crítica']).optional().default('Media'),
+  descripcion: z.string().trim().min(5, 'Describe brevemente la falla (mín. 5 caracteres)').max(1500),
+  estado: z
+    .enum(['Reportada', 'En diagnóstico', 'En reparación', 'Esperando piezas', 'Resuelta'])
+    .optional()
+    .default('Reportada'),
+  tecnicoResponsable: z.string().trim().max(120).optional(),
+  fechaReporte: z.string().trim().max(40).optional(),
+  accionesRealizadas: z.string().trim().max(1500).optional(),
+});
+
+export const incidenciaUpdateSchema = z.object({
+  id: z.string().trim().min(1, 'El ID de incidencia es obligatorio').max(64),
+  estado: z.enum([
+    'Reportada',
+    'En diagnóstico',
+    'En reparación',
+    'Esperando piezas',
+    'Resuelta',
+  ]),
+  accionesRealizadas: z.string().trim().max(1500).optional(),
+});
+
+/**
+ * Validación estricta de POST /api/configuracion (impide inyección de claves arbitrarias)
+ */
+export const systemConfigSchema = z.object({
+  labName: z.string().trim().min(3).max(200).optional(),
+  labLocation: z.string().trim().min(3).max(250).optional(),
+  adminEmail: z.string().trim().email('Correo de administrador inválido').max(150).optional(),
+  maintenanceAlertDays: z.coerce.number().int().min(1).max(365).optional(),
+  allowPublicView: z.boolean().optional(),
+  requireApproval: z.boolean().optional(),
+  maxReservationHours: z.coerce.number().int().min(1).max(8).optional(),
+  maxAdvanceDays: z.coerce.number().int().min(1).max(90).optional(),
+  categorias: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
+});
+
+/**
+ * Validación estricta de POST /api/categorias
+ */
+export const categoryUpdateSchema = z.object({
+  id: z
+    .string()
+    .trim()
+    .min(2)
+    .max(64)
+    .regex(/^[a-z0-9-]+$/, 'El identificador de categoría debe contener solo minúsculas, números y guiones'),
+  name: z.string().trim().min(2).max(100).optional(),
+  description: z.string().trim().max(1000).optional(),
+  plaiUsage: z.string().trim().max(2000).optional(),
+  videoUrl: SAFE_URL_SCHEMA.optional(),
+  color: z
+    .string()
+    .trim()
+    .regex(/^#[0-9a-fA-F]{3,8}$/, 'Color hexadecimal inválido')
+    .optional(),
+  benefits: z.array(z.string().trim().min(1).max(200)).max(15).optional(),
+  successCases: z
+    .array(
+      z.object({
+        title: z.string().trim().min(1).max(150),
+        desc: z.string().trim().max(500).default(''),
+      })
+    )
+    .max(15)
+    .optional(),
+});

@@ -29,14 +29,38 @@ function isNextAuthCookie(name: string): boolean {
 
 /**
  * Cierre de sesión federado (Single Sign-Out / SLO) contra Keycloak.
- * 1. Obtiene el `idToken` desde el JWT de servidor (nunca expuesto al navegador).
- * 2. Expira TODAS las cookies de sesión locales de NextAuth, incluyendo fragmentos
- *    chunked (`.0`, `.1`, `.2`, ...) que existan en la petición.
- * 3. Redirige al endpoint `end_session_endpoint` de Keycloak para revocar la sesión SSO.
+ * Seguridad:
+ * - Solo acepta método POST (rechaza GET con 405 para impedir Logout CSRF vía <img> o enlaces).
+ * - Valida cabecera Origin contra Host para mitigar CSRF entre sitios.
+ * - Expira TODAS las cookies locales de NextAuth (incluyendo chunks .0, .1, ...).
+ * - Devuelve `{ success: true, logoutUrl }` para que el cliente navegue al end_session_endpoint.
  */
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
+  const origin = req.headers.get('origin');
+  const host = req.headers.get('host');
+  if (origin && host) {
+    try {
+      const originHost = new URL(origin).host;
+      if (originHost !== host) {
+        logger.warn('Intento de logout con origen cruzado rechazado (Logout CSRF)', {
+          origin,
+          host,
+        });
+        return NextResponse.json(
+          { success: false, message: 'Origen de petición no autorizado.' },
+          { status: 403 }
+        );
+      }
+    } catch {
+      return NextResponse.json(
+        { success: false, message: 'Cabecera Origin malformada.' },
+        { status: 400 }
+      );
+    }
+  }
+
   const postLogoutRedirect = new URL('/login', env.siteUrl).toString();
-  let redirectTarget = postLogoutRedirect;
+  let logoutUrl = postLogoutRedirect;
 
   try {
     const token = await getToken({
@@ -57,7 +81,7 @@ export async function GET(req: NextRequest) {
         keycloakLogoutUrl.searchParams.set('client_id', env.keycloakClientId);
       }
 
-      redirectTarget = keycloakLogoutUrl.toString();
+      logoutUrl = keycloakLogoutUrl.toString();
     }
   } catch (error) {
     logger.warn('No se pudo construir la URL de cierre federado en Keycloak', {
@@ -65,9 +89,8 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const response = NextResponse.redirect(redirectTarget);
+  const response = NextResponse.json({ success: true, logoutUrl });
 
-  // Recolectar nombres base + todas las cookies reales de NextAuth presentes (incluyendo .0, .1, ...)
   const cookiesToClear = new Set<string>(BASE_NEXTAUTH_COOKIES);
   for (const cookie of req.cookies.getAll()) {
     if (isNextAuthCookie(cookie.name)) {

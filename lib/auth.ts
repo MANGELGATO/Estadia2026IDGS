@@ -138,9 +138,14 @@ export function getAuthOptions(): NextAuthOptions {
           return true;
         }
 
+        const profileObj = profile as Record<string, unknown> | undefined;
+        const accessClaims = decodeJwtPayload(account?.access_token);
+        const emailVerified =
+          profileObj?.email_verified === true || accessClaims?.email_verified === true;
+
         const resolvedRole = resolveRoleFromKeycloakLogin(
           account?.access_token,
-          profile as Record<string, unknown> | undefined,
+          profileObj,
           clientId
         );
 
@@ -150,19 +155,33 @@ export function getAuthOptions(): NextAuthOptions {
             name: user.name || 'Usuario PLAi',
             email: user.email,
             role: resolvedRole,
+            emailVerified,
           });
 
           if (!syncResult.allowed) {
+            if (syncResult.reason === 'email_unverified') {
+              logger.warn(
+                'Inicio de sesión denegado: correo no verificado en Keycloak para cuenta pre-registrada',
+                { userId: user.id }
+              );
+              return '/login?error=EmailNotVerified';
+            }
             logger.warn('Inicio de sesión denegado: cuenta marcada como Inactiva en el directorio', {
               userId: user.id,
             });
             return '/login?error=AccountInactive';
           }
         } catch (error) {
-          logger.error('Error al sincronizar usuario Keycloak en Directus durante signIn', {
-            userId: user.id,
-            error: String(error),
-          });
+          // Política FAIL-CLOSED: si Directus no responde, no se permite iniciar sesión
+          // para garantizar que una cuenta marcada como Inactiva jamás evada el bloqueo.
+          logger.error(
+            'Error al verificar/sincronizar usuario Keycloak en Directus durante signIn (fail-closed)',
+            {
+              userId: user.id,
+              error: String(error),
+            }
+          );
+          return '/login?error=ServiceUnavailable';
         }
 
         return true;

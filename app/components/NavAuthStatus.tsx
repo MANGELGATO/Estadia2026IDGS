@@ -8,8 +8,17 @@ import { UserCircle2, LogOut, ShieldCheck, User } from 'lucide-react';
 export default function NavAuthStatus() {
   const { data: session, status } = useSession();
 
-  const handleFederatedLogout = () => {
-    window.location.href = '/api/auth/federated-logout';
+  const handleFederatedLogout = async () => {
+    try {
+      const res = await fetch('/api/auth/federated-logout', {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
+      const data = await res.json().catch(() => ({}));
+      window.location.href = typeof data.logoutUrl === 'string' ? data.logoutUrl : '/login';
+    } catch {
+      window.location.href = '/login';
+    }
   };
 
   if (status === 'loading') {

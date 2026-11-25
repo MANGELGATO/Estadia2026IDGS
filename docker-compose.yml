@@ -18,7 +18,7 @@
 
 services:
   nginx-plai-recursos:
-    image: AQUI_HACER_CAMBIOS_CORRESPONDIENTES_CON_REGISTRY_PLAI/plai-recursos-nginx:${VERSION:-1.0.0}
+    image: ${REGISTRY:?Debes exportar REGISTRY}/plai-recursos-nginx:${VERSION:-1.0.0}
     read_only: true
     cap_drop:
       - ALL
@@ -30,12 +30,15 @@ services:
       # - seccomp:/etc/docker/seccomp/plai-default.json
     environment:
       ALLOWED_HOST: AQUI_HACER_CAMBIOS_CORRESPONDIENTES_CON_DOMINIO_INSTITUCIONAL_PLAI
-      SSL_CERT_FILE: /run/secrets/plai_recursos_tls_cert
-      SSL_KEY_FILE: /run/secrets/plai_recursos_tls_key
-    secrets:
-      - plai_recursos_tls_cert
-      - plai_recursos_tls_key
+      SSL_CERT_FILE: /etc/nginx/ssl/fullchain.pem
+      SSL_KEY_FILE: /etc/nginx/ssl/privkey.pem
     volumes:
+      # Certificados TLS en el host (alineado con el script de renovación Let's Encrypt de PLAi).
+      # El directorio del host debe ser legible por UID 101 (nginx) y se monta read-only.
+      - type: bind
+        source: /opt/plai/plai-recursos/ssl/AQUI_HACER_CAMBIOS_CORRESPONDIENTES_CON_DOMINIO_INSTITUCIONAL_PLAI
+        target: /etc/nginx/ssl
+        read_only: true
       # mode: 1023 (equivalente decimal de 01777 octal; Docker Swarm ignora notación octal con 0 inicial)
       - type: tmpfs
         target: /tmp
@@ -82,7 +85,7 @@ services:
       - plai_isolated_backend
 
   app:
-    image: AQUI_HACER_CAMBIOS_CORRESPONDIENTES_CON_REGISTRY_PLAI/plai-recursos-espacios:${VERSION:-1.0.0}
+    image: ${REGISTRY:?Debes exportar REGISTRY}/plai-recursos-espacios:${VERSION:-1.0.0}
     read_only: true
     cap_drop:
       - ALL
@@ -127,7 +130,7 @@ services:
       interval: 30s
       timeout: 3s
       retries: 3
-      start_period: 15s
+      start_period: 40s
     logging:
       driver: json-file
       options:
@@ -176,8 +179,4 @@ secrets:
   plai_recursos_keycloak_secret:
     external: true
   plai_recursos_directus_token:
-    external: true
-  plai_recursos_tls_cert:
-    external: true
-  plai_recursos_tls_key:
     external: true

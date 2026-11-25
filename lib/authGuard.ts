@@ -34,7 +34,9 @@ export async function requireSession(allowedRoles?: UserRole[]): Promise<AuthGua
     };
   }
 
-  // Verificar que la cuenta no haya sido marcada como Inactiva por un administrador
+  // Verificar que la cuenta no haya sido marcada como Inactiva por un administrador.
+  // Política FAIL-CLOSED: si Directus no responde, se devuelve HTTP 503 y se impide el acceso
+  // para garantizar que un usuario Inactivo nunca pueda operar durante una interrupción de Directus.
   if (env.hasDirectusConfig) {
     try {
       const isActive = await isUsuarioActiveInDB(session.user.email, session.user.id);
@@ -51,9 +53,24 @@ export async function requireSession(allowedRoles?: UserRole[]): Promise<AuthGua
         };
       }
     } catch (error) {
-      logger.warn('No se pudo verificar estado activo del usuario en Directus', {
-        error: String(error),
-      });
+      logger.error(
+        'Error al verificar estado activo del usuario en Directus (fail-closed -> 503)',
+        {
+          userId: session.user.id,
+          error: String(error),
+        }
+      );
+      return {
+        user: null,
+        errorResponse: NextResponse.json(
+          {
+            success: false,
+            message:
+              'El directorio institucional de PLAi no está disponible temporalmente. Intenta de nuevo en unos momentos.',
+          },
+          { status: 503 }
+        ),
+      };
     }
   }
 

@@ -3,14 +3,12 @@ import type { NextConfig } from 'next';
 // Las cabeceras estáticas se mantienen aquí; Content-Security-Policy se calcula
 // dinámicamente por petición en `proxy.ts` con nonce criptográfico y el origen
 // real de KEYCLOAK_ISSUER en tiempo de ejecución (sin 'unsafe-inline' en script-src).
+// Nota: Strict-Transport-Security (HSTS) se emite exclusivamente desde NGINX (puerto 8443 TLS)
+// para evitar duplicar la cabecera en cada respuesta HTTPS.
 const securityHeaders = [
   {
     key: 'X-DNS-Prefetch-Control',
     value: 'on',
-  },
-  {
-    key: 'Strict-Transport-Security',
-    value: 'max-age=63072000; includeSubDomains; preload',
   },
   {
     key: 'X-Frame-Options',

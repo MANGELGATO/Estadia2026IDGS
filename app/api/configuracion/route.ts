@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSystemConfigFromDB, saveSystemConfigInDB } from '../../../lib/db';
 import { requireSession } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
+import { systemConfigSchema } from '../../../lib/validations/schemas';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,10 +35,23 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+    const parsed = systemConfigSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Parámetros de configuración inválidos.',
+          errors: parsed.error.flatten().fieldErrors,
+        },
+        { status: 400 }
+      );
+    }
+
     const current = await getSystemConfigFromDB();
     const updated = await saveSystemConfigInDB({
       ...current,
-      ...body,
+      ...parsed.data,
     });
     logger.info('Configuración del sistema actualizada', {
       adminEmail: updated.adminEmail,

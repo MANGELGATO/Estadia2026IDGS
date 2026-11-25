@@ -3,6 +3,8 @@ import { getEquiposFromDB, insertEquipoInDB, deleteEquipoInDB } from '../../../l
 import { DeviceItem } from '../../../lib/mockData';
 import { requireSession } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
+import { generateEntityId } from '../../../lib/folio';
+import { equipoSchema } from '../../../lib/validations/schemas';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +17,7 @@ export async function GET() {
       total: equipos.length,
     });
   } catch (error) {
-    logger.error('Error al obtener equipos de la base de datos', { path: '/api/equipos' }, error);
+    logger.error('Error al obtener equipos en Directus', { path: '/api/equipos' }, error);
     return NextResponse.json(
       { success: false, message: 'Error interno al consultar equipos' },
       { status: 500 }
@@ -28,24 +30,50 @@ export async function POST(req: NextRequest) {
   if (auth.errorResponse) return auth.errorResponse;
 
   try {
-    const item = (await req.json()) as DeviceItem;
+    const body = await req.json();
+    const parsed = equipoSchema.safeParse(body);
 
-    if (!item.name || !item.inventoryNumber || !item.category) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { success: false, message: 'Faltan campos obligatorios (nombre, código PLAi, categoría)' },
+        {
+          success: false,
+          message: 'Datos de equipo inválidos.',
+          errors: parsed.error.flatten().fieldErrors,
+        },
         { status: 400 }
       );
     }
 
+    const d = parsed.data;
+    const item: DeviceItem = {
+      id: d.id || generateEntityId('eq'),
+      name: d.name,
+      category: d.category,
+      brand: d.brand,
+      model: d.model,
+      inventoryNumber: d.inventoryNumber,
+      serialNumber: d.serialNumber,
+      storage: d.storage,
+      status: d.status,
+      location: d.location,
+      specs: d.specs,
+      accessories: d.accessories,
+      imageEmoji: d.imageEmoji,
+      imageUrl: d.imageUrl || undefined,
+      responsible: d.responsible,
+      observations: d.observations,
+      dateAdded: d.dateAdded,
+    };
+
     const saved = await insertEquipoInDB(item);
     if (!saved) {
       return NextResponse.json(
-        { success: false, message: 'No se pudo guardar el equipo en la base de datos' },
+        { success: false, message: 'No se pudo guardar el equipo en Directus' },
         { status: 500 }
       );
     }
 
-    logger.info('Equipo registrado o actualizado en PostgreSQL', {
+    logger.info('Equipo registrado o actualizado en Directus', {
       id: item.id,
       codigo_plai: item.inventoryNumber,
       actor: auth.user.email,
@@ -60,9 +88,9 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    logger.error('Error al guardar equipo en base de datos', { path: '/api/equipos' }, error);
+    logger.error('Error al guardar equipo en Directus', { path: '/api/equipos' }, error);
     return NextResponse.json(
-      { success: false, message: 'Error al persistir equipo en la base de datos' },
+      { success: false, message: 'Error al persistir equipo en Directus' },
       { status: 500 }
     );
   }
@@ -74,11 +102,11 @@ export async function DELETE(req: NextRequest) {
 
   try {
     const { searchParams } = new URL(req.url);
-    const id = searchParams.get('id');
+    const id = searchParams.get('id')?.trim();
 
-    if (!id) {
+    if (!id || id.length > 64) {
       return NextResponse.json(
-        { success: false, message: 'Parámetro id es obligatorio' },
+        { success: false, message: 'Parámetro id es obligatorio y válido' },
         { status: 400 }
       );
     }
@@ -91,7 +119,7 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    logger.info('Equipo eliminado de la base de datos', { id, actor: auth.user.email });
+    logger.info('Equipo eliminado de Directus', { id, actor: auth.user.email });
 
     return NextResponse.json({
       success: true,

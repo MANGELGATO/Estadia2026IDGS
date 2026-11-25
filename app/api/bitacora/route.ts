@@ -10,6 +10,11 @@ import {
 } from '../../../lib/db';
 import { requireSession } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
+import { generateEntityId, generateFolio } from '../../../lib/folio';
+import {
+  bitacoraEntregaSchema,
+  bitacoraDevolucionSchema,
+} from '../../../lib/validations/schemas';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,59 +44,54 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+    const parsed = bitacoraEntregaSchema.safeParse(body);
 
-    if (
-      !body.codigoPlai ||
-      !body.usuarioNombre ||
-      !body.fechaEntrega ||
-      !body.fechaDevolucionEstimada
-    ) {
+    if (!parsed.success) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Faltan campos obligatorios para registrar la entrega del dispositivo',
+          message: 'Los datos de entrega en bitácora no son válidos.',
+          errors: parsed.error.flatten().fieldErrors,
         },
         { status: 400 }
       );
     }
 
-    const equipo = await getEquipoByCodigoPLAi(body.codigoPlai);
+    const data = parsed.data;
+    const equipo = await getEquipoByCodigoPLAi(data.codigoPlai);
     if (!equipo) {
       return NextResponse.json(
         {
           success: false,
-          message: `No se encontró ningún equipo con el código PLAi: ${body.codigoPlai}`,
+          message: `No se encontró ningún equipo con el código PLAi: ${data.codigoPlai}`,
         },
         { status: 404 }
       );
     }
 
     const item: BitacoraItem = {
-      id: `bit-${Date.now()}`,
+      id: generateEntityId('bit'),
       equipoId: equipo.id,
       codigoPlai: equipo.inventoryNumber,
       equipoNombre: equipo.name,
-      usuarioNombre: String(body.usuarioNombre).trim(),
-      usuarioEmail: String(body.usuarioEmail || '').trim().toLowerCase(),
-      usuarioDependencia: body.usuarioDependencia
-        ? String(body.usuarioDependencia).trim()
-        : undefined,
-      fechaEntrega: body.fechaEntrega,
-      fechaDevolucionEstimada: body.fechaDevolucionEstimada,
+      usuarioNombre: data.usuarioNombre,
+      usuarioEmail: (data.usuarioEmail || '').toLowerCase(),
+      usuarioDependencia: data.usuarioDependencia || undefined,
+      fechaEntrega: data.fechaEntrega,
+      fechaDevolucionEstimada: data.fechaDevolucionEstimada,
       estadoPrestamo: 'Activo',
-      condicionEntrega: body.condicionEntrega || 'Excelente',
-      accesoriosEntregados: body.accesoriosEntregados || 'Equipo completo con accesorios originales',
-      observacionesEntrega: body.observacionesEntrega
-        ? String(body.observacionesEntrega).trim()
-        : undefined,
+      condicionEntrega: data.condicionEntrega,
+      accesoriosEntregados:
+        data.accesoriosEntregados || 'Equipo completo con accesorios originales',
+      observacionesEntrega: data.observacionesEntrega || undefined,
       adminEntrega: auth.user.name,
     };
 
-    await insertBitacoraEntregaInDB(item, body.reservaId ? String(body.reservaId) : undefined);
+    await insertBitacoraEntregaInDB(item, data.reservaId);
     logger.info('Entrega de equipo registrada en bitácora', {
       id: item.id,
       codigo: item.codigoPlai,
-      reservaId: body.reservaId,
+      reservaId: data.reservaId,
       actor: auth.user.email,
     });
 
@@ -118,6 +118,19 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
+    const parsed = bitacoraDevolucionSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Los datos de devolución no son válidos.',
+          errors: parsed.error.flatten().fieldErrors,
+        },
+        { status: 400 }
+      );
+    }
+
     const {
       id,
       fechaDevolucionReal,
@@ -126,24 +139,14 @@ export async function PUT(req: NextRequest) {
       observacionesDevolucion,
       incidenciaGenerada,
       descripcionIncidencia,
-    } = body;
-
-    if (!id || !fechaDevolucionReal || !condicionDevolucion) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'ID, fecha de devolución real y condición de retorno son obligatorios',
-        },
-        { status: 400 }
-      );
-    }
+    } = parsed.data;
 
     await updateBitacoraDevolucionInDB(id, {
       fechaDevolucionReal,
       condicionDevolucion,
       accesoriosDevueltos: accesoriosDevueltos || 'Completos',
       observacionesDevolucion,
-      incidenciaGenerada: Boolean(incidenciaGenerada),
+      incidenciaGenerada,
       adminRecibe: auth.user.name,
     });
 
@@ -152,8 +155,8 @@ export async function PUT(req: NextRequest) {
       const item = logs.find((b) => b.id === id);
       if (item) {
         const incidencia: IncidenciaItem = {
-          id: `inc-${Date.now()}`,
-          folio: `INC-${Date.now().toString().slice(-4)}`,
+          id: generateEntityId('inc'),
+          folio: generateFolio('INC'),
           equipoId: item.equipoId,
           codigoPlai: item.codigoPlai,
           equipoNombre: item.equipoNombre,
