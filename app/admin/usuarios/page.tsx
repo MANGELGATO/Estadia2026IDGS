@@ -108,10 +108,9 @@ export default function UsuariosPage() {
       id: editingItem?.id,
       name: (fd.get('name') as string).trim(),
       email: (fd.get('email') as string).trim().toLowerCase(),
-      password: (fd.get('password') as string)?.trim() || undefined,
-      role: fd.get('role') as UserRole,
       status: (fd.get('status') as UserStatus) || 'Activo',
       dependencia: (fd.get('dependencia') as string)?.trim() || 'Comunidad PLAi',
+      telefono: (fd.get('telefono') as string)?.trim() || undefined,
     };
 
     try {
@@ -120,15 +119,21 @@ export default function UsuariosPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      const json = await res.json().catch(() => ({}));
       if (res.ok) {
         setIsModalOpen(false);
         setActionNotice({
           text: editingItem
-            ? `Datos de ${payload.name} actualizados y sincronizados.`
-            : `Usuario ${payload.name} creado exitosamente (puede iniciar sesión con su correo).`,
+            ? `Perfil operativo de ${payload.name} actualizado.`
+            : `Perfil de ${payload.name} pre-registrado. Su acceso y rol efectivo se sincronizarán al iniciar sesión con Keycloak.`,
           type: 'success',
         });
         fetchUsuarios();
+      } else {
+        setActionNotice({
+          text: json.message || 'No fue posible guardar el perfil del usuario.',
+          type: 'warning',
+        });
       }
     } catch (err) {
       console.error('Error guardando usuario:', err);
@@ -172,9 +177,9 @@ export default function UsuariosPage() {
     <div className="flex animate-pop-in flex-col gap-8">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <h1 className="mb-1 font-heading text-3xl font-extrabold text-navy">Gestión de Usuarios</h1>
+          <h1 className="mb-1 font-heading text-3xl font-extrabold text-navy">Directorio de Usuarios</h1>
           <p className="text-sm text-plai-muted md:text-base">
-            Administra las cuentas institucionales, permisos y trazabilidad de préstamos por usuario
+            Los usuarios se registran automáticamente al iniciar sesión con Keycloak SSO. Los roles y contraseñas se administran en Keycloak; aquí puedes gestionar su dependencia y habilitar o desactivar su acceso al laboratorio.
           </p>
         </div>
       </div>
@@ -236,19 +241,23 @@ export default function UsuariosPage() {
               <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-navy">Correo electrónico *</label>
-                  <input type="email" name="email" className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem?.email} required />
+                  <input
+                    type="email"
+                    name="email"
+                    readOnly={!!editingItem}
+                    className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all read-only:bg-gray-100 focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20"
+                    defaultValue={editingItem?.email}
+                    required
+                  />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">
-                    Contraseña {editingItem ? '(Opcional)' : '*'}
-                  </label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Teléfono</label>
                   <input
-                    type="password"
-                    name="password"
-                    placeholder={editingItem ? 'Dejar vacío para conservar actual' : 'Mínimo 8 caracteres'}
-                    minLength={editingItem ? undefined : 8}
-                    required={!editingItem}
+                    type="tel"
+                    name="telefono"
+                    placeholder="Ej. 33 1410 1620"
                     className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20"
+                    defaultValue={editingItem?.telefono || ''}
                   />
                 </div>
               </div>
@@ -264,31 +273,31 @@ export default function UsuariosPage() {
               </div>
               <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Rol</label>
-                  <select name="role" className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem?.role || 'Colaborador'}>
-                    <option value="Administrador">Administrador</option>
-                    <option value="Colaborador">Colaborador</option>
-                    <option value="Usuario Final">Usuario Final</option>
-                  </select>
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Rol (desde Keycloak)</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={editingItem?.role || 'Sincronizado al iniciar sesión'}
+                    className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3.5 py-2.5 text-sm text-gray-600"
+                  />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Estado</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-navy">Estado en Laboratorio</label>
                   <select name="status" className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20" defaultValue={editingItem?.status || 'Activo'}>
-                    <option value="Activo">Activo</option>
-                    <option value="Inactivo">Inactivo</option>
+                    <option value="Activo">Activo (Acceso permitido)</option>
+                    <option value="Inactivo">Inactivo (Acceso bloqueado)</option>
                   </select>
                 </div>
               </div>
-              <div className="my-4 rounded-xl border border-black/[0.06] bg-gray-50 p-3.5 text-xs text-gray-600">
-                <div className="mb-1 font-bold text-navy">Descripción de roles:</div>
-                <div className="flex flex-col gap-1">
-                  <div><strong>Administrador:</strong> Acceso total al panel administrativo, inventario y bitácora.</div>
-                  <div><strong>Colaborador / Usuario Final:</strong> Acceso al portal de préstamos, agenda y reservaciones con autollenado de identidad.</div>
-                </div>
+              <div className="my-4 rounded-xl border border-blue-100 bg-blue-50/70 p-3.5 text-xs text-blue-900">
+                <div className="mb-1 font-bold text-navy">Autenticación centralizada en Keycloak SSO</div>
+                <p className="leading-relaxed">
+                  Las contraseñas y los roles de cliente (<code className="font-mono">admin</code>, <code className="font-mono">colaborador</code>, <code className="font-mono">usuario</code>) se asignan exclusivamente en Keycloak. Marcar un perfil como <strong>Inactivo</strong> bloquea su acceso al laboratorio y a las APIs.
+                </p>
               </div>
               <div className="mt-6 flex justify-end gap-3">
                 <button type="button" className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100" onClick={() => setIsModalOpen(false)}>Cancelar</button>
-                <button type="submit" className="rounded-lg bg-plai px-5 py-2 text-sm font-semibold text-white shadow-md transition-all hover:bg-plai-dark">{editingItem ? 'Guardar Cambios' : 'Crear Usuario'}</button>
+                <button type="submit" className="rounded-lg bg-[#ed8d1b] px-5 py-2 text-sm font-semibold text-white shadow-md transition-all hover:bg-[#d67a10]">{editingItem ? 'Guardar Cambios' : 'Registrar Perfil'}</button>
               </div>
             </form>
           </div>

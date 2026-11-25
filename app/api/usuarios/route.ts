@@ -25,13 +25,19 @@ export async function GET() {
   }
 }
 
+/**
+ * Crea o actualiza un perfil operativo en el directorio `<prefix>usuarios`.
+ * Nota de seguridad: las contraseñas y los roles efectivos (RBAC) son administrados
+ * exclusivamente por Keycloak; aquí solo se gestionan metadatos operativos
+ * (dependencia, teléfono) y el estado local `Activo`/`Inactivo` dentro del laboratorio.
+ */
 export async function POST(req: NextRequest) {
   const auth = await requireSession(['admin']);
   if (auth.errorResponse) return auth.errorResponse;
 
   try {
     const body = await req.json();
-    const { id, name, email, password, role, status, dependencia, telefono } = body;
+    const { id, name, email, status, dependencia, telefono } = body;
 
     if (!name || !email) {
       return NextResponse.json(
@@ -40,46 +46,55 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const isNew = !id;
-    if (isNew && (!password || String(password).trim().length < 8)) {
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const existingList = await getUsuariosFromDB();
+    const existing = existingList.find(
+      (u) => (id && u.id === String(id)) || u.email.toLowerCase() === normalizedEmail
+    );
+
+    // El rol efectivo proviene de Keycloak; conservar el último rol sincronizado (o 'Usuario Final' si es pre-registro)
+    const preservedRole: UsuarioItem['role'] = existing?.role || 'Usuario Final';
+
+    // Evitar que un administrador se desactive a sí mismo o a otro administrador desde esta pantalla
+    if (status === 'Inactivo' && preservedRole === 'Administrador') {
       return NextResponse.json(
         {
           success: false,
-          message: 'Para crear un usuario nuevo se requiere una contraseña de al menos 8 caracteres.',
+          message:
+            'No es posible desactivar una cuenta con rol Administrador desde el portal; revoca el rol en Keycloak.',
         },
         { status: 400 }
       );
     }
 
-    const user: UsuarioItem & { password?: string } = {
-      id: id ? String(id) : `usr-${Date.now()}`,
+    const user: UsuarioItem = {
+      id: existing?.id || (id ? String(id) : `usr-${Date.now()}`),
       name: String(name).trim(),
-      email: String(email).trim().toLowerCase(),
-      password: password ? String(password).trim() : undefined,
-      role: role || 'Usuario Final',
-      status: status || 'Activo',
+      email: normalizedEmail,
+      role: preservedRole,
+      status: status === 'Inactivo' ? 'Inactivo' : 'Activo',
       dependencia: dependencia ? String(dependencia).trim() : 'Comunidad PLAi',
       telefono: telefono ? String(telefono).trim() : undefined,
-      lastLogin: new Date().toISOString().split('T')[0],
-      reservations: 0,
+      lastLogin: existing?.lastLogin || 'Pendiente de primer acceso SSO',
+      reservations: existing?.reservations || 0,
     };
 
     const saved = await upsertUsuarioInDB(user);
 
-    logger.info('Usuario institucional guardado', {
+    logger.info('Perfil operativo de usuario actualizado', {
       id: saved.id,
       email: saved.email,
-      role: saved.role,
+      accountStatus: saved.status,
       actor: auth.user.email,
     });
 
     return NextResponse.json(
       {
         success: true,
-        message: 'Usuario guardado exitosamente',
+        message: 'Perfil operativo guardado correctamente',
         data: saved,
       },
-      { status: 201 }
+      { status: existing ? 200 : 201 }
     );
   } catch (error) {
     logger.error('Error al guardar usuario', { path: '/api/usuarios' }, error);

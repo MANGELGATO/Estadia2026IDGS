@@ -1,34 +1,8 @@
 import type { NextConfig } from 'next';
 
-const isProd = process.env.NODE_ENV === 'production';
-
-function getOriginSafe(rawUrl?: string): string | null {
-  if (!rawUrl) return null;
-  try {
-    return new URL(rawUrl).origin;
-  } catch {
-    return null;
-  }
-}
-
-const keycloakOrigin = getOriginSafe(process.env.KEYCLOAK_ISSUER);
-
-const connectSrc = [
-  "'self'",
-  ...(keycloakOrigin ? [keycloakOrigin] : []),
-  ...(!isProd ? ['http://localhost:*', 'ws://localhost:*'] : []),
-].join(' ');
-
-const formActionSrc = [
-  "'self'",
-  ...(keycloakOrigin ? [keycloakOrigin] : []),
-].join(' ');
-
-// En producción NO se permite 'unsafe-eval' ni orígenes localhost/ws
-const scriptSrc = isProd
-  ? "'self' 'unsafe-inline'"
-  : "'self' 'unsafe-eval' 'unsafe-inline'";
-
+// Las cabeceras estáticas se mantienen aquí; Content-Security-Policy se calcula
+// dinámicamente por petición en `proxy.ts` con nonce criptográfico y el origen
+// real de KEYCLOAK_ISSUER en tiempo de ejecución (sin 'unsafe-inline' en script-src).
 const securityHeaders = [
   {
     key: 'X-DNS-Prefetch-Control',
@@ -53,22 +27,6 @@ const securityHeaders = [
   {
     key: 'Permissions-Policy',
     value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()',
-  },
-  {
-    key: 'Content-Security-Policy',
-    value: [
-      "default-src 'self'",
-      `script-src ${scriptSrc}`,
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com data:",
-      "img-src 'self' data: blob:",
-      `connect-src ${connectSrc}`,
-      "object-src 'none'",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      `form-action ${formActionSrc}`,
-      ...(isProd ? ['upgrade-insecure-requests'] : []),
-    ].join('; '),
   },
 ];
 

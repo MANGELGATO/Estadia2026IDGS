@@ -132,39 +132,18 @@ class DirectusClient {
     return Array.isArray(json.data) ? json.data : [];
   }
 
+  /**
+   * Consulta un ítem por `id` mediante filtro de colección (`filter[id][_eq]`) en lugar de
+   * `GET /items/<col>/<id>`. En Directus 11, el endpoint por ID responde HTTP 403 tanto para
+   * falta de permisos como para registros inexistentes; filtrar sobre la colección devuelve
+   * siempre HTTP 200 con `data: []` cuando el registro no existe y 403 solo si faltan permisos.
+   */
   async getItemById<T>(collection: string, id: string | number): Promise<T | null> {
-    const col = directusCollection(collection);
-    const baseUrl = this.ensureConfigured(col);
-
-    const response = await fetch(
-      `${baseUrl}/items/${encodeURIComponent(col)}/${encodeURIComponent(String(id))}`,
-      {
-        method: 'GET',
-        headers: this.headers,
-        cache: 'no-store',
-      }
-    );
-
-    if (response.status === 404) {
-      return null;
-    }
-
-    if (!response.ok) {
-      const details = await this.parseErrorBody(response);
-      logger.error(`Error HTTP ${response.status} al leer item Directus: ${col}/${id}`, {
-        status: response.status,
-        collection: col,
-      });
-      throw new DirectusError(
-        `Error al leer item en Directus (${col}/${id}): HTTP ${response.status}`,
-        response.status,
-        col,
-        details
-      );
-    }
-
-    const json: DirectusResponse<T> = await response.json();
-    return json.data ?? null;
+    const items = await this.getItems<T>(collection, {
+      'filter[id][_eq]': String(id),
+      limit: 1,
+    });
+    return items[0] ?? null;
   }
 
   async createItem<T>(collection: string, data: Partial<T>): Promise<T> {
@@ -245,6 +224,11 @@ class DirectusClient {
   }
 
   async deleteItem(collection: string, id: string | number): Promise<void> {
+    const existing = await this.getItemById(collection, id);
+    if (!existing) {
+      return;
+    }
+
     const col = directusCollection(collection);
     const baseUrl = this.ensureConfigured(col);
 

@@ -116,6 +116,8 @@ describe('NextAuth.js + Keycloak OIDC Security (PLAi Standard v1.0)', () => {
     expect(token.id).toBe('kc-uuid-999');
     expect(token.role).toBe('admin');
     expect(token.idToken).toBe('fake-id-token-for-slo');
+    // No se persiste accessToken en la cookie JWT para evitar fragmentación innecesaria
+    expect((token as Record<string, unknown>).accessToken).toBeUndefined();
   });
 
   it('el callback session propaga id y role a session.user sin exponer idToken al navegador', async () => {

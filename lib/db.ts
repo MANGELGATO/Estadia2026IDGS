@@ -50,6 +50,23 @@ function formatTimestamp(val: string | Date | null | undefined): string {
   return String(val);
 }
 
+/**
+ * Normaliza fechas provenientes de inputs (`YYYY-MM-DDTHH:mm` o `YYYY-MM-DD HH:mm:ss`)
+ * a formato ISO 8601 válido para campos `timestamp` reales en Directus/PostgreSQL.
+ */
+function toIsoTimestamp(val: string | Date | null | undefined): string {
+  if (!val) return new Date().toISOString();
+  if (val instanceof Date) return val.toISOString();
+  const trimmed = String(val).trim();
+  if (!trimmed) return new Date().toISOString();
+  const normalized = trimmed.includes('T') ? trimmed : trimmed.replace(' ', 'T');
+  const parsed = new Date(normalized);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString();
+  }
+  return trimmed;
+}
+
 // ====================================================================
 // 1. EQUIPOS (colección: <prefix>equipos)
 // ====================================================================
@@ -300,8 +317,8 @@ export async function insertBitacoraEntregaInDB(
     usuario_nombre: item.usuarioNombre,
     usuario_email: item.usuarioEmail,
     usuario_dependencia: item.usuarioDependencia || null,
-    fecha_entrega: item.fechaEntrega,
-    fecha_devolucion_estimada: item.fechaDevolucionEstimada,
+    fecha_entrega: toIsoTimestamp(item.fechaEntrega),
+    fecha_devolucion_estimada: toIsoTimestamp(item.fechaDevolucionEstimada),
     estado_prestamo: item.estadoPrestamo || 'Activo',
     condicion_entrega: item.condicionEntrega || 'Excelente',
     accesorios_entregados: item.accesoriosEntregados || 'Equipo completo',
@@ -340,7 +357,7 @@ export async function updateBitacoraDevolucionInDB(
 ): Promise<boolean> {
   const estadoPrestamo = devolucion.incidenciaGenerada ? 'Con Incidencia' : 'Devuelto';
   const updated = await directus.updateItem<BitacoraRow>('bitacora_uso', id, {
-    fecha_devolucion_real: devolucion.fechaDevolucionReal,
+    fecha_devolucion_real: toIsoTimestamp(devolucion.fechaDevolucionReal),
     condicion_devolucion: devolucion.condicionDevolucion || null,
     accesorios_devueltos: devolucion.accesoriosDevueltos,
     observaciones_devolucion: devolucion.observacionesDevolucion || null,
@@ -595,8 +612,8 @@ export async function insertIncidenciaInDB(incidencia: IncidenciaItem): Promise<
     descripcion: incidencia.descripcion,
     estado: incidencia.estado || 'Reportada',
     tecnico_responsable: incidencia.tecnicoResponsable,
-    fecha_reporte: incidencia.fechaReporte,
-    fecha_resolucion: incidencia.fechaResolucion || null,
+    fecha_reporte: toIsoTimestamp(incidencia.fechaReporte),
+    fecha_resolucion: incidencia.fechaResolucion ? toIsoTimestamp(incidencia.fechaResolucion) : null,
     acciones_realizadas: incidencia.accionesRealizadas || null,
   });
 
@@ -614,8 +631,7 @@ export async function updateIncidenciaStatusInDB(
   estado: IncidenciaItem['estado'],
   accionesRealizadas?: string
 ): Promise<boolean> {
-  const fechaResolucion =
-    estado === 'Resuelta' ? new Date().toISOString().slice(0, 19).replace('T', ' ') : undefined;
+  const fechaResolucion = estado === 'Resuelta' ? new Date().toISOString() : undefined;
 
   const payload: Partial<IncidenciaRow> = { estado };
   if (fechaResolucion) payload.fecha_resolucion = fechaResolucion;
@@ -697,9 +713,7 @@ export async function getUsuariosFromDB(): Promise<UsuarioItem[]> {
   }));
 }
 
-export async function upsertUsuarioInDB(
-  user: UsuarioItem & { password?: string }
-): Promise<UsuarioItem> {
+export async function upsertUsuarioInDB(user: UsuarioItem): Promise<UsuarioItem> {
   const dbRol = mapLabelToDbRole(user.role);
   await directus.upsertItem<UsuarioRow>('usuarios', user.id, {
     id: user.id,
@@ -713,7 +727,7 @@ export async function upsertUsuarioInDB(
   return {
     id: user.id,
     name: user.name,
-    email: user.email,
+    email: user.email.toLowerCase(),
     role: user.role,
     status: user.status,
     dependencia: user.dependencia,
@@ -721,6 +735,77 @@ export async function upsertUsuarioInDB(
     lastLogin: user.lastLogin,
     reservations: user.reservations,
   };
+}
+
+/**
+ * Sincroniza automáticamente un usuario autenticado por Keycloak en `<prefix>usuarios`.
+ * - Si el usuario ya existe y está marcado como `Inactivo`, devuelve `{ allowed: false }`
+ *   para bloquear su acceso al laboratorio.
+ * - Si existe y está `Activo`, actualiza nombre, rol (desde Keycloak) y `ultimo_login`.
+ * - Si no existe, lo registra automáticamente para que aparezca en el directorio operativo.
+ */
+export async function syncKeycloakUserInDB(params: {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'colaborador' | 'usuario';
+}): Promise<{ allowed: boolean; status: 'Activo' | 'Inactivo' }> {
+  const normalizedEmail = params.email.trim().toLowerCase();
+  const nowIso = new Date().toISOString();
+
+  // Buscar por ID (sub de Keycloak) o por correo si fue pre-registrado manualmente
+  let existing = await directus.getItemById<UsuarioRow>('usuarios', params.id);
+  if (!existing) {
+    const byEmail = await directus.getItems<UsuarioRow>('usuarios', {
+      'filter[email][_eq]': normalizedEmail,
+      limit: 1,
+    });
+    existing = byEmail[0] ?? null;
+  }
+
+  if (existing) {
+    if (existing.estado === 'Inactivo') {
+      return { allowed: false, status: 'Inactivo' };
+    }
+    await directus.updateItem<UsuarioRow>('usuarios', existing.id, {
+      nombre: params.name,
+      rol: params.role,
+      ultimo_login: nowIso,
+    });
+    return { allowed: true, status: 'Activo' };
+  }
+
+  await directus.createItem<UsuarioRow>('usuarios', {
+    id: params.id,
+    nombre: params.name,
+    email: normalizedEmail,
+    rol: params.role,
+    estado: 'Activo',
+    dependencia: 'Comunidad PLAi',
+    ultimo_login: nowIso,
+  });
+
+  return { allowed: true, status: 'Activo' };
+}
+
+/**
+ * Verifica si un usuario autenticado sigue habilitado (`Activo`) en el directorio local.
+ * Si un administrador lo marcó como `Inactivo`, revoca inmediatamente el acceso a las APIs.
+ */
+export async function isUsuarioActiveInDB(email: string, id?: string): Promise<boolean> {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (id) {
+    const byId = await directus.getItemById<UsuarioRow>('usuarios', id);
+    if (byId) return byId.estado !== 'Inactivo';
+  }
+  const byEmail = await directus.getItems<UsuarioRow>('usuarios', {
+    'filter[email][_eq]': normalizedEmail,
+    limit: 1,
+  });
+  if (byEmail[0]) {
+    return byEmail[0].estado !== 'Inactivo';
+  }
+  return true;
 }
 
 // ====================================================================

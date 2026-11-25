@@ -1,10 +1,10 @@
 # ==============================================================================
-# CONFIGURACIÓN NGINX REVERSE PROXY UNPRIVILEGED - ESTÁNDAR PLAi v1.0
-# - Escucha en puerto 8080 (no privilegiado, compatible con cap_drop: [ALL] y UID 101).
+# CONFIGURACIÓN NGINX REVERSE PROXY UNPRIVILEGED (TLS PASSTHROUGH) - PLAi v1.0
+# - Escucha HTTPS (TLS 1.2/1.3) en puerto 8443 para Traefik TLS passthrough.
+# - Puerto 8080 expone ÚNICAMENTE /nginx-health (healthcheck local) y redirección 301 a HTTPS.
+# - Nunca sirve la aplicación por HTTP plano (garantiza cookies __Secure- de NextAuth).
 # - Resolución DNS dinámica de Swarm (127.0.0.11): no falla si `app` arranca después.
-# - Rechaza cabeceras Host no autorizadas (default_server -> 444).
-# - Preserva X-Forwarded-Proto y X-Forwarded-Port desde Traefik.
-# - Healthcheck propio en /nginx-health desacoplado de la app.
+# - Rechaza SNI/Host no autorizados (ssl_reject_handshake on en 8443, 444 en 8080).
 # ==============================================================================
 
 worker_processes auto;
@@ -37,21 +37,10 @@ http {
   uwsgi_temp_path /tmp/uwsgi_temp;
   scgi_temp_path /tmp/scgi_temp;
 
-  # Manejo correcto de Connection para WebSockets vs HTTP normal (no manda Upgrade siempre)
+  # Manejo correcto de Connection para WebSockets vs HTTP normal
   map $http_upgrade $connection_upgrade {
     default upgrade;
     ''      '';
-  }
-
-  # Preservar protocolo y puerto reales terminados en Traefik/Gateway
-  map $http_x_forwarded_proto $forwarded_proto {
-    default $http_x_forwarded_proto;
-    ''      $scheme;
-  }
-
-  map $http_x_forwarded_port $forwarded_port {
-    default $http_x_forwarded_port;
-    ''      $server_port;
   }
 
   log_format plai_json escape=json '{'
@@ -63,6 +52,7 @@ http {
     '"status":$status,'
     '"body_bytes_sent":$body_bytes_sent,'
     '"request_time":$request_time,'
+    '"ssl_protocol":"$ssl_protocol",'
     '"http_referrer":"$http_referer",'
     '"http_user_agent":"$http_user_agent"'
   '}';
@@ -86,8 +76,10 @@ http {
   limit_req_zone $binary_remote_addr zone=general_limit:10m rate=20r/s;
   limit_req_zone $binary_remote_addr zone=auth_limit:10m rate=5r/s;
 
-  # Bloque por defecto: rechaza cualquier petición con Host distinto al dominio autorizado
-  # (excepto /nginx-health para el HEALTHCHECK local en 127.0.0.1)
+  # --------------------------------------------------------------------------
+  # Puerto 8080: EXCLUSIVAMENTE healthcheck local y redirección a HTTPS.
+  # La aplicación NUNCA se sirve por HTTP plano.
+  # --------------------------------------------------------------------------
   server {
     listen 8080 default_server;
     server_name _;
@@ -106,20 +98,49 @@ http {
     listen 8080;
     server_name ${ALLOWED_HOST};
 
-    # DNS interno de Docker Swarm para resolución dinámica del servicio `app`
-    resolver 127.0.0.11 valid=10s ipv6=off;
-    set $upstream_app http://app:3000;
-
-    # Cabeceras de seguridad complementarias
-    add_header X-Frame-Options "DENY" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    # Healthcheck propio de Nginx (desacoplado de Next.js)
     location = /nginx-health {
       access_log off;
       return 200 "ok\n";
     }
+
+    location / {
+      return 301 https://$host$request_uri;
+    }
+  }
+
+  # --------------------------------------------------------------------------
+  # Puerto 8443: Terminación TLS directa (Traefik TCP/TLS passthrough)
+  # --------------------------------------------------------------------------
+  server {
+    listen 8443 ssl default_server;
+    server_name _;
+    ssl_reject_handshake on;
+  }
+
+  server {
+    listen 8443 ssl;
+    http2 on;
+    server_name ${ALLOWED_HOST};
+
+    ssl_certificate     ${SSL_CERT_FILE};
+    ssl_certificate_key ${SSL_KEY_FILE};
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
+    ssl_prefer_server_ciphers off;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_tickets off;
+
+    # DNS interno de Docker Swarm para resolución dinámica del servicio `app`
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $upstream_app http://app:3000;
+
+    # Cabeceras de seguridad complementarias sobre HTTPS
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     # Bloquear archivos ocultos y rutas sensibles (.env, .git, etc.)
     location ~ /\.(?!well-known) {
@@ -137,7 +158,9 @@ http {
       proxy_set_header Host $host;
       proxy_set_header Connection "";
       expires 365d;
-      add_header Cache-Control "public, max-age=31536000, immutable";
+      add_header Cache-Control "public, max-age=31536000, immutable" always;
+      add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+      add_header X-Content-Type-Options "nosniff" always;
       access_log off;
     }
 
@@ -150,12 +173,12 @@ http {
       proxy_http_version 1.1;
       proxy_set_header Host $host;
       proxy_set_header X-Real-IP $remote_addr;
-      proxy_set_header X-Forwarded-Proto $forwarded_proto;
-      proxy_set_header X-Forwarded-Port $forwarded_port;
+      proxy_set_header X-Forwarded-Proto https;
+      proxy_set_header X-Forwarded-Port 443;
       access_log off;
     }
 
-    # Endpoints de autenticación (rate limiting estricto)
+    # Endpoints de autenticación (rate limiting estricto + protocolo HTTPS fijo)
     location /api/auth/ {
       limit_except GET POST HEAD OPTIONS {
         deny all;
@@ -168,8 +191,8 @@ http {
       proxy_set_header Host $host;
       proxy_set_header X-Real-IP $remote_addr;
       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Proto $forwarded_proto;
-      proxy_set_header X-Forwarded-Port $forwarded_port;
+      proxy_set_header X-Forwarded-Proto https;
+      proxy_set_header X-Forwarded-Port 443;
       proxy_set_header X-Forwarded-Host $host;
     }
 
@@ -186,8 +209,8 @@ http {
       proxy_set_header Host $host;
       proxy_set_header X-Real-IP $remote_addr;
       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Proto $forwarded_proto;
-      proxy_set_header X-Forwarded-Port $forwarded_port;
+      proxy_set_header X-Forwarded-Proto https;
+      proxy_set_header X-Forwarded-Port 443;
       proxy_set_header X-Forwarded-Host $host;
 
       proxy_connect_timeout 30s;

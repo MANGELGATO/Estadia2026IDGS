@@ -12,7 +12,7 @@ import {
   RiArrowRightUpLine,
   RiHome4Line,
 } from "react-icons/ri";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 
 const navSections = [
   {
@@ -45,8 +45,8 @@ export default function UserSidebar() {
   const userEmail = session?.user?.email || "";
   const userInitial = userName.charAt(0).toUpperCase();
 
-  const handleSignOut = async () => {
-    await signOut({ callbackUrl: "/login" });
+  const handleSignOut = () => {
+    window.location.href = "/api/auth/federated-logout";
   };
 
   return (

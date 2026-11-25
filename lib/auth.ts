@@ -2,6 +2,7 @@ import type { NextAuthOptions } from 'next-auth';
 import KeycloakProvider from 'next-auth/providers/keycloak';
 import { env, isBuildPhase } from './env';
 import { logger } from './logger';
+import { syncKeycloakUserInDB } from './db';
 import type { UserRole } from '../types/next-auth';
 
 /**
@@ -59,6 +60,22 @@ export function extractKeycloakRole(
   return 'usuario';
 }
 
+function resolveRoleFromKeycloakLogin(
+  accessToken: string | undefined,
+  profile: Record<string, unknown> | undefined,
+  clientId: string
+): UserRole {
+  const accessClaims = decodeJwtPayload(accessToken);
+  const roleFromAccessToken = extractKeycloakRole(accessClaims, clientId);
+  if (roleFromAccessToken !== 'usuario') {
+    return roleFromAccessToken;
+  }
+  if (profile) {
+    return extractKeycloakRole(profile, clientId);
+  }
+  return 'usuario';
+}
+
 /**
  * Construye las opciones de NextAuth en tiempo de ejecución (lazy) para:
  * 1. Evitar que `next build` dentro del Dockerfile falle cuando los Docker secrets
@@ -66,6 +83,7 @@ export function extractKeycloakRole(
  * 2. Validar estrictamente en runtime de producción que existan `NEXTAUTH_SECRET`
  *    y las credenciales de Keycloak sin valores por defecto hardcodeados.
  * 3. Mantener Keycloak como ÚNICO proveedor de identidad (sin puerta trasera local).
+ * 4. NO persistir `access_token` en el JWT de sesión para mantener la cookie compacta.
  */
 export function getAuthOptions(): NextAuthOptions {
   if (env.isProduction && !isBuildPhase()) {
@@ -112,25 +130,57 @@ export function getAuthOptions(): NextAuthOptions {
       }),
     ],
     callbacks: {
+      async signIn({ user, account, profile }) {
+        if (!user.email) {
+          return false;
+        }
+        if (!env.hasDirectusConfig) {
+          return true;
+        }
+
+        const resolvedRole = resolveRoleFromKeycloakLogin(
+          account?.access_token,
+          profile as Record<string, unknown> | undefined,
+          clientId
+        );
+
+        try {
+          const syncResult = await syncKeycloakUserInDB({
+            id: user.id,
+            name: user.name || 'Usuario PLAi',
+            email: user.email,
+            role: resolvedRole,
+          });
+
+          if (!syncResult.allowed) {
+            logger.warn('Inicio de sesión denegado: cuenta marcada como Inactiva en el directorio', {
+              userId: user.id,
+            });
+            return '/login?error=AccountInactive';
+          }
+        } catch (error) {
+          logger.error('Error al sincronizar usuario Keycloak en Directus durante signIn', {
+            userId: user.id,
+            error: String(error),
+          });
+        }
+
+        return true;
+      },
       async jwt({ token, user, account, profile }) {
         if (user) {
           token.id = user.id;
           token.role = user.role;
         }
         if (account) {
-          token.accessToken = account.access_token;
+          // Solo conservamos idToken (necesario para id_token_hint en SLO de Keycloak).
+          // NO guardamos access_token porque no se utiliza y fragmenta innecesariamente la cookie.
           token.idToken = account.id_token;
-
-          // 1. Prioridad: extraer roles del access_token JWT de Keycloak (donde vive resource_access)
-          const accessClaims = decodeJwtPayload(account.access_token);
-          const roleFromAccessToken = extractKeycloakRole(accessClaims, clientId);
-
-          if (roleFromAccessToken !== 'usuario') {
-            token.role = roleFromAccessToken;
-          } else if (profile) {
-            // 2. Respaldo: si el cliente de Keycloak tiene mapper hacia ID Token / UserInfo
-            token.role = extractKeycloakRole(profile as Record<string, unknown>, clientId);
-          }
+          token.role = resolveRoleFromKeycloakLogin(
+            account.access_token,
+            profile as Record<string, unknown> | undefined,
+            clientId
+          );
         }
         return token;
       },

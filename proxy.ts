@@ -12,10 +12,60 @@ import {
 import { env } from './lib/env';
 import { logger } from './lib/logger';
 
+function getOriginSafe(rawUrl?: string): string | null {
+  if (!rawUrl) return null;
+  try {
+    return new URL(rawUrl).origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Construye una Content-Security-Policy estricta por petición en tiempo de ejecución:
+ * - Elimina `'unsafe-inline'` de `script-src` usando un nonce criptográfico + `'strict-dynamic'`.
+ * - Resuelve `KEYCLOAK_ISSUER` en runtime (cuando el contenedor ya tiene sus variables de entorno)
+ *   para incluir el origen institucional de Keycloak en `connect-src` y `form-action`.
+ */
+export function buildCspHeader(nonce: string): string {
+  const isProd = process.env.NODE_ENV === 'production';
+  const keycloakOrigin = getOriginSafe(env.keycloakIssuer);
+
+  const scriptSrc = isProd
+    ? `'self' 'nonce-${nonce}' 'strict-dynamic'`
+    : `'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`;
+
+  const connectSrc = [
+    "'self'",
+    ...(keycloakOrigin ? [keycloakOrigin] : []),
+    ...(!isProd ? ['http://localhost:*', 'ws://localhost:*'] : []),
+  ].join(' ');
+
+  const formActionSrc = [
+    "'self'",
+    ...(keycloakOrigin ? [keycloakOrigin] : []),
+  ].join(' ');
+
+  return [
+    "default-src 'self'",
+    `script-src ${scriptSrc}`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    "img-src 'self' data: blob:",
+    `connect-src ${connectSrc}`,
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    `form-action ${formActionSrc}`,
+    ...(isProd ? ['upgrade-insecure-requests'] : []),
+  ].join('; ');
+}
+
 /**
  * Proxy de seguridad de Next.js 16 (reemplazo normativo de middleware.ts).
- * Protege las rutas privadas `/admin/*` y `/usuario/*` verificando exclusivamente
- * el JWT firmado por NextAuth.js y aplica Rate Limiting en endpoints sensibles (Sección 7.3).
+ * - Genera CSP estricta con nonce único por petición y origen de Keycloak en runtime.
+ * - Protege las rutas privadas `/admin/*` y `/usuario/*` verificando el JWT firmado por NextAuth.js.
+ * - Aplica Rate Limiting y protección CSRF en endpoints sensibles (Estándar PLAi v1.0, Sección 7.3).
  */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -79,6 +129,11 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  // Las rutas de API no requieren RBAC de páginas ni nonce HTML
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next();
+  }
+
   if (pathname === '/login' && process.env.NODE_ENV === 'production') {
     const rate = checkRateLimit(`login_page:${ip}`, RATE_LIMIT_LOGIN_PAGE);
     if (!rate.success) {
@@ -91,47 +146,69 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  const token = await getToken({ req: request, secret: env.nextAuthSecret });
-
   const isAdminRoute = pathname.startsWith('/admin');
   const isAdminOnlyRoute =
     pathname.startsWith('/admin/usuarios') || pathname.startsWith('/admin/configuracion');
   const isUsuarioRoute = pathname.startsWith('/usuario');
   const isLoginRoute = pathname === '/login';
 
-  // 2. Acceso a rutas protegidas sin sesión válida
-  if (!token && (isAdminRoute || isUsuarioRoute)) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('callbackUrl', pathname);
-    return NextResponse.redirect(loginUrl);
-  }
+  if (isAdminRoute || isUsuarioRoute || isLoginRoute) {
+    const token = await getToken({ req: request, secret: env.nextAuthSecret });
 
-  // 3. Control de acceso basado en roles (RBAC)
-  if (token && isAdminRoute) {
-    const role = token.role;
-    if (role !== 'admin' && role !== 'colaborador') {
-      return NextResponse.redirect(new URL('/usuario', request.url));
+    // 2. Acceso a rutas protegidas sin sesión válida
+    if (!token && (isAdminRoute || isUsuarioRoute)) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('callbackUrl', pathname);
+      return NextResponse.redirect(loginUrl);
     }
-    if (isAdminOnlyRoute && role !== 'admin') {
-      return NextResponse.redirect(new URL('/admin', request.url));
+
+    // 3. Control de acceso basado en roles (RBAC)
+    if (token && isAdminRoute) {
+      const role = token.role;
+      if (role !== 'admin' && role !== 'colaborador') {
+        return NextResponse.redirect(new URL('/usuario', request.url));
+      }
+      if (isAdminOnlyRoute && role !== 'admin') {
+        return NextResponse.redirect(new URL('/admin', request.url));
+      }
+    }
+
+    // 4. Redirección automática si el usuario ya está autenticado y visita /login
+    if (isLoginRoute && token) {
+      const destination =
+        token.role === 'admin' || token.role === 'colaborador' ? '/admin' : '/usuario';
+      return NextResponse.redirect(new URL(destination, request.url));
     }
   }
 
-  // 4. Redirección automática si el usuario ya está autenticado y visita /login
-  if (isLoginRoute && token) {
-    const destination =
-      token.role === 'admin' || token.role === 'colaborador' ? '/admin' : '/usuario';
-    return NextResponse.redirect(new URL(destination, request.url));
-  }
+  // 5. CSP dinámica con nonce único por petición (Next.js 16 inyecta automáticamente el nonce en SSR)
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  const cspHeader = buildCspHeader(nonce);
 
-  return NextResponse.next();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('Content-Security-Policy', cspHeader);
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
+  response.headers.set('Content-Security-Policy', cspHeader);
+
+  return response;
 }
 
 export const config = {
   matcher: [
-    '/admin/:path*',
-    '/usuario/:path*',
-    '/login',
+    {
+      source:
+        '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
     '/api/auth/:path*',
     '/api/reservas',
     '/api/solicitudes-espacios',

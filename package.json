@@ -12,7 +12,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "directus:setup": "node scripts/setup-directus-schema.mjs"
+    "directus:setup": "node scripts/setup-directus-schema.mjs",
+    "directus:seed": "node scripts/seed-directus-data.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.41.0",

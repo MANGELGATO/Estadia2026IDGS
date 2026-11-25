@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Montserrat, Mulish } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/Navbar";
@@ -25,9 +26,13 @@ export const metadata: Metadata = {
   description: "SOLUCIONES PLAi — Plataforma Abierta de Innovación. Catálogo de equipamiento tecnológico, aplicaciones inmersivas y espacios especializados.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // Leer x-nonce fuerza renderizado dinámico por petición para que Next.js 16
+  // adjunte automáticamente el nonce CSP a sus scripts de hidratación.
+  await headers();
+
   return (
     <html lang="es" className={`${montserrat.variable} ${mulish.variable}`}>
       <body>

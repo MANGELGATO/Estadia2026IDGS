@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
-import { proxy } from './proxy';
+import { proxy, buildCspHeader } from './proxy';
 import * as jwt from 'next-auth/jwt';
 import { rateLimiter } from './lib/rateLimit';
 
@@ -132,6 +132,50 @@ describe('Proxy Security and RBAC (Next.js 16)', () => {
       });
       const res = await proxy(req);
       expect(res.status).not.toBe(429);
+    });
+  });
+
+  describe('CSP dinámica con nonce y origen Keycloak en runtime', () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalKeycloakIssuer = process.env.KEYCLOAK_ISSUER;
+
+    afterEach(() => {
+      vi.stubEnv('NODE_ENV', originalNodeEnv ?? 'test');
+      if (originalKeycloakIssuer === undefined) {
+        delete process.env.KEYCLOAK_ISSUER;
+      } else {
+        process.env.KEYCLOAK_ISSUER = originalKeycloakIssuer;
+      }
+    });
+
+    it('emite CSP con nonce único por petición sin unsafe-inline en script-src en producción', async () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      process.env.KEYCLOAK_ISSUER = 'https://sso.plai.mx/realms/plai';
+
+      const res1 = await proxy(new NextRequest('https://recursos.plai.mx/'));
+      const res2 = await proxy(new NextRequest('https://recursos.plai.mx/'));
+
+      const csp1 = res1.headers.get('Content-Security-Policy') || '';
+      const csp2 = res2.headers.get('Content-Security-Policy') || '';
+
+      expect(csp1).toContain("script-src 'self' 'nonce-");
+      expect(csp1).toContain("'strict-dynamic'");
+      expect(csp1).not.toContain("script-src 'self' 'unsafe-inline'");
+      expect(csp1).not.toContain("'unsafe-eval'");
+      expect(csp1).toContain('connect-src \'self\' https://sso.plai.mx');
+      expect(csp1).toContain('form-action \'self\' https://sso.plai.mx');
+      expect(csp1).toContain('upgrade-insecure-requests');
+      expect(csp1).not.toBe(csp2);
+    });
+
+    it('buildCspHeader resuelve KEYCLOAK_ISSUER en tiempo de ejecución', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      process.env.KEYCLOAK_ISSUER = 'https://auth.institucional.plai.mx/realms/lab';
+
+      const csp = buildCspHeader('test-nonce-123');
+      expect(csp).toContain("script-src 'self' 'nonce-test-nonce-123' 'strict-dynamic'");
+      expect(csp).toContain("connect-src 'self' https://auth.institucional.plai.mx");
+      expect(csp).toContain("form-action 'self' https://auth.institucional.plai.mx");
     });
   });
 });

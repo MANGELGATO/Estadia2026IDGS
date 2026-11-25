@@ -80,4 +80,60 @@ describe('Directus REST Client (PLAi Standard v1.0)', () => {
       })
     );
   });
+
+  it('getItemById consulta por filtro (compatible con Directus 11 sin falsos 403) y devuelve null si no existe', async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: [] }),
+    });
+
+    const item = await directus.getItemById('configuracion', 'general');
+    expect(item).toBeNull();
+
+    const calledUrl = new URL((global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0]);
+    expect(calledUrl.pathname).toBe('/items/lab_recursos_configuracion');
+    expect(calledUrl.searchParams.get('filter[id][_eq]')).toBe('general');
+    expect(calledUrl.searchParams.get('limit')).toBe('1');
+  });
+
+  it('upsertItem crea el registro cuando el filtro devuelve lista vacía y actualiza cuando existe', async () => {
+    const created = { id: 'eq-new', nombre: 'Meta Quest 3' };
+    const updated = { id: 'eq-new', nombre: 'Meta Quest 3 Pro' };
+
+    global.fetch = vi
+      .fn()
+      // 1a llamada: getItemById -> lista vacía (no existe)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [] }) })
+      // 2a llamada: createItem -> POST
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: created }) })
+      // 3a llamada: getItemById -> encontrado
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [created] }) })
+      // 4a llamada: updateItem -> PATCH
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: updated }) });
+
+    const r1 = await directus.upsertItem('equipos', 'eq-new', { nombre: 'Meta Quest 3' });
+    expect(r1).toEqual(created);
+    expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls[1][1]).toMatchObject({
+      method: 'POST',
+    });
+
+    const r2 = await directus.upsertItem('equipos', 'eq-new', { nombre: 'Meta Quest 3 Pro' });
+    expect(r2).toEqual(updated);
+    expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls[3][1]).toMatchObject({
+      method: 'PATCH',
+    });
+  });
+
+  it('getItemById propaga DirectusError 403 cuando realmente faltan permisos en la colección', async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      json: async () => ({ errors: [{ message: 'Forbidden' }] }),
+    });
+
+    await expect(directus.getItemById('configuracion', 'general')).rejects.toMatchObject({
+      name: 'DirectusError',
+      status: 403,
+    });
+  });
 });

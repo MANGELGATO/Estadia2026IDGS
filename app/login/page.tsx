@@ -17,7 +17,9 @@ function LoginFormContent() {
   const authErrorParam = searchParams.get('error');
 
   const [error, setError] = useState<string | null>(
-    authErrorParam
+    authErrorParam === 'AccountInactive'
+      ? 'Tu cuenta está desactivada en el laboratorio PLAi. Contacta al administrador para reactivar tu acceso.'
+      : authErrorParam
       ? 'No fue posible completar la autenticación con Keycloak. Intenta nuevamente.'
       : null
   );

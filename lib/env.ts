@@ -10,23 +10,28 @@ import fs from 'node:fs';
  * Cumple con el estándar PLAi v1.0, secciones 5.2 y 6 (patrón VARIABLE_FILE).
  */
 export function getEnvSecret(name: string, fallback = ''): string {
-  // 1. VARIABLE_FILE explícita (p. ej. DIRECTUS_TOKEN_FILE=/run/secrets/directus_token)
+  // 1. VARIABLE_FILE explícita (p. ej. DIRECTUS_TOKEN_FILE=/run/secrets/plai_recursos_directus_token)
   const fileVar = process.env[`${name}_FILE`];
-  if (fileVar && fs.existsSync(fileVar)) {
+  if (fileVar && fs.existsSync(/*turbopackIgnore: true*/ fileVar)) {
     try {
-      return fs.readFileSync(fileVar, 'utf-8').trim();
+      return fs.readFileSync(/*turbopackIgnore: true*/ fileVar, 'utf-8').trim();
     } catch {
       // Ignora error de lectura y pasa al siguiente método
     }
   }
 
-  // 2. Ruta estándar de Docker secrets (/run/secrets/<nombre_en_minusculas>)
-  const defaultSecretPath = `/run/secrets/${name.toLowerCase()}`;
-  if (fs.existsSync(defaultSecretPath)) {
-    try {
-      return fs.readFileSync(defaultSecretPath, 'utf-8').trim();
-    } catch {
-      // Ignora error y pasa a variable de entorno
+  // 2. Rutas estándar de Docker secrets (con prefijo de la app y nombre base)
+  const candidatePaths = [
+    `/run/secrets/plai_recursos_${name.toLowerCase()}`,
+    `/run/secrets/${name.toLowerCase()}`,
+  ];
+  for (const secretPath of candidatePaths) {
+    if (fs.existsSync(/*turbopackIgnore: true*/ secretPath)) {
+      try {
+        return fs.readFileSync(/*turbopackIgnore: true*/ secretPath, 'utf-8').trim();
+      } catch {
+        // Ignora error y prueba el siguiente origen
+      }
     }
   }
 
@@ -110,7 +115,7 @@ export const env = {
     }
     if (this.isProduction) {
       throw new Error(
-        'CRÍTICO: NEXTAUTH_SECRET es obligatorio en producción (usar Docker secret /run/secrets/nextauth_secret o NEXTAUTH_SECRET_FILE).'
+        'CRÍTICO: NEXTAUTH_SECRET es obligatorio en producción (usar Docker secret /run/secrets/plai_recursos_nextauth_secret o NEXTAUTH_SECRET_FILE).'
       );
     }
     return 'plai-local-development-secret-only-change-in-production';
