@@ -3,87 +3,35 @@
 import React, { useState, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { signIn, getSession } from 'next-auth/react';
-import { Lock, Mail, AlertCircle, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { signIn } from 'next-auth/react';
+import { AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
 
 function isSafeRelativePath(path: string): boolean {
   return path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/login');
 }
 
 function LoginFormContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '';
+  const authErrorParam = searchParams.get('error');
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(
+    authErrorParam
+      ? 'No fue posible completar la autenticación con Keycloak. Intenta nuevamente.'
+      : null
+  );
   const [keycloakLoading, setKeycloakLoading] = useState(false);
-  const [showCredentialsForm, setShowCredentialsForm] = useState(false);
 
   const handleKeycloakLogin = async () => {
     setKeycloakLoading(true);
     setError(null);
     try {
-      const destination = callbackUrl && isSafeRelativePath(callbackUrl) ? callbackUrl : '/admin';
+      const destination = callbackUrl && isSafeRelativePath(callbackUrl) ? callbackUrl : '/usuario';
       await signIn('keycloak', { callbackUrl: destination });
     } catch {
       setError('No fue posible conectar con el servidor Keycloak SSO de PLAi.');
       setKeycloakLoading(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim() || !password) {
-      setError('Por favor ingresa tu correo institucional y tu contraseña.');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const res = await signIn('credentials', {
-        email: email.trim().toLowerCase(),
-        password,
-        redirect: false,
-      });
-
-      if (res?.status === 429) {
-        setError(
-          'Has alcanzado el límite máximo de intentos permitidos por seguridad. Espera un minuto antes de reintentar.'
-        );
-        setLoading(false);
-        return;
-      }
-
-      if (res?.error || !res?.ok) {
-        setError('Credenciales inválidas o cuenta inactiva. Verifica tu correo y contraseña.');
-        setLoading(false);
-        return;
-      }
-
-      // Obtener el rol real y autorizado directamente de la sesión firmada por el servidor
-      const session = await getSession();
-      const role = session?.user?.role || 'usuario';
-      const isStaff = role === 'admin' || role === 'colaborador';
-
-      let destination = isStaff ? '/admin' : '/usuario';
-      if (isSafeRelativePath(callbackUrl)) {
-        const requestsAdmin = callbackUrl.startsWith('/admin');
-        if (!requestsAdmin || isStaff) {
-          destination = callbackUrl;
-        }
-      }
-
-      router.push(destination);
-      router.refresh();
-    } catch {
-      setError('No fue posible conectar con el servicio de autenticación. Intenta nuevamente.');
-      setLoading(false);
     }
   };
 
@@ -120,12 +68,11 @@ function LoginFormContent() {
           </div>
         )}
 
-        {/* Botón Principal: Acceso SSO Institucional PLAi con Keycloak */}
         <div className="mb-6 space-y-3">
           <button
             type="button"
             onClick={handleKeycloakLogin}
-            disabled={keycloakLoading || loading}
+            disabled={keycloakLoading}
             className="flex w-full items-center justify-center gap-3 rounded-2xl bg-[#1B365D] py-3.5 px-4 text-sm font-semibold text-white shadow-lg shadow-[#1B365D]/20 transition hover:bg-[#152a48] active:scale-[0.99] disabled:opacity-60"
           >
             {keycloakLoading ? (
@@ -141,101 +88,14 @@ function LoginFormContent() {
             )}
           </button>
           <p className="text-center text-xs text-gray-500">
-            Autenticación unificada mediante el servidor Keycloak institucional
+            Autenticación única administrada por el servidor Keycloak institucional de PLAi
           </p>
         </div>
-
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-200" />
-          </div>
-          <div className="relative flex justify-center text-xs">
-            <button
-              type="button"
-              onClick={() => setShowCredentialsForm(!showCredentialsForm)}
-              className="bg-white px-3 text-gray-500 hover:text-gray-700 font-medium transition"
-            >
-              {showCredentialsForm
-                ? '▲ Ocultar acceso por credenciales'
-                : '▼ O ingresar con credenciales locales'}
-            </button>
-          </div>
-        </div>
-
-        {showCredentialsForm && (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label
-                htmlFor="login-email"
-                className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-700"
-              >
-                Correo Institucional
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                <input
-                  id="login-email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nombre.apellido@plai.mx"
-                  required
-                  disabled={loading}
-                  className="w-full rounded-xl border border-gray-300 py-2.5 pl-11 pr-4 text-sm text-gray-800 transition focus:border-[#1B365D] focus:outline-none focus:ring-2 focus:ring-[#1B365D]/20 disabled:bg-gray-100"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label
-                htmlFor="login-password"
-                className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-700"
-              >
-                Contraseña
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                <input
-                  id="login-password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  required
-                  disabled={loading}
-                  className="w-full rounded-xl border border-gray-300 py-2.5 pl-11 pr-4 text-sm text-gray-800 transition focus:border-[#1B365D] focus:outline-none focus:ring-2 focus:ring-[#1B365D]/20 disabled:bg-gray-100"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#ed8d1b] py-3 text-sm font-semibold text-white shadow-md transition hover:bg-[#d67a10] active:scale-[0.99] disabled:opacity-60"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Verificando credenciales...</span>
-                </>
-              ) : (
-                <>
-                  <span>Iniciar Sesión Local</span>
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </button>
-          </form>
-        )}
 
         <div className="mt-6 flex items-start gap-2.5 rounded-xl border border-gray-100 bg-[#F8FAFC] p-3.5 text-xs text-plai-muted">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#1e5ca7]" />
           <p className="leading-relaxed">
-            El nivel de acceso se asigna automáticamente según tu perfil registrado en PLAi. Si requieres alta o restablecimiento de cuenta, contacta al área de Tecnología e Infraestructura.
+            El nivel de acceso (administrador, colaborador o usuario) se asigna automáticamente según los roles configurados en tu cuenta institucional de Keycloak.
           </p>
         </div>
 

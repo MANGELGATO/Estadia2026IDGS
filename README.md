@@ -1,42 +1,29 @@
-# Plataforma de Gestión de Recursos y Espacios de PLAi
+# Plataforma de Gestión de Recursos y Espacios — PLAi
 
-Sistema web institucional de la **Plataforma Abierta de Innovación (PLAi)** para el catálogo, préstamo de equipamiento tecnológico, reserva de espacios, bitácora operativa y seguimiento de mantenimiento del Laboratorio de Innovación, Robótica y Tecnologías Inmersivas.
+Sistema web institucional para el catálogo, reservación, control de bitácora y mantenimiento de equipamiento tecnológico y espacios del Laboratorio de Innovación de PLAi.
 
-Construido conforme al **Estándar Tecnológico para Proyectos de Software de PLAi v1.0**.
+## Arquitectura Técnica (Estándar PLAi v1.0)
 
-## Stack Tecnológico
+- **Frontend y Backend:** Next.js 16 (App Router, `output: 'standalone'`), React 19, TypeScript 5, Tailwind CSS 4.
+- **Autenticación y Autorización (SSO):** NextAuth.js v4 conectado exclusivamente a **Keycloak (OIDC)**, con mapeo estricto de roles de cliente (`resource_access.<client_id>.roles`) y cierre de sesión federado (SLO en `/api/auth/federated-logout`).
+- **Persistencia de Datos:** **100% Directus REST API** (`lib/directus.ts`) sobre colecciones prefijadas (`lab_recursos_*`) administrables desde `admin.plai.mx`, sin acceso SQL directo a tablas internas y sin fallback en memoria.
+- **Infraestructura y Red:** Proxy inverso **NGINX Unprivileged (`1.28-alpine`, puerto `8080`)** + red interna aislada (`plai_isolated_backend`, `internal: true`) + red de salida controlada (`plai_app_egress`) para Docker Swarm.
 
-- **Frontend / SSR:** Next.js 16 (App Router, `output: 'standalone'`), React 19, TypeScript 5, Tailwind CSS 4 + daisyUI 5.
-- **Autenticación y RBAC:** NextAuth.js 4.24 (JWT en servidor, hash `scrypt` con `timingSafeEqual`, roles `admin`, `colaborador` y `usuario` validados en proxy, layouts y APIs).
-- **Base de Datos:** PostgreSQL 15/16 / Neon (`pg` con `DATABASE_URL` y soporte para Docker secrets `VARIABLE_FILE`).
-- **Infraestructura:** Contenedor multi-etapa `node:22-alpine3.22` (no root, `read_only`, `tini`, `HEALTHCHECK` en `/api/health`) listo para Docker Swarm + Traefik v3.
+## Documentación
 
-## Documentación y Base de Datos
+- **Montaje local y desarrollo:** [`INSTRUCCIONES_MONTAJE_PC.md`](./INSTRUCCIONES_MONTAJE_PC.md)
+- **Despliegue en producción (Docker Swarm, Keycloak, Directus, NGINX):** [`DEPLOY_SWARM.md`](./DEPLOY_SWARM.md)
+- **Variables de entorno y Docker Secrets:** [`.env.example`](./.env.example)
 
-- **Guía completa de instalación, variables de entorno, Neon/PostgreSQL, Docker Swarm e integración con PLAi:**  
-  [`INSTRUCCIONES_MONTAJE_PC.md`](./INSTRUCCIONES_MONTAJE_PC.md)
-- **Esquema e inicialización de base de datos (PostgreSQL / Neon, idempotentes):**
-  - [`database/01_schema_postgresql.sql`](./database/01_schema_postgresql.sql)
-  - [`database/02_seed_postgresql.sql`](./database/02_seed_postgresql.sql)
-- **Plantilla de variables de entorno:**  
-  [`.env.example`](./.env.example)
-
-## Inicio Rápido
+## Comandos Principales
 
 ```bash
-pnpm install --frozen-lockfile
-cp .env.example .env.local
-# Configurar DATABASE_URL, NEXTAUTH_URL y NEXTAUTH_SECRET en .env.local
-# Ejecutar database/01_schema_postgresql.sql y database/02_seed_postgresql.sql
-pnpm dev
+pnpm install --frozen-lockfile   # Instalar dependencias
+pnpm directus:setup              # Crear colecciones lab_recursos_* en Directus vía API oficial
+pnpm dev                         # Desarrollo local
+pnpm exec tsc --noEmit           # Verificación TypeScript
+pnpm lint                        # ESLint
+pnpm test                        # Suite de pruebas Vitest
+pnpm build                       # Build de producción standalone
+./deploy-production.sh           # Validación, escaneo Trivy y despliegue en Swarm
 ```
-
-## Scripts Principales
-
-| Comando | Descripción |
-| :--- | :--- |
-| `pnpm dev` | Servidor de desarrollo (`http://localhost:3000`) |
-| `pnpm build` | Compilación de producción (`standalone`) |
-| `pnpm start` | Arranque en producción |
-| `pnpm lint` | Análisis estático con ESLint 9 |
-| `pnpm test` | Pruebas automatizadas con Vitest |

@@ -1,178 +1,137 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { authOptions } from './auth';
-import { hashPassword, verifyPassword } from './password';
-import * as db from './db';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { getAuthOptions, extractKeycloakRole, decodeJwtPayload } from './auth';
 
-vi.mock('./db', async () => {
-  const actual = await vi.importActual<typeof db>('./db');
-  return {
-    ...actual,
-    getUsuarioByEmailForAuth: vi.fn(),
-    updateUsuarioLastLogin: vi.fn().mockResolvedValue(undefined),
-  };
-});
+function makeFakeJwt(payload: Record<string, unknown>): string {
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  return `${header}.${body}.signature`;
+}
 
-describe('NextAuth.js & Password Security (PLAi Standard v1.0)', () => {
-  const getUsuarioMock = vi.mocked(db.getUsuarioByEmailForAuth);
+describe('NextAuth.js + Keycloak OIDC Security (PLAi Standard v1.0)', () => {
+  const originalEnv = process.env;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('genera y valida hashes scrypt con sal única (sin contraseñas en texto plano)', () => {
-    const hash1 = hashPassword('ClaveSegura2026!');
-    const hash2 = hashPassword('ClaveSegura2026!');
-
-    expect(hash1.startsWith('scrypt$')).toBe(true);
-    expect(hash1).not.toBe(hash2);
-    expect(verifyPassword('ClaveSegura2026!', hash1)).toBe(true);
-    expect(verifyPassword('ClaveIncorrecta', hash1)).toBe(false);
-    expect(verifyPassword('ClaveSegura2026!', 'ClaveSegura2026!')).toBe(false);
-  });
-
-  it('configura la estrategia de sesión basada en JWT', () => {
-    expect(authOptions.session?.strategy).toBe('jwt');
-  });
-
-  it('cuenta con las páginas de autenticación institucionales configuradas', () => {
-    expect(authOptions.pages?.signIn).toBe('/login');
-    expect(authOptions.pages?.error).toBe('/login');
-  });
-
-  it('valida credenciales válidas contra la base de datos y retorna el rol real', async () => {
-    const storedHash = hashPassword('PlaiProdPass#2026');
-    getUsuarioMock.mockResolvedValueOnce({
-      id: 'usr-admin-01',
-      name: 'Administrador PLAi',
-      email: 'admin@plai.mx',
-      passwordHash: storedHash,
-      role: 'admin',
-      status: 'Activo',
-    });
-
-    const credentialsProvider = authOptions.providers.find((p) => p.id === 'credentials') as {
-      options?: { authorize: (credentials: unknown, req: unknown) => Promise<unknown> };
-      authorize?: (credentials: unknown, req: unknown) => Promise<unknown>;
+    process.env = {
+      ...originalEnv,
+      KEYCLOAK_ID: 'plai-recursos',
+      KEYCLOAK_SECRET: 'test-secret',
+      KEYCLOAK_ISSUER: 'https://sso.example.test/realms/plai',
     };
-    const authorize = credentialsProvider.options?.authorize || credentialsProvider.authorize;
-
-    const result = (await authorize!(
-      { email: 'admin@plai.mx', password: 'PlaiProdPass#2026' },
-      {}
-    )) as { id: string; email: string; role: string } | null;
-
-    expect(result).not.toBeNull();
-    expect(result?.id).toBe('usr-admin-01');
-    expect(result?.email).toBe('admin@plai.mx');
-    expect(result?.role).toBe('admin');
   });
 
-  it('rechaza usuarios con cuenta inactiva aunque la contraseña sea correcta', async () => {
-    const storedHash = hashPassword('PlaiProdPass#2026');
-    getUsuarioMock.mockResolvedValueOnce({
-      id: 'usr-inactivo',
-      name: 'Cuenta Suspendida',
-      email: 'inactivo@plai.mx',
-      passwordHash: storedHash,
-      role: 'usuario',
-      status: 'Inactivo',
-    });
-
-    const credentialsProvider = authOptions.providers.find((p) => p.id === 'credentials') as {
-      options?: { authorize: (credentials: unknown, req: unknown) => Promise<unknown> };
-      authorize?: (credentials: unknown, req: unknown) => Promise<unknown>;
-    };
-    const authorize = credentialsProvider.options?.authorize || credentialsProvider.authorize;
-
-    const result = await authorize!(
-      { email: 'inactivo@plai.mx', password: 'PlaiProdPass#2026' },
-      {}
-    );
-
-    expect(result).toBeNull();
+  afterEach(() => {
+    process.env = originalEnv;
   });
 
-  it('rechaza credenciales con contraseña incorrecta', async () => {
-    const storedHash = hashPassword('PlaiProdPass#2026');
-    getUsuarioMock.mockResolvedValueOnce({
-      id: 'usr-admin-01',
-      name: 'Administrador PLAi',
-      email: 'admin@plai.mx',
-      passwordHash: storedHash,
-      role: 'admin',
-      status: 'Activo',
-    });
-
-    const credentialsProvider = authOptions.providers.find((p) => p.id === 'credentials') as {
-      options?: { authorize: (credentials: unknown, req: unknown) => Promise<unknown> };
-      authorize?: (credentials: unknown, req: unknown) => Promise<unknown>;
-    };
-    const authorize = credentialsProvider.options?.authorize || credentialsProvider.authorize;
-
-    const result = await authorize!(
-      { email: 'admin@plai.mx', password: 'password-invalida' },
-      {}
-    );
-
-    expect(result).toBeNull();
+  it('usa únicamente Keycloak como proveedor de identidad (sin puerta trasera de contraseña local)', () => {
+    const opts = getAuthOptions();
+    expect(opts.providers).toHaveLength(1);
+    expect(opts.providers[0].id).toBe('keycloak');
   });
 
-  it('rechaza usuarios inexistentes', async () => {
-    getUsuarioMock.mockResolvedValueOnce(null);
-
-    const credentialsProvider = authOptions.providers.find((p) => p.id === 'credentials') as {
-      options?: { authorize: (credentials: unknown, req: unknown) => Promise<unknown> };
-      authorize?: (credentials: unknown, req: unknown) => Promise<unknown>;
-    };
-    const authorize = credentialsProvider.options?.authorize || credentialsProvider.authorize;
-
-    const result = await authorize!(
-      { email: 'desconocido@plai.mx', password: 'password' },
-      {}
-    );
-
-    expect(result).toBeNull();
+  it('configura estrategia JWT de 8 horas y páginas institucionales', () => {
+    const opts = getAuthOptions();
+    expect(opts.session?.strategy).toBe('jwt');
+    expect(opts.session?.maxAge).toBe(8 * 60 * 60);
+    expect(opts.pages?.signIn).toBe('/login');
   });
 
-  it('el callback jwt propaga id y role', async () => {
-    const jwtCallback = authOptions.callbacks?.jwt;
+  it('extrae roles EXCLUSIVAMENTE de resource_access[clientId].roles con coincidencia exacta', () => {
+    expect(
+      extractKeycloakRole(
+        { resource_access: { 'plai-recursos': { roles: ['admin'] } } },
+        'plai-recursos'
+      )
+    ).toBe('admin');
+
+    expect(
+      extractKeycloakRole(
+        { resource_access: { 'plai-recursos': { roles: ['colaborador'] } } },
+        'plai-recursos'
+      )
+    ).toBe('colaborador');
+
+    expect(
+      extractKeycloakRole(
+        { resource_access: { 'plai-recursos': { roles: ['usuario'] } } },
+        'plai-recursos'
+      )
+    ).toBe('usuario');
+  });
+
+  it('bloquea escalamiento de privilegios desde realm_access, grupos u otras apps del mismo realm', () => {
+    // Rol admin en realm global NO debe dar admin en esta app
+    expect(
+      extractKeycloakRole({ realm_access: { roles: ['admin', 'plai_admin'] } }, 'plai-recursos')
+    ).toBe('usuario');
+
+    // Rol admin en OTRA app del mismo realm NO debe dar admin aquí
+    expect(
+      extractKeycloakRole(
+        { resource_access: { 'otra-app-plai': { roles: ['admin'] } } },
+        'plai-recursos'
+      )
+    ).toBe('usuario');
+
+    // Grupos o roles con subcadena "admin" NO deben dar admin
+    expect(
+      extractKeycloakRole(
+        {
+          groups: ['/administracion', 'super-admin'],
+          resource_access: { 'plai-recursos': { roles: ['cursos-admin', 'administrativo'] } },
+        },
+        'plai-recursos'
+      )
+    ).toBe('usuario');
+  });
+
+  it('decodifica access_token de Keycloak en el callback jwt para leer resource_access', async () => {
+    const opts = getAuthOptions();
+    const jwtCallback = opts.callbacks?.jwt;
     expect(jwtCallback).toBeDefined();
 
-    // @ts-expect-error testing jwt callback
+    const accessToken = makeFakeJwt({
+      sub: 'kc-uuid-999',
+      resource_access: {
+        'plai-recursos': { roles: ['admin'] },
+      },
+    });
+
+    expect(decodeJwtPayload(accessToken)?.sub).toBe('kc-uuid-999');
+
+    // @ts-expect-error mock de parámetros del callback jwt
     const token = await jwtCallback({
       token: {},
-      user: { id: 'usr-123', role: 'admin', email: 'admin@plai.mx' },
+      user: { id: 'kc-uuid-999', role: 'usuario', email: 'admin@plai.mx' },
+      account: {
+        provider: 'keycloak',
+        type: 'oauth',
+        providerAccountId: 'kc-uuid-999',
+        access_token: accessToken,
+        id_token: 'fake-id-token-for-slo',
+      },
+      profile: { sub: 'kc-uuid-999' }, // /userinfo sin roles
     });
 
-    expect(token.id).toBe('usr-123');
+    expect(token.id).toBe('kc-uuid-999');
     expect(token.role).toBe('admin');
+    expect(token.idToken).toBe('fake-id-token-for-slo');
   });
 
-  it('el callback session propaga id y role a session.user', async () => {
-    const sessionCallback = authOptions.callbacks?.session;
+  it('el callback session propaga id y role a session.user sin exponer idToken al navegador', async () => {
+    const opts = getAuthOptions();
+    const sessionCallback = opts.callbacks?.session;
     expect(sessionCallback).toBeDefined();
 
-    // @ts-expect-error invocar callback con mock simplificado
+    // @ts-expect-error mock simplificado
     const session = await sessionCallback({
       session: { user: { name: 'Admin', email: 'admin@plai.mx' }, expires: '' },
-      token: { id: 'usr-123', role: 'admin' },
+      token: { id: 'kc-uuid-999', role: 'admin', idToken: 'secret-id-token' },
     });
 
-    const enrichedUser = session?.user as { id?: string; role?: string } | undefined;
-    expect(enrichedUser?.id).toBe('usr-123');
+    const enrichedUser = session.user as { id?: string; role?: string } | undefined;
+    expect(enrichedUser?.id).toBe('kc-uuid-999');
     expect(enrichedUser?.role).toBe('admin');
-  });
-
-  it('mapea correctamente roles de Keycloak (realm_access y resource_access)', async () => {
-    const { extractKeycloakRole } = await import('./auth');
-    
-    // Admin en realm
-    expect(extractKeycloakRole({ realm_access: { roles: ['default-roles-plai', 'admin'] } }, 'plai-recursos')).toBe('admin');
-    
-    // Colaborador en client roles
-    expect(extractKeycloakRole({ resource_access: { 'plai-recursos': { roles: ['colaborador'] } } }, 'plai-recursos')).toBe('colaborador');
-    
-    // Usuario estándar por defecto
-    expect(extractKeycloakRole({ realm_access: { roles: ['offline_access'] } }, 'plai-recursos')).toBe('usuario');
+    expect((session as unknown as Record<string, unknown>).idToken).toBeUndefined();
   });
 });

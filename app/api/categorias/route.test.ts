@@ -1,8 +1,19 @@
-import { describe, it, expect, afterAll, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, POST } from './route';
-import { defaultCategoriesConfig, updateCategoryConfig } from '../../../lib/categoriesConfig';
 import * as nextAuth from 'next-auth';
+
+const mockCategoriesStore = new Map<string, Record<string, unknown>>();
+
+vi.mock('../../../lib/directus', () => ({
+  directus: {
+    getItems: vi.fn(async () => Array.from(mockCategoriesStore.values())),
+    upsertItem: vi.fn(async (_col: string, id: string, data: Record<string, unknown>) => {
+      mockCategoriesStore.set(id, { id, ...data });
+      return { id, ...data };
+    }),
+  },
+}));
 
 vi.mock('next-auth', () => ({
   getServerSession: vi.fn(),
@@ -12,6 +23,7 @@ describe('/api/categorias API Endpoint', () => {
   const getServerSessionMock = vi.mocked(nextAuth.getServerSession);
 
   beforeEach(() => {
+    mockCategoriesStore.clear();
     getServerSessionMock.mockReset();
     getServerSessionMock.mockResolvedValue({
       user: {
@@ -21,10 +33,6 @@ describe('/api/categorias API Endpoint', () => {
         role: 'admin',
       },
     });
-  });
-
-  afterAll(async () => {
-    await updateCategoryConfig('realidad-virtual', defaultCategoriesConfig['realidad-virtual']);
   });
 
   it('GET devuelve todas las categorías con éxito sin requerir autenticación', async () => {

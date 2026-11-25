@@ -24,6 +24,7 @@ export async function proxy(request: NextRequest) {
   // 1. Rate Limiting en endpoints sensibles (Estándar PLAi v1.0, Sección 7.3)
   const isAuthAttempt =
     pathname.startsWith('/api/auth') &&
+    pathname !== '/api/auth/federated-logout' &&
     (pathname.includes('/signin') || pathname.includes('/callback') || request.method === 'POST');
 
   if (isAuthAttempt) {

@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
-import { authOptions } from './auth';
+import { getAuthOptions } from './auth';
 import type { UserRole } from '../types/next-auth';
 
 export interface AuthenticatedUser {
@@ -19,7 +19,7 @@ export type AuthGuardResult =
  * Nunca confía en datos enviados por el cliente ni cookies no firmadas.
  */
 export async function requireSession(allowedRoles?: UserRole[]): Promise<AuthGuardResult> {
-  const session = await getServerSession(authOptions);
+  const session = await getServerSession(getAuthOptions());
 
   if (!session?.user?.email) {
     return {

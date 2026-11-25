@@ -1,19 +1,22 @@
 # syntax=docker/dockerfile:1
-FROM nginx:1.27-alpine
+# Imagen oficial unprivileged actualizada (corre como UID 101 en puerto 8080 sin CAP_NET_BIND_SERVICE).
+# Recomendado: fijar digest @sha256:... al publicar en el registro privado de PLAi.
+FROM nginxinc/nginx-unprivileged:1.28-alpine
 
-# Hardening y permisos para ejecución como usuario no root
-RUN rm -rf /etc/nginx/conf.d/* /etc/nginx/nginx.conf \
-  && chown -R nginx:nginx /var/cache/nginx /var/log/nginx /etc/nginx
+COPY --chown=101:101 nginx.conf.template /etc/nginx/nginx.conf.template
+COPY --chown=101:101 entrypoint.sh /usr/local/bin/nginx-entrypoint.sh
 
-COPY nginx.conf /etc/nginx/nginx.conf
+USER root
+RUN chmod +x /usr/local/bin/nginx-entrypoint.sh \
+ && rm -rf /etc/nginx/conf.d/*
+USER 101
 
-# Validar sintaxis de configuración
-RUN nginx -t
+ENV ALLOWED_HOST=localhost
 
-USER nginx
-EXPOSE 80
+EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
-  CMD wget -qO- http://127.0.0.1/api/health || exit 1
+# Healthcheck desacoplado de la app Next.js (evita reinicios en cascada si app tarda en arrancar)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8080/nginx-health || exit 1
 
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/usr/local/bin/nginx-entrypoint.sh"]

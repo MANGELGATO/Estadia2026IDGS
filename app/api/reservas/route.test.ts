@@ -4,6 +4,32 @@ import { NextRequest } from 'next/server';
 import { rateLimiter } from '../../../lib/rateLimit';
 import * as nextAuth from 'next-auth';
 
+vi.mock('../../../lib/directus', () => ({
+  directus: {
+    getItems: vi.fn(async (collection: string) => {
+      if (collection === 'equipos') {
+        return [
+          {
+            id: 'vr-01',
+            categoria_id: 'realidad-virtual',
+            nombre: 'Meta Quest 3',
+            marca: 'Meta',
+            modelo: 'Quest 3',
+            numero_serie: 'SN-001',
+            codigo_plai: '5151000013-1',
+            estado: 'Disponible',
+            ubicacion: 'Laboratorio VR',
+            especificaciones: ['512 GB'],
+            accesorios: ['2 Controladores Touch Plus'],
+          },
+        ];
+      }
+      return [];
+    }),
+    createItem: vi.fn(async (_col: string, data: Record<string, unknown>) => data),
+  },
+}));
+
 vi.mock('next-auth', () => ({
   getServerSession: vi.fn(),
 }));
@@ -17,7 +43,7 @@ describe('POST /api/reservas Route Handler', () => {
     rateLimiter.reset();
     getServerSessionMock.mockResolvedValue({
       user: {
-        id: 'usr-01',
+        id: 'kc-new-user-uuid-987654',
         name: 'Laura Martinez',
         email: 'laura.martinez@plai.mx',
         role: 'usuario',

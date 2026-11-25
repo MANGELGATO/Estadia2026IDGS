@@ -1,4 +1,33 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
+
+const isProd = process.env.NODE_ENV === 'production';
+
+function getOriginSafe(rawUrl?: string): string | null {
+  if (!rawUrl) return null;
+  try {
+    return new URL(rawUrl).origin;
+  } catch {
+    return null;
+  }
+}
+
+const keycloakOrigin = getOriginSafe(process.env.KEYCLOAK_ISSUER);
+
+const connectSrc = [
+  "'self'",
+  ...(keycloakOrigin ? [keycloakOrigin] : []),
+  ...(!isProd ? ['http://localhost:*', 'ws://localhost:*'] : []),
+].join(' ');
+
+const formActionSrc = [
+  "'self'",
+  ...(keycloakOrigin ? [keycloakOrigin] : []),
+].join(' ');
+
+// En producción NO se permite 'unsafe-eval' ni orígenes localhost/ws
+const scriptSrc = isProd
+  ? "'self' 'unsafe-inline'"
+  : "'self' 'unsafe-eval' 'unsafe-inline'";
 
 const securityHeaders = [
   {
@@ -29,14 +58,16 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+      `script-src ${scriptSrc}`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
-      "img-src 'self' data: blob: https:",
-      "connect-src 'self' https://*.plai.mx http://localhost:* ws://localhost:*",
+      "img-src 'self' data: blob:",
+      `connect-src ${connectSrc}`,
+      "object-src 'none'",
       "frame-ancestors 'none'",
       "base-uri 'self'",
-      "form-action 'self' https://*.plai.mx",
+      `form-action ${formActionSrc}`,
+      ...(isProd ? ['upgrade-insecure-requests'] : []),
     ].join('; '),
   },
 ];
@@ -44,6 +75,7 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   // Estándar PLAi: servidor Node autónomo para empaquetar en Docker (sección 4.1)
   output: 'standalone',
+  poweredByHeader: false,
   images: {
     unoptimized: true,
   },

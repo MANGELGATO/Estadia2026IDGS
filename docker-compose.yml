@@ -1,103 +1,138 @@
-# Stack de Docker Swarm (Estándar PLAi v1.0, Sección 5.2)
-# Despliegue: docker stack deploy -c docker-compose.yml plai-recursos
-# Incluye arquitectura de red de doble capa:
-#   1. plai_public: donde escucha NGINX (conectado a Traefik institucional).
-#   2. plai_isolated_backend (internal: true): red privada y aislada donde vive la app Next.js.
+# ==============================================================================
+# Stack de Docker Swarm (Estándar PLAi v1.0)
+# Despliegue recomendado: ./deploy-production.sh
+#
+# IMPORTANTE:
+# Sustituir TODOS los valores marcados en MAYÚSCULAS
+# (`AQUI_HACER_CAMBIOS_CORRESPONDIENTES_CON_...`) por las direcciones, nombres
+# de red, registro privado y secretos institucionales reales de PLAi.
+#
+# Arquitectura de red:
+#   1. Red externa de Traefik/Gateway: llega SOLO a `nginx:8080`.
+#      (Traefik termina TLS externamente y reenvía X-Forwarded-Proto: https;
+#       si Traefik usa file provider en PLAi, no se requieren labels Docker).
+#   2. `plai_isolated_backend` (internal: true): red privada y aislada entre
+#      `nginx` y `app`. `app` NO publica puertos al exterior.
+#   3. `plai_app_egress`: red con salida controlada para que `app` pueda
+#      conectarse a Keycloak OIDC y a la API de Directus (admin.plai.mx).
+# ==============================================================================
+
 services:
   nginx:
-    image: registry.example.plai.mx/plai-recursos-nginx:1.0.0
-    build:
-      context: ./nginx
-      dockerfile: Dockerfile
+    image: AQUI_HACER_CAMBIOS_CORRESPONDIENTES_CON_REGISTRY_PLAI/plai-recursos-nginx:1.0.0
     read_only: true
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
+      # Ajustar según política de seguridad del nodo Swarm de PLAi:
+      # - seccomp:unconfined (NO usar; usar perfil por defecto de Docker o perfil corporativo)
+      # - apparmor:docker-default
+    environment:
+      ALLOWED_HOST: AQUI_HACER_CAMBIOS_CORRESPONDIENTES_CON_DOMINIO_INSTITUCIONAL_PLAI
     volumes:
-      - type: tmpfs
-        target: /var/cache/nginx
-      - type: tmpfs
-        target: /var/run
+      # tmpfs con mode 01777 para permitir escritura al usuario no-root (UID 101)
       - type: tmpfs
         target: /tmp
+        tmpfs:
+          size: 33554432
+          mode: 01777
+      - type: tmpfs
+        target: /var/cache/nginx
+        tmpfs:
+          size: 33554432
+          mode: 01777
+      - type: tmpfs
+        target: /var/run
+        tmpfs:
+          size: 8388608
+          mode: 01777
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/nginx-health"]
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       replicas: 1
       resources:
         limits:
           cpus: "0.25"
           memory: 128M
+          pids: 64
         reservations:
           cpus: "0.05"
           memory: 64M
       restart_policy:
         condition: on-failure
-      labels:
-        # Entrada pública institucional vía Traefik v3
-        - traefik.enable=true
-        - traefik.http.routers.plai-recursos.rule=Host(`recursos.example.plai.mx`)
-        - traefik.http.routers.plai-recursos.entrypoints=websecure
-        - traefik.http.routers.plai-recursos.tls=true
-        - traefik.http.services.plai-recursos.loadbalancer.server.port=80
+      # Nota: Si el Traefik de PLAi usa file provider, configurar el router en el
+      # archivo dinámico de Traefik apuntando a `http://plai-recursos_nginx:8080`.
     networks:
-      - plai_public
+      - plai_gateway_net
       - plai_isolated_backend
 
   app:
-    image: registry.example.plai.mx/plai-recursos-espacios:1.0.0
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: AQUI_HACER_CAMBIOS_CORRESPONDIENTES_CON_REGISTRY_PLAI/plai-recursos-espacios:1.0.0
     read_only: true
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
+      # - apparmor:docker-default
     environment:
       NODE_ENV: production
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
       NEXT_TELEMETRY_DISABLED: "1"
-      NEXT_PUBLIC_SITE_URL: https://recursos.example.plai.mx
-      NEXTAUTH_URL: https://recursos.example.plai.mx
+      NEXT_PUBLIC_SITE_URL: https://AQUI_HACER_CAMBIOS_CORRESPONDIENTES_CON_DOMINIO_INSTITUCIONAL_PLAI
+      NEXTAUTH_URL: https://AQUI_HACER_CAMBIOS_CORRESPONDIENTES_CON_DOMINIO_INSTITUCIONAL_PLAI
       NEXTAUTH_SECRET_FILE: /run/secrets/nextauth_secret
-      DATABASE_URL_FILE: /run/secrets/database_url
+      KEYCLOAK_ISSUER: https://AQUI_HACER_CAMBIOS_CORRESPONDIENTES_CON_URL_KEYCLOAK_INSTITUCIONAL/realms/AQUI_REALM_PLAI
       KEYCLOAK_ID_FILE: /run/secrets/keycloak_id
       KEYCLOAK_SECRET_FILE: /run/secrets/keycloak_secret
-      KEYCLOAK_ISSUER: https://auth.plai.mx/realms/plai
-      DIRECTUS_URL: https://admin.plai.mx
+      DIRECTUS_URL: https://AQUI_HACER_CAMBIOS_CORRESPONDIENTES_CON_URL_DIRECTUS_ADMIN_PLAI
+      DIRECTUS_COLLECTION_PREFIX: lab_recursos_
       DIRECTUS_TOKEN_FILE: /run/secrets/directus_token
     secrets:
       - nextauth_secret
-      - database_url
       - keycloak_id
       - keycloak_secret
       - directus_token
     volumes:
+      # tmpfs con mode 01777 para permitir escritura al usuario no-root (UID 1001)
       - type: tmpfs
         target: /tmp
+        tmpfs:
+          size: 33554432
+          mode: 01777
       - type: tmpfs
         target: /app/.next/cache
         tmpfs:
           size: 67108864
+          mode: 01777
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       replicas: 1
       resources:
         limits:
           cpus: "0.50"
           memory: 512M
+          pids: 128
         reservations:
           cpus: "0.10"
           memory: 128M
@@ -105,21 +140,24 @@ services:
         condition: on-failure
     networks:
       - plai_isolated_backend
-    # La aplicación NO publica puertos al exterior; solo NGINX se comunica con ella por plai_isolated_backend.
+      - plai_app_egress
+    # Sin puertos publicados: el tráfico entrante solo llega desde NGINX por plai_isolated_backend.
 
 networks:
-  # Red pública compartida con el balanceador/Traefik
-  plai_public:
+  # Red overlay del Traefik/Gateway de PLAi (reemplazar el nombre externo real)
+  plai_gateway_net:
     external: true
-  # Red privada interna y aislada (sin exposición al exterior)
+    name: AQUI_HACER_CAMBIOS_CORRESPONDIENTES_CON_RED_EXTERNA_SWARM_PLAI
+  # Red interna y aislada entre NGINX y Next.js (sin salida a internet ni acceso externo)
   plai_isolated_backend:
     driver: overlay
     internal: true
+  # Red de salida (egress) para que Next.js alcance Keycloak OIDC y Directus API
+  plai_app_egress:
+    driver: overlay
 
 secrets:
   nextauth_secret:
-    external: true
-  database_url:
     external: true
   keycloak_id:
     external: true

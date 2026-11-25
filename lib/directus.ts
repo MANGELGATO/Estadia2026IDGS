@@ -9,119 +9,270 @@ export interface DirectusResponse<T> {
   };
 }
 
+export class DirectusError extends Error {
+  public readonly status: number;
+  public readonly collection: string;
+  public readonly details?: unknown;
+
+  constructor(message: string, status: number, collection: string, details?: unknown) {
+    super(message);
+    this.name = 'DirectusError';
+    this.status = status;
+    this.collection = collection;
+    this.details = details;
+  }
+}
+
 /**
- * Cliente REST ligero y seguro para interactuar con la instancia Directus de PLAi
- * (https://admin.plai.mx) conforme al Estándar Tecnológico v1.0.
+ * Resuelve el nombre completo de una colección con el prefijo exclusivo de esta app
+ * (`DIRECTUS_COLLECTION_PREFIX`, por defecto `lab_recursos_`) para evitar cualquier
+ * colisión con colecciones de otras aplicaciones alojadas en admin.plai.mx.
+ */
+export function directusCollection(baseName: string): string {
+  const prefix = env.directusCollectionPrefix;
+  if (baseName.startsWith(prefix)) return baseName;
+  return `${prefix}${baseName}`;
+}
+
+/**
+ * Cliente REST estricto para la API oficial de Directus (admin.plai.mx).
+ * - Todas las lecturas usan `cache: 'no-store'` para evitar datos obsoletos tras escrituras.
+ * - Todos los errores HTTP o de red se propagan mediante `DirectusError` (nunca se ocultan).
+ * - No contiene URL de producción por defecto: exige `DIRECTUS_URL` y `DIRECTUS_TOKEN`.
  */
 class DirectusClient {
-  private get baseUrl(): string {
-    return env.directusUrl.replace(/\/+$/, '');
+  private ensureConfigured(collection: string): string {
+    const baseUrl = env.directusUrl;
+    if (!baseUrl) {
+      throw new DirectusError(
+        'DIRECTUS_URL no está configurado. Define la URL de Directus en las variables de entorno.',
+        503,
+        collection
+      );
+    }
+    if (!env.directusToken) {
+      throw new DirectusError(
+        'DIRECTUS_TOKEN no está configurado (usar Docker secret /run/secrets/directus_token o DIRECTUS_TOKEN_FILE).',
+        503,
+        collection
+      );
+    }
+    return baseUrl;
   }
 
   private get headers(): HeadersInit {
-    const headers: Record<string, string> = {
+    return {
       'Content-Type': 'application/json',
       Accept: 'application/json',
+      Authorization: `Bearer ${env.directusToken}`,
     };
-    if (env.directusToken) {
-      headers['Authorization'] = `Bearer ${env.directusToken}`;
-    }
-    return headers;
   }
 
-  /**
-   * Consulta una colección en Directus con filtros y parámetros opcionales
-   */
-  async getItems<T>(collection: string, queryParams: Record<string, string | number> = {}): Promise<T[]> {
-    if (!this.baseUrl) {
-      return [];
+  private async parseErrorBody(response: Response): Promise<unknown> {
+    try {
+      return await response.json();
+    } catch {
+      try {
+        return await response.text();
+      } catch {
+        return undefined;
+      }
+    }
+  }
+
+  async ping(): Promise<boolean> {
+    if (!env.hasDirectusConfig) return false;
+    try {
+      const response = await fetch(`${env.directusUrl}/server/ping`, {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async getItems<T>(
+    collection: string,
+    queryParams: Record<string, string | number> = {}
+  ): Promise<T[]> {
+    const col = directusCollection(collection);
+    const baseUrl = this.ensureConfigured(col);
+
+    const url = new URL(`${baseUrl}/items/${encodeURIComponent(col)}`);
+    if (!('limit' in queryParams)) {
+      url.searchParams.set('limit', '-1');
+    }
+    for (const [key, value] of Object.entries(queryParams)) {
+      url.searchParams.set(key, String(value));
     }
 
-    try {
-      const url = new URL(`${this.baseUrl}/items/${collection}`);
-      Object.entries(queryParams).forEach(([key, value]) => {
-        url.searchParams.set(key, String(value));
-      });
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: this.headers,
+      cache: 'no-store',
+    });
 
-      const response = await fetch(url.toString(), {
+    if (!response.ok) {
+      const details = await this.parseErrorBody(response);
+      logger.error(`Error HTTP ${response.status} al consultar colección Directus: ${col}`, {
+        status: response.status,
+        collection: col,
+      });
+      throw new DirectusError(
+        `Error al consultar Directus (${col}): HTTP ${response.status}`,
+        response.status,
+        col,
+        details
+      );
+    }
+
+    const json: DirectusResponse<T[]> = await response.json();
+    return Array.isArray(json.data) ? json.data : [];
+  }
+
+  async getItemById<T>(collection: string, id: string | number): Promise<T | null> {
+    const col = directusCollection(collection);
+    const baseUrl = this.ensureConfigured(col);
+
+    const response = await fetch(
+      `${baseUrl}/items/${encodeURIComponent(col)}/${encodeURIComponent(String(id))}`,
+      {
         method: 'GET',
         headers: this.headers,
-        next: { revalidate: 60 },
-      });
-
-      if (!response.ok) {
-        logger.warn(`Error al consultar colección Directus: ${collection}`, {
-          status: response.status,
-          url: url.toString(),
-        });
-        return [];
+        cache: 'no-store',
       }
+    );
 
-      const json: DirectusResponse<T[]> = await response.json();
-      return json.data || [];
-    } catch (error) {
-      logger.error(`Fallo en conexión con Directus API (${collection})`, undefined, error);
-      return [];
+    if (response.status === 404) {
+      return null;
     }
+
+    if (!response.ok) {
+      const details = await this.parseErrorBody(response);
+      logger.error(`Error HTTP ${response.status} al leer item Directus: ${col}/${id}`, {
+        status: response.status,
+        collection: col,
+      });
+      throw new DirectusError(
+        `Error al leer item en Directus (${col}/${id}): HTTP ${response.status}`,
+        response.status,
+        col,
+        details
+      );
+    }
+
+    const json: DirectusResponse<T> = await response.json();
+    return json.data ?? null;
   }
 
-  /**
-   * Crea un nuevo registro en una colección de Directus
-   */
-  async createItem<T>(collection: string, data: Partial<T>): Promise<T | null> {
-    if (!this.baseUrl) {
-      return null;
-    }
+  async createItem<T>(collection: string, data: Partial<T>): Promise<T> {
+    const col = directusCollection(collection);
+    const baseUrl = this.ensureConfigured(col);
 
-    try {
-      const response = await fetch(`${this.baseUrl}/items/${collection}`, {
-        method: 'POST',
-        headers: this.headers,
-        body: JSON.stringify(data),
+    const response = await fetch(`${baseUrl}/items/${encodeURIComponent(col)}`, {
+      method: 'POST',
+      headers: this.headers,
+      cache: 'no-store',
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const details = await this.parseErrorBody(response);
+      logger.error(`Error HTTP ${response.status} al crear item en Directus: ${col}`, {
+        status: response.status,
+        collection: col,
       });
-
-      if (!response.ok) {
-        logger.warn(`Error al crear item en Directus: ${collection}`, {
-          status: response.status,
-        });
-        return null;
-      }
-
-      const json: DirectusResponse<T> = await response.json();
-      return json.data;
-    } catch (error) {
-      logger.error(`Fallo al enviar item a Directus (${collection})`, undefined, error);
-      return null;
+      throw new DirectusError(
+        `Error al crear registro en Directus (${col}): HTTP ${response.status}`,
+        response.status,
+        col,
+        details
+      );
     }
+
+    const json: DirectusResponse<T> = await response.json();
+    return json.data;
   }
 
-  /**
-   * Actualiza un registro existente en Directus
-   */
-  async updateItem<T>(collection: string, id: string | number, data: Partial<T>): Promise<T | null> {
-    if (!this.baseUrl) {
-      return null;
-    }
+  async updateItem<T>(
+    collection: string,
+    id: string | number,
+    data: Partial<T>
+  ): Promise<T> {
+    const col = directusCollection(collection);
+    const baseUrl = this.ensureConfigured(col);
 
-    try {
-      const response = await fetch(`${this.baseUrl}/items/${collection}/${id}`, {
+    const response = await fetch(
+      `${baseUrl}/items/${encodeURIComponent(col)}/${encodeURIComponent(String(id))}`,
+      {
         method: 'PATCH',
         headers: this.headers,
+        cache: 'no-store',
         body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        logger.warn(`Error al actualizar item en Directus: ${collection}/${id}`, {
-          status: response.status,
-        });
-        return null;
       }
+    );
 
-      const json: DirectusResponse<T> = await response.json();
-      return json.data;
-    } catch (error) {
-      logger.error(`Fallo al actualizar item en Directus (${collection}/${id})`, undefined, error);
-      return null;
+    if (!response.ok) {
+      const details = await this.parseErrorBody(response);
+      logger.error(`Error HTTP ${response.status} al actualizar item Directus: ${col}/${id}`, {
+        status: response.status,
+        collection: col,
+      });
+      throw new DirectusError(
+        `Error al actualizar registro en Directus (${col}/${id}): HTTP ${response.status}`,
+        response.status,
+        col,
+        details
+      );
+    }
+
+    const json: DirectusResponse<T> = await response.json();
+    return json.data;
+  }
+
+  async upsertItem<T>(
+    collection: string,
+    id: string | number,
+    data: Partial<T>
+  ): Promise<T> {
+    const existing = await this.getItemById<T>(collection, id);
+    if (existing) {
+      return this.updateItem<T>(collection, id, data);
+    }
+    return this.createItem<T>(collection, { id, ...data } as Partial<T>);
+  }
+
+  async deleteItem(collection: string, id: string | number): Promise<void> {
+    const col = directusCollection(collection);
+    const baseUrl = this.ensureConfigured(col);
+
+    const response = await fetch(
+      `${baseUrl}/items/${encodeURIComponent(col)}/${encodeURIComponent(String(id))}`,
+      {
+        method: 'DELETE',
+        headers: this.headers,
+        cache: 'no-store',
+      }
+    );
+
+    if (response.status === 404) {
+      return;
+    }
+
+    if (!response.ok) {
+      const details = await this.parseErrorBody(response);
+      logger.error(`Error HTTP ${response.status} al eliminar item Directus: ${col}/${id}`, {
+        status: response.status,
+        collection: col,
+      });
+      throw new DirectusError(
+        `Error al eliminar registro en Directus (${col}/${id}): HTTP ${response.status}`,
+        response.status,
+        col,
+        details
+      );
     }
   }
 }

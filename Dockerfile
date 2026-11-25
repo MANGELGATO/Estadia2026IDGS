@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
-# Estándar PLAi, sección 5.1: multi-etapa, base con versión fija, usuario no root,
-# puerto no privilegiado, HEALTHCHECK, init (tini) y apagado limpio.
-# Recomendado: fijar el digest (@sha256:...) de la imagen base al publicar.
+# Estándar PLAi v1.0, sección 5.1:
+# multi-etapa, base fija, usuario no root (UID 1001), puerto no privilegiado,
+# sin herramientas innecesarias en runtime, HEALTHCHECK, init (tini) y apagado limpio.
+# Recomendado: fijar el digest (@sha256:...) de la imagen base al publicar en el registro PLAi.
 
 ARG NODE_IMAGE=node:22-alpine3.22
 ARG PNPM_VERSION=11.28.5
@@ -28,14 +29,16 @@ RUN pnpm run build
 FROM ${NODE_IMAGE} AS runtime
 WORKDIR /app
 
-# tini como PID 1 (manejo de señales y procesos zombi)
+# tini como PID 1 y eliminación de gestores de paquetes no necesarios en runtime
 RUN apk add --no-cache tini \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /opt/yarn* /usr/local/bin/yarn* /usr/local/bin/corepack \
  && addgroup -g 1001 -S nodejs \
  && adduser -S nextjs -u 1001 -G nodejs
 
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
-    PORT=3000
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
 
 # Salida standalone: solo lo necesario para ejecutar (sin código fuente ni devDependencies)
 COPY --from=build --chown=1001:1001 /app/.next/standalone ./
@@ -49,6 +52,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 
 ENTRYPOINT ["/sbin/tini", "--"]
-# Docker sobrescribe HOSTNAME con el id del contenedor; se fuerza 0.0.0.0 para que
-# Next escuche en todas las interfaces. 'exec' deja a node recibiendo SIGTERM.
-CMD ["sh", "-c", "HOSTNAME=0.0.0.0 exec node server.js"]
+CMD ["node", "server.js"]

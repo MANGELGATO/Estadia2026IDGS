@@ -1,108 +1,38 @@
-import { Pool } from 'pg';
-import { env } from './env';
-import { DeviceItem, mockDevices, AppItem, mockApps } from './mockData';
-import { hashPassword } from './password';
-import { logger } from './logger';
+import { directus } from './directus';
+import type { DeviceItem, AppItem } from './mockData';
 
 export type { DeviceItem };
 
-// Pool singleton de PostgreSQL / Neon para reutilizar conexiones en Next.js
-declare global {
-  var __pgPool: Pool | undefined;
-}
-
-export function getPool(): Pool {
-  if (!global.__pgPool) {
-    if (env.databaseUrl) {
-      global.__pgPool = new Pool({
-        connectionString: env.databaseUrl,
-        ssl: env.dbSsl ? { rejectUnauthorized: false } : undefined,
-        max: 10,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 10000,
-      });
-    } else {
-      global.__pgPool = new Pool({
-        host: env.dbHost || '127.0.0.1',
-        port: env.dbPort,
-        user: env.dbUser || 'postgres',
-        password: env.dbPassword || undefined,
-        database: env.dbName,
-        ssl: env.dbSsl ? { rejectUnauthorized: false } : undefined,
-        max: 10,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 10000,
-      });
-    }
-  }
-  return global.__pgPool;
-}
+/**
+ * Capa de persistencia 100% respaldada por la API oficial de Directus (admin.plai.mx).
+ * - Sin conexiones directas a PostgreSQL/Neon.
+ * - Sin respaldo silencioso en memoria: cualquier fallo de Directus se propaga con error real.
+ * - Colecciones prefijadas (`DIRECTUS_COLLECTION_PREFIX`, default `lab_recursos_`) para no
+ *   colisionar con otras aplicaciones en la misma instancia de Directus.
+ */
 
 export async function checkDatabaseConnection(): Promise<boolean> {
-  if (!env.hasDatabaseConfig) return false;
-  try {
-    const pool = getPool();
-    await pool.query('SELECT 1');
-    return true;
-  } catch {
-    return false;
-  }
+  return directus.ping();
 }
 
-// Almacenamiento en memoria únicamente para entornos sin BD configurada (ej. pruebas unitarias).
-// Cumple con Docker Swarm read_only: true (nunca escribe archivos en disco junto al código).
-interface MemoryStore {
-  equipos: DeviceItem[];
-  aplicaciones: AppItem[];
-  bitacora: BitacoraItem[];
-  reservaciones: ReservacionItem[];
-  incidencias: IncidenciaItem[];
-  usuarios: UsuarioRecord[];
-  cursos: CursoAgendaItem[];
-  config: SystemConfig;
-}
-
-declare global {
-  var __plaiMemoryStore: MemoryStore | undefined;
-}
-
-function getMemoryStore(): MemoryStore {
-  if (!global.__plaiMemoryStore) {
-    global.__plaiMemoryStore = {
-      equipos: [...mockDevices],
-      aplicaciones: [...mockApps],
-      bitacora: [],
-      reservaciones: [],
-      incidencias: [],
-      usuarios: [],
-      cursos: [],
-      config: { ...initialSystemConfig },
-    };
-  }
-  return global.__plaiMemoryStore;
-}
-
-// Mapeos de categorías
 const CATEGORY_MAP: Record<string, DeviceItem['category']> = {
   'realidad-virtual': 'Realidad Virtual',
-  'robotica': 'Robótica',
+  robotica: 'Robótica',
   'fabricacion-digital': 'Fabricación digital',
-  'drones': 'Drones',
+  drones: 'Drones',
   'computo-multimedia': 'Cómputo',
 };
 
 const CATEGORY_TO_ID_MAP: Record<string, string> = {
   'Realidad Virtual': 'realidad-virtual',
-  'Robótica': 'robotica',
+  Robótica: 'robotica',
   'Fabricación digital': 'fabricacion-digital',
-  'Drones': 'drones',
-  'Cómputo': 'computo-multimedia',
+  Drones: 'drones',
+  Cómputo: 'computo-multimedia',
 };
 
 function parseStringArray(val: unknown, fallback: string[]): string[] {
-  if (Array.isArray(val)) {
-    return val.map(String);
-  }
+  if (Array.isArray(val)) return val.map(String);
   if (typeof val === 'string' && val.trim().length > 0) {
     try {
       const parsed = JSON.parse(val);
@@ -114,13 +44,18 @@ function parseStringArray(val: unknown, fallback: string[]): string[] {
   return fallback;
 }
 
+function formatTimestamp(val: string | Date | null | undefined): string {
+  if (!val) return '';
+  if (val instanceof Date) return val.toISOString().slice(0, 19).replace('T', ' ');
+  return String(val);
+}
+
 // ====================================================================
-// 1. EQUIPOS
+// 1. EQUIPOS (colección: <prefix>equipos)
 // ====================================================================
 interface EquipoRow {
   id: string;
   categoria_id: string;
-  categoria_nombre?: string | null;
   nombre: string;
   marca: string;
   modelo: string;
@@ -129,29 +64,23 @@ interface EquipoRow {
   codigo_plai: string;
   estado: DeviceItem['status'];
   ubicacion: string;
-  especificaciones: unknown;
-  accesorios: unknown;
-  imagen_emoji: string | null;
+  especificaciones?: string[] | string | null;
+  accesorios?: string[] | string | null;
+  imagen_emoji?: string | null;
   imagen_url?: string | null;
-  responsable: string | null;
-  observaciones: string | null;
-  created_at: string | Date | null;
+  responsable?: string | null;
+  observaciones?: string | null;
+  date_created?: string | null;
 }
 
 export function mapRowToDeviceItem(row: EquipoRow): DeviceItem {
-  const specs = parseStringArray(row.especificaciones, ['Sin especificaciones registradas']);
+  const category = CATEGORY_MAP[row.categoria_id] || 'Realidad Virtual';
+  const specs = parseStringArray(row.especificaciones, ['Especificaciones estándar PLAi']);
   const accessories = parseStringArray(row.accesorios, ['Equipo estándar']);
-  const category =
-    CATEGORY_MAP[row.categoria_id] ||
-    (row.categoria_nombre as DeviceItem['category']) ||
-    'Realidad Virtual';
 
-  let dateAdded: string | undefined;
-  if (row.created_at) {
-    const d = new Date(row.created_at);
-    if (!Number.isNaN(d.getTime())) {
-      dateAdded = d.toISOString().split('T')[0];
-    }
+  let dateAdded = new Date().toISOString().split('T')[0];
+  if (row.date_created) {
+    dateAdded = String(row.date_created).split('T')[0];
   }
 
   return {
@@ -160,11 +89,11 @@ export function mapRowToDeviceItem(row: EquipoRow): DeviceItem {
     category,
     brand: row.marca,
     model: row.modelo,
-    inventoryNumber: row.codigo_plai,
-    serialNumber: row.numero_serie,
     storage: row.almacenamiento || 'N/A',
-    status: row.estado || 'Disponible',
-    location: row.ubicacion || 'Laboratorio de Innovación PLAi',
+    serialNumber: row.numero_serie,
+    inventoryNumber: row.codigo_plai,
+    status: row.estado,
+    location: row.ubicacion,
     specs,
     accessories,
     imageEmoji: row.imagen_emoji || '📦',
@@ -176,228 +105,109 @@ export function mapRowToDeviceItem(row: EquipoRow): DeviceItem {
 }
 
 export async function getEquiposFromDB(): Promise<DeviceItem[]> {
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      const { rows } = await pool.query<EquipoRow>(`
-        SELECT e.*, c.nombre AS categoria_nombre
-        FROM equipos e
-        LEFT JOIN categorias c ON e.categoria_id = c.id
-        ORDER BY e.created_at DESC, e.id ASC
-      `);
-      return rows.map(mapRowToDeviceItem);
-    } catch (error) {
-      logger.error('Error al consultar equipos en PostgreSQL', { error: String(error) });
-    }
-  }
-  return getMemoryStore().equipos;
+  const rows = await directus.getItems<EquipoRow>('equipos', { sort: 'nombre' });
+  return rows.map(mapRowToDeviceItem);
 }
 
 export async function insertEquipoInDB(item: DeviceItem): Promise<boolean> {
   const categoriaId = CATEGORY_TO_ID_MAP[item.category] || 'realidad-virtual';
-
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      await pool.query(
-        `
-        INSERT INTO equipos (
-          id, categoria_id, nombre, marca, modelo, almacenamiento,
-          numero_serie, codigo_plai, estado, ubicacion, especificaciones,
-          accesorios, imagen_emoji, imagen_url, responsable, observaciones
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, $13, $14, $15, $16)
-        ON CONFLICT (id) DO UPDATE SET
-          categoria_id = EXCLUDED.categoria_id,
-          nombre = EXCLUDED.nombre,
-          marca = EXCLUDED.marca,
-          modelo = EXCLUDED.modelo,
-          almacenamiento = EXCLUDED.almacenamiento,
-          numero_serie = EXCLUDED.numero_serie,
-          codigo_plai = EXCLUDED.codigo_plai,
-          estado = EXCLUDED.estado,
-          ubicacion = EXCLUDED.ubicacion,
-          especificaciones = EXCLUDED.especificaciones,
-          accesorios = EXCLUDED.accesorios,
-          imagen_emoji = EXCLUDED.imagen_emoji,
-          imagen_url = EXCLUDED.imagen_url,
-          responsable = EXCLUDED.responsable,
-          observaciones = EXCLUDED.observaciones,
-          updated_at = NOW()
-        `,
-        [
-          item.id,
-          categoriaId,
-          item.name,
-          item.brand,
-          item.model,
-          item.storage || 'N/A',
-          item.serialNumber || `SN-${Date.now()}`,
-          item.inventoryNumber,
-          item.status,
-          item.location,
-          JSON.stringify(item.specs || []),
-          JSON.stringify(item.accessories || []),
-          item.imageEmoji || '📦',
-          item.imageUrl || null,
-          item.responsible || 'Laboratorio de Innovación PLAi',
-          item.observations || null,
-        ]
-      );
-      return true;
-    } catch (error) {
-      logger.error('Error al guardar equipo en PostgreSQL', { error: String(error) });
-      throw error;
-    }
-  }
-
-  const store = getMemoryStore();
-  const idx = store.equipos.findIndex(
-    (e) => e.id === item.id || e.inventoryNumber === item.inventoryNumber
-  );
-  if (idx >= 0) store.equipos[idx] = item;
-  else store.equipos.unshift(item);
+  await directus.upsertItem<EquipoRow>('equipos', item.id, {
+    id: item.id,
+    categoria_id: categoriaId,
+    nombre: item.name,
+    marca: item.brand,
+    modelo: item.model,
+    almacenamiento: item.storage || 'N/A',
+    numero_serie: item.serialNumber,
+    codigo_plai: item.inventoryNumber,
+    estado: item.status,
+    ubicacion: item.location,
+    especificaciones: item.specs,
+    accesorios: item.accessories,
+    imagen_emoji: item.imageEmoji || '📦',
+    imagen_url: item.imageUrl || null,
+    responsable: item.responsible || 'Laboratorio de Innovación PLAi',
+    observaciones: item.observations || null,
+  });
   return true;
 }
 
 export async function deleteEquipoInDB(id: string): Promise<boolean> {
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      const result = await pool.query('DELETE FROM equipos WHERE id = $1', [id]);
-      return (result.rowCount ?? 0) > 0;
-    } catch (error) {
-      logger.error('Error al eliminar equipo en PostgreSQL', { error: String(error) });
-      throw error;
-    }
-  }
-
-  const store = getMemoryStore();
-  const prevLen = store.equipos.length;
-  store.equipos = store.equipos.filter((e) => e.id !== id);
-  return store.equipos.length < prevLen;
+  await directus.deleteItem('equipos', id);
+  return true;
 }
 
 export async function getEquipoByCodigoPLAi(codigo: string): Promise<DeviceItem | null> {
-  const all = await getEquiposFromDB();
-  const normalized = codigo.trim().toLowerCase();
-  return all.find((e) => e.inventoryNumber.toLowerCase() === normalized) || null;
+  const rows = await directus.getItems<EquipoRow>('equipos', {
+    'filter[codigo_plai][_icontains]': codigo.trim(),
+    limit: 5,
+  });
+  const exact = rows.find(
+    (r) => r.codigo_plai.toLowerCase() === codigo.trim().toLowerCase()
+  );
+  return exact ? mapRowToDeviceItem(exact) : null;
 }
 
 // ====================================================================
-// 2. APLICACIONES VR / PC
+// 2. APLICACIONES (colección: <prefix>aplicaciones)
 // ====================================================================
-interface AppRow {
+interface AplicacionRow {
   id: string;
   nombre: string;
   desarrollador: string;
   version: string;
   categoria: string;
   plataforma: AppItem['platform'];
-  clasificacion_edad: string;
-  descripcion: string;
-  imagen_url: string | null;
-  equipos_instalados: number;
-  estado: AppItem['status'];
+  clasificacion_edad?: string | null;
+  descripcion?: string | null;
+  imagen_url?: string | null;
+  equipos_instalados?: number | null;
+  estado?: 'Activa' | 'Inactiva' | null;
 }
 
 export async function getAplicacionesFromDB(): Promise<AppItem[]> {
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      const { rows } = await pool.query<AppRow>(
-        'SELECT * FROM aplicaciones ORDER BY created_at DESC, id ASC'
-      );
-      return rows.map((r) => ({
-        id: String(r.id),
-        name: r.nombre,
-        developer: r.desarrollador,
-        version: r.version,
-        category: r.categoria as AppItem['category'],
-        platform: r.plataforma,
-        ageRating: r.clasificacion_edad,
-        description: r.descripcion,
-        imageUrl: r.imagen_url || undefined,
-        iconUrl: r.imagen_url || undefined,
-        devicesInstalled: Number(r.equipos_instalados || 1),
-        status: r.estado,
-      }));
-    } catch (error) {
-      logger.error('Error al consultar aplicaciones en PostgreSQL', { error: String(error) });
-    }
-  }
-  return getMemoryStore().aplicaciones;
+  const rows = await directus.getItems<AplicacionRow>('aplicaciones', { sort: 'nombre' });
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.nombre,
+    developer: r.desarrollador,
+    version: r.version || '1.0',
+    category: r.categoria,
+    platform: r.plataforma || 'Meta Quest',
+    ageRating: r.clasificacion_edad || 'Todas las edades',
+    description: r.descripcion || '',
+    imageUrl: r.imagen_url || undefined,
+    devicesInstalled: Number(r.equipos_instalados ?? 1),
+    status: r.estado || 'Activa',
+  }));
 }
 
 export async function insertAplicacionInDB(app: AppItem): Promise<boolean> {
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      await pool.query(
-        `
-        INSERT INTO aplicaciones (
-          id, nombre, desarrollador, version, categoria, plataforma,
-          clasificacion_edad, descripcion, imagen_url, equipos_instalados, estado
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        ON CONFLICT (id) DO UPDATE SET
-          nombre = EXCLUDED.nombre,
-          desarrollador = EXCLUDED.desarrollador,
-          version = EXCLUDED.version,
-          categoria = EXCLUDED.categoria,
-          plataforma = EXCLUDED.plataforma,
-          clasificacion_edad = EXCLUDED.clasificacion_edad,
-          descripcion = EXCLUDED.descripcion,
-          imagen_url = EXCLUDED.imagen_url,
-          equipos_instalados = EXCLUDED.equipos_instalados,
-          estado = EXCLUDED.estado,
-          updated_at = NOW()
-        `,
-        [
-          app.id,
-          app.name,
-          app.developer,
-          app.version || '1.0',
-          app.category,
-          app.platform,
-          app.ageRating || 'Todas las edades',
-          app.description,
-          app.imageUrl || app.iconUrl || null,
-          app.devicesInstalled || 1,
-          app.status || 'Activa',
-        ]
-      );
-      return true;
-    } catch (error) {
-      logger.error('Error al guardar aplicación en PostgreSQL', { error: String(error) });
-      throw error;
-    }
-  }
-
-  const store = getMemoryStore();
-  const idx = store.aplicaciones.findIndex((a) => a.id === app.id);
-  if (idx >= 0) store.aplicaciones[idx] = app;
-  else store.aplicaciones.unshift(app);
+  const estadoVal: 'Activa' | 'Inactiva' =
+    app.status === 'Inactiva' ? 'Inactiva' : 'Activa';
+  await directus.upsertItem<AplicacionRow>('aplicaciones', app.id, {
+    id: app.id,
+    nombre: app.name,
+    desarrollador: app.developer,
+    version: app.version || '1.0',
+    categoria: app.category,
+    plataforma: app.platform || 'Meta Quest',
+    clasificacion_edad: app.ageRating || 'Todas las edades',
+    descripcion: app.description || '',
+    imagen_url: app.imageUrl || null,
+    equipos_instalados: Number(app.devicesInstalled ?? 1),
+    estado: estadoVal,
+  });
   return true;
 }
 
 export async function deleteAplicacionInDB(id: string): Promise<boolean> {
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      const result = await pool.query('DELETE FROM aplicaciones WHERE id = $1', [id]);
-      return (result.rowCount ?? 0) > 0;
-    } catch (error) {
-      logger.error('Error al eliminar aplicación en PostgreSQL', { error: String(error) });
-      throw error;
-    }
-  }
-
-  const store = getMemoryStore();
-  store.aplicaciones = store.aplicaciones.filter((a) => a.id !== id);
+  await directus.deleteItem('aplicaciones', id);
   return true;
 }
 
 // ====================================================================
-// 3. BITÁCORA DE USO (ENTREGAS Y DEVOLUCIONES)
+// 3. BITÁCORA DE USO (colección: <prefix>bitacora_uso)
 // ====================================================================
 export interface BitacoraItem {
   id: string;
@@ -430,140 +240,90 @@ interface BitacoraRow {
   equipo_nombre: string;
   usuario_nombre: string;
   usuario_email: string;
-  usuario_dependencia: string | null;
-  fecha_entrega: string | Date;
-  fecha_devolucion_estimada: string | Date;
-  fecha_devolucion_real: string | Date | null;
+  usuario_dependencia?: string | null;
+  fecha_entrega: string;
+  fecha_devolucion_estimada: string;
+  fecha_devolucion_real?: string | null;
   estado_prestamo: BitacoraItem['estadoPrestamo'];
   condicion_entrega: BitacoraItem['condicionEntrega'];
-  condicion_devolucion: BitacoraItem['condicionDevolucion'] | null;
+  condicion_devolucion?: BitacoraItem['condicionDevolucion'] | null;
   accesorios_entregados: string;
-  accesorios_devueltos: string | null;
-  observaciones_entrega: string | null;
-  observaciones_devolucion: string | null;
-  incidencia_generada: boolean;
+  accesorios_devueltos?: string | null;
+  observaciones_entrega?: string | null;
+  observaciones_devolucion?: string | null;
+  incidencia_generada?: boolean | null;
   admin_entrega: string;
-  admin_recibe: string | null;
-}
-
-function formatTimestamp(val: string | Date | null | undefined): string {
-  if (!val) return '';
-  if (val instanceof Date) return val.toISOString().slice(0, 19).replace('T', ' ');
-  return String(val);
+  admin_recibe?: string | null;
+  date_created?: string | null;
 }
 
 export async function getBitacoraFromDB(): Promise<BitacoraItem[]> {
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      const { rows } = await pool.query<BitacoraRow>(
-        'SELECT * FROM bitacora_uso ORDER BY fecha_entrega DESC'
-      );
-      return rows.map((r) => ({
-        id: String(r.id),
-        equipoId: r.equipo_id,
-        codigoPlai: r.codigo_plai,
-        equipoNombre: r.equipo_nombre,
-        usuarioNombre: r.usuario_nombre,
-        usuarioEmail: r.usuario_email,
-        usuarioDependencia: r.usuario_dependencia || undefined,
-        fechaEntrega: formatTimestamp(r.fecha_entrega),
-        fechaDevolucionEstimada: formatTimestamp(r.fecha_devolucion_estimada),
-        fechaDevolucionReal: r.fecha_devolucion_real
-          ? formatTimestamp(r.fecha_devolucion_real)
-          : undefined,
-        estadoPrestamo: r.estado_prestamo,
-        condicionEntrega: r.condicion_entrega,
-        condicionDevolucion: r.condicion_devolucion || undefined,
-        accesoriosEntregados: r.accesorios_entregados,
-        accesoriosDevueltos: r.accesorios_devueltos || undefined,
-        observacionesEntrega: r.observaciones_entrega || undefined,
-        observacionesDevolucion: r.observaciones_devolucion || undefined,
-        incidenciaGenerada: Boolean(r.incidencia_generada),
-        adminEntrega: r.admin_entrega,
-        adminRecibe: r.admin_recibe || undefined,
-      }));
-    } catch (error) {
-      logger.error('Error al consultar bitácora en PostgreSQL', { error: String(error) });
-    }
-  }
-  return getMemoryStore().bitacora;
+  const rows = await directus.getItems<BitacoraRow>('bitacora_uso', {
+    sort: '-fecha_entrega',
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    equipoId: r.equipo_id,
+    codigoPlai: r.codigo_plai,
+    equipoNombre: r.equipo_nombre,
+    usuarioNombre: r.usuario_nombre,
+    usuarioEmail: r.usuario_email,
+    usuarioDependencia: r.usuario_dependencia || undefined,
+    fechaEntrega: formatTimestamp(r.fecha_entrega),
+    fechaDevolucionEstimada: formatTimestamp(r.fecha_devolucion_estimada),
+    fechaDevolucionReal: r.fecha_devolucion_real
+      ? formatTimestamp(r.fecha_devolucion_real)
+      : undefined,
+    estadoPrestamo: r.estado_prestamo,
+    condicionEntrega: r.condicion_entrega,
+    condicionDevolucion: r.condicion_devolucion || undefined,
+    accesoriosEntregados: r.accesorios_entregados,
+    accesoriosDevueltos: r.accesorios_devueltos || undefined,
+    observacionesEntrega: r.observaciones_entrega || undefined,
+    observacionesDevolucion: r.observaciones_devolucion || undefined,
+    incidenciaGenerada: Boolean(r.incidencia_generada),
+    adminEntrega: r.admin_entrega,
+    adminRecibe: r.admin_recibe || undefined,
+    createdAt: r.date_created || undefined,
+  }));
 }
 
 export async function insertBitacoraEntregaInDB(
   item: BitacoraItem,
   reservaId?: string
 ): Promise<boolean> {
-  if (env.hasDatabaseConfig) {
-    const pool = getPool();
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query(
-        `
-        INSERT INTO bitacora_uso (
-          id, equipo_id, codigo_plai, equipo_nombre, usuario_nombre,
-          usuario_email, usuario_dependencia, fecha_entrega, fecha_devolucion_estimada,
-          estado_prestamo, condicion_entrega, accesorios_entregados, observaciones_entrega,
-          admin_entrega
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-        ON CONFLICT (id) DO NOTHING
-        `,
-        [
-          item.id,
-          item.equipoId,
-          item.codigoPlai,
-          item.equipoNombre,
-          item.usuarioNombre,
-          item.usuarioEmail,
-          item.usuarioDependencia || null,
-          item.fechaEntrega,
-          item.fechaDevolucionEstimada,
-          item.estadoPrestamo || 'Activo',
-          item.condicionEntrega || 'Excelente',
-          item.accesoriosEntregados || 'Equipo completo',
-          item.observacionesEntrega || null,
-          item.adminEntrega || 'Administrador PLAi',
-        ]
-      );
+  await directus.createItem<BitacoraRow>('bitacora_uso', {
+    id: item.id,
+    equipo_id: item.equipoId,
+    codigo_plai: item.codigoPlai,
+    equipo_nombre: item.equipoNombre,
+    usuario_nombre: item.usuarioNombre,
+    usuario_email: item.usuarioEmail,
+    usuario_dependencia: item.usuarioDependencia || null,
+    fecha_entrega: item.fechaEntrega,
+    fecha_devolucion_estimada: item.fechaDevolucionEstimada,
+    estado_prestamo: item.estadoPrestamo || 'Activo',
+    condicion_entrega: item.condicionEntrega || 'Excelente',
+    accesorios_entregados: item.accesoriosEntregados || 'Equipo completo',
+    observaciones_entrega: item.observacionesEntrega || null,
+    incidencia_generada: false,
+    admin_entrega: item.adminEntrega || 'Administrador PLAi',
+  });
 
-      await client.query(
-        `UPDATE equipos SET estado = 'En uso', updated_at = NOW() WHERE codigo_plai = $1 OR id = $2`,
-        [item.codigoPlai, item.equipoId]
-      );
-
-      if (reservaId) {
-        await client.query(
-          `UPDATE reservaciones SET estado = 'En uso', codigo_plai_asignado = $1, equipo_id = $2, updated_at = NOW() WHERE id = $3`,
-          [item.codigoPlai, item.equipoId, reservaId]
-        );
-      } else {
-        await client.query(
-          `UPDATE reservaciones
-           SET estado = 'En uso', updated_at = NOW()
-           WHERE estado IN ('Aprobada', 'Pendiente')
-             AND (LOWER(codigo_plai_asignado) = LOWER($1) OR equipo_id = $2)`,
-          [item.codigoPlai, item.equipoId]
-        );
-      }
-
-      await client.query('COMMIT');
-      return true;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      logger.error('Error al registrar entrega en PostgreSQL', { error: String(error) });
-      throw error;
-    } finally {
-      client.release();
-    }
+  // Sincronizar estado del equipo en Directus
+  if (item.equipoId) {
+    await directus.updateItem<EquipoRow>('equipos', item.equipoId, { estado: 'En uso' });
   }
 
-  const store = getMemoryStore();
-  store.bitacora.unshift(item);
-  const eq = store.equipos.find(
-    (e) => e.inventoryNumber.toLowerCase() === item.codigoPlai.toLowerCase() || e.id === item.equipoId
-  );
-  if (eq) eq.status = 'En uso';
+  // Sincronizar reservación vinculada
+  if (reservaId) {
+    await directus.updateItem<ReservacionRow>('reservaciones', reservaId, {
+      estado: 'En uso',
+      codigo_plai_asignado: item.codigoPlai,
+      equipo_id: item.equipoId,
+    });
+  }
+
   return true;
 }
 
@@ -578,79 +338,42 @@ export async function updateBitacoraDevolucionInDB(
     adminRecibe: string;
   }
 ): Promise<boolean> {
-  if (env.hasDatabaseConfig) {
-    const pool = getPool();
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const estadoPrestamo = devolucion.incidenciaGenerada ? 'Con Incidencia' : 'Devuelto';
-      const { rows } = await client.query<{ codigo_plai: string; equipo_id: string }>(
-        `
-        UPDATE bitacora_uso SET
-          fecha_devolucion_real = $1,
-          condicion_devolucion = $2,
-          accesorios_devueltos = $3,
-          observaciones_devolucion = $4,
-          incidencia_generada = $5,
-          estado_prestamo = $6,
-          admin_recibe = $7
-        WHERE id = $8
-        RETURNING codigo_plai, equipo_id
-        `,
-        [
-          devolucion.fechaDevolucionReal,
-          devolucion.condicionDevolucion || null,
-          devolucion.accesoriosDevueltos,
-          devolucion.observacionesDevolucion || null,
-          Boolean(devolucion.incidenciaGenerada),
-          estadoPrestamo,
-          devolucion.adminRecibe,
-          id,
-        ]
-      );
+  const estadoPrestamo = devolucion.incidenciaGenerada ? 'Con Incidencia' : 'Devuelto';
+  const updated = await directus.updateItem<BitacoraRow>('bitacora_uso', id, {
+    fecha_devolucion_real: devolucion.fechaDevolucionReal,
+    condicion_devolucion: devolucion.condicionDevolucion || null,
+    accesorios_devueltos: devolucion.accesoriosDevueltos,
+    observaciones_devolucion: devolucion.observacionesDevolucion || null,
+    incidencia_generada: Boolean(devolucion.incidenciaGenerada),
+    estado_prestamo: estadoPrestamo,
+    admin_recibe: devolucion.adminRecibe,
+  });
 
-      if (rows[0]) {
-        const nuevoEstado = devolucion.incidenciaGenerada ? 'En mantenimiento' : 'Disponible';
-        await client.query(
-          'UPDATE equipos SET estado = $1, updated_at = NOW() WHERE codigo_plai = $2 OR id = $3',
-          [nuevoEstado, rows[0].codigo_plai, rows[0].equipo_id]
-        );
-        await client.query(
-          `UPDATE reservaciones
-           SET estado = 'Completada', updated_at = NOW()
-           WHERE estado IN ('En uso', 'Aprobada')
-             AND (LOWER(codigo_plai_asignado) = LOWER($1) OR equipo_id = $2)`,
-          [rows[0].codigo_plai, rows[0].equipo_id]
-        );
-      }
+  if (updated?.equipo_id) {
+    const nuevoEstadoEquipo: DeviceItem['status'] = devolucion.incidenciaGenerada
+      ? 'En mantenimiento'
+      : 'Disponible';
+    await directus.updateItem<EquipoRow>('equipos', updated.equipo_id, {
+      estado: nuevoEstadoEquipo,
+    });
 
-      await client.query('COMMIT');
-      return true;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      logger.error('Error al actualizar devolución en PostgreSQL', { error: String(error) });
-      throw error;
-    } finally {
-      client.release();
+    // Completar reservaciones activas de ese equipo
+    const activas = await directus.getItems<ReservacionRow>('reservaciones', {
+      'filter[equipo_id][_eq]': updated.equipo_id,
+      'filter[estado][_eq]': 'En uso',
+    });
+    for (const res of activas) {
+      await directus.updateItem<ReservacionRow>('reservaciones', res.id, {
+        estado: 'Completada',
+      });
     }
   }
 
-  const store = getMemoryStore();
-  const item = store.bitacora.find((b) => b.id === id);
-  if (item) {
-    item.fechaDevolucionReal = devolucion.fechaDevolucionReal;
-    item.condicionDevolucion = devolucion.condicionDevolucion;
-    item.accesoriosDevueltos = devolucion.accesoriosDevueltos;
-    item.observacionesDevolucion = devolucion.observacionesDevolucion;
-    item.incidenciaGenerada = devolucion.incidenciaGenerada;
-    item.estadoPrestamo = devolucion.incidenciaGenerada ? 'Con Incidencia' : 'Devuelto';
-    item.adminRecibe = devolucion.adminRecibe;
-  }
   return true;
 }
 
 // ====================================================================
-// 4. RESERVACIONES
+// 4. RESERVACIONES (colección: <prefix>reservaciones)
 // ====================================================================
 export interface ReservacionItem {
   id: string;
@@ -658,6 +381,7 @@ export interface ReservacionItem {
   categoriaId: string;
   equipoId?: string;
   codigoPlaiAsignado?: string;
+  /** Identificador `sub` del usuario en Keycloak (texto sin FK local rota) */
   usuarioId?: string;
   usuarioNombre: string;
   usuarioEmail: string;
@@ -679,120 +403,83 @@ interface ReservacionRow {
   id: string;
   folio: string;
   categoria_id: string;
-  equipo_id: string | null;
-  codigo_plai_asignado: string | null;
-  usuario_id: string | null;
+  equipo_id?: string | null;
+  codigo_plai_asignado?: string | null;
+  usuario_keycloak_id?: string | null;
   usuario_nombre: string;
   usuario_email: string;
-  usuario_telefono: string | null;
-  usuario_institucion: string | null;
-  fecha_uso: string | Date;
+  usuario_telefono?: string | null;
+  usuario_institucion?: string | null;
+  fecha_uso: string;
   hora_inicio: string;
   hora_fin: string;
   actividad: string;
   estado: ReservacionItem['estado'];
-  accesorios_incluidos: string | null;
-  condicion_salida: string | null;
-  observaciones_admin: string | null;
-  aprobado_por: string | null;
+  accesorios_incluidos?: string | null;
+  condicion_salida?: string | null;
+  observaciones_admin?: string | null;
+  aprobado_por?: string | null;
+  date_created?: string | null;
 }
 
 export async function getReservacionesFromDB(filterByEmail?: string): Promise<ReservacionItem[]> {
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      const query = filterByEmail
-        ? 'SELECT * FROM reservaciones WHERE LOWER(usuario_email) = LOWER($1) ORDER BY created_at DESC'
-        : 'SELECT * FROM reservaciones ORDER BY created_at DESC';
-      const params = filterByEmail ? [filterByEmail] : [];
-      const { rows } = await pool.query<ReservacionRow>(query, params);
-      return rows.map((r) => ({
-        id: String(r.id),
-        folio: r.folio || String(r.id),
-        categoriaId: r.categoria_id || 'realidad-virtual',
-        equipoId: r.equipo_id || undefined,
-        codigoPlaiAsignado: r.codigo_plai_asignado || undefined,
-        usuarioId: r.usuario_id || undefined,
-        usuarioNombre: r.usuario_nombre,
-        usuarioEmail: r.usuario_email,
-        usuarioTelefono: r.usuario_telefono || undefined,
-        usuarioInstitucion: r.usuario_institucion || undefined,
-        fechaUso:
-          r.fecha_uso instanceof Date
-            ? r.fecha_uso.toISOString().split('T')[0]
-            : String(r.fecha_uso).split('T')[0],
-        horaInicio: String(r.hora_inicio || '10:00').substring(0, 5),
-        horaFin: String(r.hora_fin || '12:00').substring(0, 5),
-        actividad: r.actividad,
-        estado: r.estado || 'Pendiente',
-        accesoriosIncluidos: r.accesorios_incluidos || undefined,
-        condicionSalida: r.condicion_salida || 'Excelente',
-        observacionesAdmin: r.observaciones_admin || undefined,
-        aprobadoPor: r.aprobado_por || undefined,
-      }));
-    } catch (error) {
-      logger.error('Error al consultar reservaciones en PostgreSQL', { error: String(error) });
-    }
-  }
-
-  const list = getMemoryStore().reservaciones;
+  const params: Record<string, string | number> = { sort: '-date_created' };
   if (filterByEmail) {
-    const norm = filterByEmail.toLowerCase().trim();
-    return list.filter((r) => r.usuarioEmail?.toLowerCase().trim() === norm);
+    params['filter[usuario_email][_icontains]'] = filterByEmail.trim().toLowerCase();
   }
-  return list;
+  const rows = await directus.getItems<ReservacionRow>('reservaciones', params);
+  const filtered = filterByEmail
+    ? rows.filter(
+        (r) => r.usuario_email.toLowerCase() === filterByEmail.trim().toLowerCase()
+      )
+    : rows;
+
+  return filtered.map((r) => ({
+    id: r.id,
+    folio: r.folio,
+    categoriaId: r.categoria_id,
+    equipoId: r.equipo_id || undefined,
+    codigoPlaiAsignado: r.codigo_plai_asignado || undefined,
+    usuarioId: r.usuario_keycloak_id || undefined,
+    usuarioNombre: r.usuario_nombre,
+    usuarioEmail: r.usuario_email,
+    usuarioTelefono: r.usuario_telefono || undefined,
+    usuarioInstitucion: r.usuario_institucion || undefined,
+    fechaUso: String(r.fecha_uso).split('T')[0],
+    horaInicio: String(r.hora_inicio).slice(0, 5),
+    horaFin: String(r.hora_fin).slice(0, 5),
+    actividad: r.actividad,
+    estado: r.estado,
+    accesoriosIncluidos: r.accesorios_incluidos || undefined,
+    condicionSalida: r.condicion_salida || undefined,
+    observacionesAdmin: r.observaciones_admin || undefined,
+    aprobadoPor: r.aprobado_por || undefined,
+    createdAt: r.date_created || undefined,
+  }));
 }
 
 export async function insertReservacionInDB(item: ReservacionItem): Promise<boolean> {
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      await pool.query(
-        `
-        INSERT INTO reservaciones (
-          id, folio, categoria_id, equipo_id, codigo_plai_asignado,
-          usuario_id, usuario_nombre, usuario_email, usuario_telefono, usuario_institucion,
-          fecha_uso, hora_inicio, hora_fin, actividad, estado,
-          accesorios_incluidos, condicion_salida, observaciones_admin
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-        ON CONFLICT (id) DO UPDATE SET
-          estado = EXCLUDED.estado,
-          equipo_id = EXCLUDED.equipo_id,
-          codigo_plai_asignado = EXCLUDED.codigo_plai_asignado,
-          updated_at = NOW()
-        `,
-        [
-          item.id,
-          item.folio || item.id,
-          item.categoriaId || 'realidad-virtual',
-          item.equipoId || null,
-          item.codigoPlaiAsignado || null,
-          item.usuarioId || null,
-          item.usuarioNombre,
-          item.usuarioEmail,
-          item.usuarioTelefono || null,
-          item.usuarioInstitucion || 'Comunidad PLAi',
-          item.fechaUso,
-          item.horaInicio,
-          item.horaFin,
-          item.actividad,
-          item.estado || 'Pendiente',
-          item.accesoriosIncluidos || null,
-          item.condicionSalida || 'Excelente',
-          item.observacionesAdmin || null,
-        ]
-      );
-      return true;
-    } catch (error) {
-      logger.error('Error al guardar reservación en PostgreSQL', { error: String(error) });
-      throw error;
-    }
-  }
-
-  const store = getMemoryStore();
-  const idx = store.reservaciones.findIndex((r) => r.id === item.id);
-  if (idx >= 0) store.reservaciones[idx] = item;
-  else store.reservaciones.unshift(item);
+  await directus.createItem<ReservacionRow>('reservaciones', {
+    id: item.id,
+    folio: item.folio,
+    categoria_id: item.categoriaId,
+    equipo_id: item.equipoId || null,
+    codigo_plai_asignado: item.codigoPlaiAsignado || null,
+    usuario_keycloak_id: item.usuarioId || null,
+    usuario_nombre: item.usuarioNombre,
+    usuario_email: item.usuarioEmail.toLowerCase(),
+    usuario_telefono: item.usuarioTelefono || null,
+    usuario_institucion: item.usuarioInstitucion || null,
+    fecha_uso: item.fechaUso,
+    hora_inicio: item.horaInicio,
+    hora_fin: item.horaFin,
+    actividad: item.actividad,
+    estado: item.estado || 'Pendiente',
+    accesorios_incluidos: item.accesoriosIncluidos || null,
+    condicion_salida: item.condicionSalida || 'Excelente',
+    observaciones_admin: item.observacionesAdmin || null,
+    aprobado_por: item.aprobadoPor || null,
+  });
   return true;
 }
 
@@ -800,84 +487,41 @@ export async function updateReservacionInDB(
   id: string,
   update: Partial<ReservacionItem>
 ): Promise<boolean> {
-  if (env.hasDatabaseConfig) {
-    const pool = getPool();
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const { rows } = await client.query<{ equipo_id: string | null; codigo_plai_asignado: string | null }>(
-        `
-        UPDATE reservaciones SET
-          estado = COALESCE($1, estado),
-          equipo_id = COALESCE($2, equipo_id),
-          codigo_plai_asignado = COALESCE($3, codigo_plai_asignado),
-          accesorios_incluidos = COALESCE($4, accesorios_incluidos),
-          condicion_salida = COALESCE($5, condicion_salida),
-          observaciones_admin = COALESCE($6, observaciones_admin),
-          aprobado_por = COALESCE($7, aprobado_por),
-          usuario_nombre = COALESCE($8, usuario_nombre),
-          fecha_uso = COALESCE($9, fecha_uso),
-          hora_inicio = COALESCE($10, hora_inicio),
-          hora_fin = COALESCE($11, hora_fin),
-          actividad = COALESCE($12, actividad),
-          updated_at = NOW()
-        WHERE id = $13
-        RETURNING equipo_id, codigo_plai_asignado
-        `,
-        [
-          update.estado || null,
-          update.equipoId || null,
-          update.codigoPlaiAsignado || null,
-          update.accesoriosIncluidos ?? null,
-          update.condicionSalida || null,
-          update.observacionesAdmin ?? null,
-          update.aprobadoPor || null,
-          update.usuarioNombre || null,
-          update.fechaUso || null,
-          update.horaInicio || null,
-          update.horaFin || null,
-          update.actividad || null,
-          id,
-        ]
-      );
+  const payload: Partial<ReservacionRow> = {};
+  if (update.estado !== undefined) payload.estado = update.estado;
+  if (update.equipoId !== undefined) payload.equipo_id = update.equipoId || null;
+  if (update.codigoPlaiAsignado !== undefined)
+    payload.codigo_plai_asignado = update.codigoPlaiAsignado || null;
+  if (update.accesoriosIncluidos !== undefined)
+    payload.accesorios_incluidos = update.accesoriosIncluidos;
+  if (update.condicionSalida !== undefined) payload.condicion_salida = update.condicionSalida;
+  if (update.observacionesAdmin !== undefined)
+    payload.observaciones_admin = update.observacionesAdmin;
+  if (update.aprobadoPor !== undefined) payload.aprobado_por = update.aprobadoPor;
+  if (update.usuarioNombre !== undefined) payload.usuario_nombre = update.usuarioNombre;
+  if (update.fechaUso !== undefined) payload.fecha_uso = update.fechaUso;
+  if (update.horaInicio !== undefined) payload.hora_inicio = update.horaInicio;
+  if (update.horaFin !== undefined) payload.hora_fin = update.horaFin;
+  if (update.actividad !== undefined) payload.actividad = update.actividad;
 
-      const targetEquipoId = update.equipoId || rows[0]?.equipo_id;
-      const targetCodigo = update.codigoPlaiAsignado || rows[0]?.codigo_plai_asignado;
-      if (update.estado && (targetEquipoId || targetCodigo)) {
-        let newDeviceStatus: DeviceItem['status'] | null = null;
-        if (update.estado === 'Aprobada') newDeviceStatus = 'Reservado';
-        else if (update.estado === 'En uso') newDeviceStatus = 'En uso';
-        else if (update.estado === 'Completada' || update.estado === 'Rechazada') {
-          newDeviceStatus = 'Disponible';
-        }
-        if (newDeviceStatus) {
-          await client.query(
-            `UPDATE equipos SET estado = $1, updated_at = NOW()
-             WHERE ($2::text IS NOT NULL AND id = $2) OR ($3::text IS NOT NULL AND LOWER(codigo_plai) = LOWER($3))`,
-            [newDeviceStatus, targetEquipoId || null, targetCodigo || null]
-          );
-        }
-      }
+  const updated = await directus.updateItem<ReservacionRow>('reservaciones', id, payload);
 
-      await client.query('COMMIT');
-      return true;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      logger.error('Error al actualizar reservación en PostgreSQL', { error: String(error) });
-      throw error;
-    } finally {
-      client.release();
+  const equipoId = update.equipoId || updated?.equipo_id;
+  if (equipoId && update.estado) {
+    if (update.estado === 'Aprobada') {
+      await directus.updateItem<EquipoRow>('equipos', equipoId, { estado: 'Reservado' });
+    } else if (update.estado === 'En uso') {
+      await directus.updateItem<EquipoRow>('equipos', equipoId, { estado: 'En uso' });
+    } else if (update.estado === 'Completada' || update.estado === 'Rechazada') {
+      await directus.updateItem<EquipoRow>('equipos', equipoId, { estado: 'Disponible' });
     }
   }
 
-  const store = getMemoryStore();
-  const item = store.reservaciones.find((r) => r.id === id);
-  if (item) Object.assign(item, update);
   return true;
 }
 
 // ====================================================================
-// 5. INCIDENCIAS DE MANTENIMIENTO
+// 5. INCIDENCIAS DE MANTENIMIENTO (colección: <prefix>incidencias)
 // ====================================================================
 export interface IncidenciaItem {
   id: string;
@@ -909,89 +553,59 @@ interface IncidenciaRow {
   descripcion: string;
   estado: IncidenciaItem['estado'];
   tecnico_responsable: string;
-  fecha_reporte: string | Date;
-  fecha_resolucion: string | Date | null;
-  acciones_realizadas: string | null;
+  fecha_reporte: string;
+  fecha_resolucion?: string | null;
+  acciones_realizadas?: string | null;
+  date_created?: string | null;
 }
 
 export async function getIncidenciasFromDB(): Promise<IncidenciaItem[]> {
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      const { rows } = await pool.query<IncidenciaRow>(
-        'SELECT * FROM incidencias_mantenimiento ORDER BY fecha_reporte DESC'
-      );
-      return rows.map((r) => ({
-        id: String(r.id),
-        folio: r.folio,
-        equipoId: r.equipo_id,
-        codigoPlai: r.codigo_plai,
-        equipoNombre: r.equipo_nombre,
-        origen: r.origen,
-        tipoFalla: r.tipo_falla,
-        severidad: r.severidad,
-        descripcion: r.descripcion,
-        estado: r.estado,
-        tecnicoResponsable: r.tecnico_responsable,
-        fechaReporte: formatTimestamp(r.fecha_reporte),
-        fechaResolucion: r.fecha_resolucion ? formatTimestamp(r.fecha_resolucion) : undefined,
-        accionesRealizadas: r.acciones_realizadas || undefined,
-      }));
-    } catch (error) {
-      logger.error('Error al consultar incidencias en PostgreSQL', { error: String(error) });
-    }
-  }
-  return getMemoryStore().incidencias;
+  const rows = await directus.getItems<IncidenciaRow>('incidencias', {
+    sort: '-fecha_reporte',
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    folio: r.folio,
+    equipoId: r.equipo_id,
+    codigoPlai: r.codigo_plai,
+    equipoNombre: r.equipo_nombre,
+    origen: r.origen,
+    tipoFalla: r.tipo_falla,
+    severidad: r.severidad,
+    descripcion: r.descripcion,
+    estado: r.estado,
+    tecnicoResponsable: r.tecnico_responsable,
+    fechaReporte: formatTimestamp(r.fecha_reporte),
+    fechaResolucion: r.fecha_resolucion ? formatTimestamp(r.fecha_resolucion) : undefined,
+    accionesRealizadas: r.acciones_realizadas || undefined,
+    createdAt: r.date_created || undefined,
+  }));
 }
 
 export async function insertIncidenciaInDB(incidencia: IncidenciaItem): Promise<boolean> {
-  if (env.hasDatabaseConfig) {
-    const pool = getPool();
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query(
-        `
-        INSERT INTO incidencias_mantenimiento (
-          id, folio, equipo_id, codigo_plai, equipo_nombre, origen,
-          tipo_falla, severidad, descripcion, estado, tecnico_responsable,
-          fecha_reporte, acciones_realizadas
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-        ON CONFLICT (id) DO NOTHING
-        `,
-        [
-          incidencia.id,
-          incidencia.folio,
-          incidencia.equipoId,
-          incidencia.codigoPlai,
-          incidencia.equipoNombre,
-          incidencia.origen,
-          incidencia.tipoFalla,
-          incidencia.severidad,
-          incidencia.descripcion,
-          incidencia.estado,
-          incidencia.tecnicoResponsable,
-          incidencia.fechaReporte,
-          incidencia.accionesRealizadas || null,
-        ]
-      );
-      await client.query(
-        `UPDATE equipos SET estado = 'En mantenimiento', updated_at = NOW() WHERE codigo_plai = $1 OR id = $2`,
-        [incidencia.codigoPlai, incidencia.equipoId]
-      );
-      await client.query('COMMIT');
-      return true;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      logger.error('Error al registrar incidencia en PostgreSQL', { error: String(error) });
-      throw error;
-    } finally {
-      client.release();
-    }
+  await directus.createItem<IncidenciaRow>('incidencias', {
+    id: incidencia.id,
+    folio: incidencia.folio,
+    equipo_id: incidencia.equipoId,
+    codigo_plai: incidencia.codigoPlai,
+    equipo_nombre: incidencia.equipoNombre,
+    origen: incidencia.origen,
+    tipo_falla: incidencia.tipoFalla,
+    severidad: incidencia.severidad,
+    descripcion: incidencia.descripcion,
+    estado: incidencia.estado || 'Reportada',
+    tecnico_responsable: incidencia.tecnicoResponsable,
+    fecha_reporte: incidencia.fechaReporte,
+    fecha_resolucion: incidencia.fechaResolucion || null,
+    acciones_realizadas: incidencia.accionesRealizadas || null,
+  });
+
+  if (incidencia.equipoId) {
+    await directus.updateItem<EquipoRow>('equipos', incidencia.equipoId, {
+      estado: 'En mantenimiento',
+    });
   }
 
-  const store = getMemoryStore();
-  store.incidencias.unshift(incidencia);
   return true;
 }
 
@@ -1000,54 +614,28 @@ export async function updateIncidenciaStatusInDB(
   estado: IncidenciaItem['estado'],
   accionesRealizadas?: string
 ): Promise<boolean> {
-  if (env.hasDatabaseConfig) {
-    const pool = getPool();
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const fechaResolucion =
-        estado === 'Resuelta' ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null;
-      const { rows } = await client.query<{ codigo_plai: string; equipo_id: string }>(
-        `
-        UPDATE incidencias_mantenimiento SET
-          estado = $1,
-          fecha_resolucion = COALESCE($2, fecha_resolucion),
-          acciones_realizadas = COALESCE($3, acciones_realizadas),
-          updated_at = NOW()
-        WHERE id = $4
-        RETURNING codigo_plai, equipo_id
-        `,
-        [estado, fechaResolucion, accionesRealizadas || null, id]
-      );
-      if (rows[0]) {
-        const nuevoEstado = estado === 'Resuelta' ? 'Disponible' : 'En mantenimiento';
-        await client.query(
-          'UPDATE equipos SET estado = $1, updated_at = NOW() WHERE codigo_plai = $2 OR id = $3',
-          [nuevoEstado, rows[0].codigo_plai, rows[0].equipo_id]
-        );
-      }
-      await client.query('COMMIT');
-      return true;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      logger.error('Error al actualizar incidencia en PostgreSQL', { error: String(error) });
-      throw error;
-    } finally {
-      client.release();
-    }
+  const fechaResolucion =
+    estado === 'Resuelta' ? new Date().toISOString().slice(0, 19).replace('T', ' ') : undefined;
+
+  const payload: Partial<IncidenciaRow> = { estado };
+  if (fechaResolucion) payload.fecha_resolucion = fechaResolucion;
+  if (accionesRealizadas !== undefined) payload.acciones_realizadas = accionesRealizadas;
+
+  const updated = await directus.updateItem<IncidenciaRow>('incidencias', id, payload);
+
+  if (updated?.equipo_id) {
+    const nuevoEstado: DeviceItem['status'] =
+      estado === 'Resuelta' ? 'Disponible' : 'En mantenimiento';
+    await directus.updateItem<EquipoRow>('equipos', updated.equipo_id, {
+      estado: nuevoEstado,
+    });
   }
 
-  const store = getMemoryStore();
-  const inc = store.incidencias.find((i) => i.id === id);
-  if (inc) {
-    inc.estado = estado;
-    if (accionesRealizadas) inc.accionesRealizadas = accionesRealizadas;
-  }
   return true;
 }
 
 // ====================================================================
-// 6. USUARIOS INSTITUCIONALES (CON HASH CRIPTOGRÁFICO DE CONTRASEÑAS)
+// 6. DIRECTORIO DE USUARIOS (colección: <prefix>usuarios — sin contraseñas; auth vive en Keycloak)
 // ====================================================================
 export interface UsuarioItem {
   id: string;
@@ -1061,30 +649,15 @@ export interface UsuarioItem {
   reservations: number;
 }
 
-export interface UsuarioAuthRecord {
-  id: string;
-  name: string;
-  email: string;
-  passwordHash: string;
-  role: 'admin' | 'colaborador' | 'usuario';
-  status: 'Activo' | 'Inactivo' | 'Suspendido';
-}
-
-interface UsuarioRecord extends UsuarioItem {
-  passwordHash: string;
-}
-
 interface UsuarioRow {
   id: string;
   nombre: string;
   email: string;
-  password_hash: string;
   rol: 'admin' | 'colaborador' | 'usuario';
-  estado: 'Activo' | 'Inactivo' | 'Suspendido';
-  telefono: string | null;
-  dependencia: string | null;
-  ultimo_login: string | Date | null;
-  created_at: string | Date | null;
+  estado: 'Activo' | 'Inactivo';
+  telefono?: string | null;
+  dependencia?: string | null;
+  ultimo_login?: string | null;
 }
 
 function mapDbRoleToLabel(rol: string): UsuarioItem['role'] {
@@ -1099,97 +672,28 @@ function mapLabelToDbRole(role: UsuarioItem['role']): 'admin' | 'colaborador' | 
   return 'usuario';
 }
 
-export async function getUsuarioByEmailForAuth(email: string): Promise<UsuarioAuthRecord | null> {
-  const normalized = email.trim().toLowerCase();
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      const { rows } = await pool.query<UsuarioRow>(
-        'SELECT id, nombre, email, password_hash, rol, estado FROM usuarios WHERE LOWER(email) = $1 LIMIT 1',
-        [normalized]
-      );
-      if (!rows[0]) return null;
-      return {
-        id: rows[0].id,
-        name: rows[0].nombre,
-        email: rows[0].email,
-        passwordHash: rows[0].password_hash,
-        role: rows[0].rol,
-        status: rows[0].estado,
-      };
-    } catch (error) {
-      logger.error('Error al consultar usuario para autenticación en PostgreSQL', { error: String(error) });
-      return null;
-    }
-  }
-
-  const found = getMemoryStore().usuarios.find((u) => u.email.toLowerCase() === normalized);
-  if (!found) return null;
-  return {
-    id: found.id,
-    name: found.name,
-    email: found.email,
-    passwordHash: found.passwordHash,
-    role: mapLabelToDbRole(found.role),
-    status: found.status,
-  };
-}
-
-export async function updateUsuarioLastLogin(userId: string): Promise<void> {
-  if (!env.hasDatabaseConfig) return;
-  try {
-    const pool = getPool();
-    await pool.query('UPDATE usuarios SET ultimo_login = NOW(), updated_at = NOW() WHERE id = $1', [
-      userId,
-    ]);
-  } catch (error) {
-    logger.warn('No se pudo actualizar último acceso del usuario', { userId, error: String(error) });
-  }
-}
-
 export async function getUsuariosFromDB(): Promise<UsuarioItem[]> {
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      const { rows } = await pool.query<UsuarioRow & { total_reservas: string }>(`
-        SELECT
-          u.id, u.nombre, u.email, u.rol, u.estado, u.telefono, u.dependencia, u.ultimo_login, u.created_at,
-          (
-            SELECT COUNT(*) FROM reservaciones r WHERE LOWER(r.usuario_email) = LOWER(u.email)
-          ) AS total_reservas
-        FROM usuarios u
-        ORDER BY u.created_at DESC, u.nombre ASC
-      `);
-      return rows.map((r) => ({
-        id: r.id,
-        name: r.nombre,
-        email: r.email,
-        role: mapDbRoleToLabel(r.rol),
-        status: r.estado === 'Activo' ? 'Activo' : 'Inactivo',
-        dependencia: r.dependencia || 'Comunidad PLAi',
-        telefono: r.telefono || undefined,
-        lastLogin: r.ultimo_login
-          ? formatTimestamp(r.ultimo_login).split(' ')[0]
-          : r.created_at
-          ? formatTimestamp(r.created_at).split(' ')[0]
-          : 'Sin registro',
-        reservations: Number(r.total_reservas || 0),
-      }));
-    } catch (error) {
-      logger.error('Error al consultar usuarios en PostgreSQL', { error: String(error) });
-    }
+  const [rows, reservaciones] = await Promise.all([
+    directus.getItems<UsuarioRow>('usuarios', { sort: 'nombre' }),
+    directus.getItems<ReservacionRow>('reservaciones'),
+  ]);
+
+  const countByEmail = new Map<string, number>();
+  for (const r of reservaciones) {
+    const key = r.usuario_email.toLowerCase();
+    countByEmail.set(key, (countByEmail.get(key) || 0) + 1);
   }
 
-  return getMemoryStore().usuarios.map((u) => ({
+  return rows.map((u) => ({
     id: u.id,
-    name: u.name,
+    name: u.nombre,
     email: u.email,
-    role: u.role,
-    status: u.status,
-    dependencia: u.dependencia,
-    telefono: u.telefono,
-    lastLogin: u.lastLogin,
-    reservations: u.reservations,
+    role: mapDbRoleToLabel(u.rol),
+    status: u.estado === 'Inactivo' ? 'Inactivo' : 'Activo',
+    dependencia: u.dependencia || undefined,
+    telefono: u.telefono || undefined,
+    lastLogin: u.ultimo_login ? formatTimestamp(u.ultimo_login) : 'Administrado por Keycloak',
+    reservations: countByEmail.get(u.email.toLowerCase()) || 0,
   }));
 }
 
@@ -1197,105 +701,19 @@ export async function upsertUsuarioInDB(
   user: UsuarioItem & { password?: string }
 ): Promise<UsuarioItem> {
   const dbRol = mapLabelToDbRole(user.role);
-  const hashed = user.password && user.password.trim().length > 0 ? hashPassword(user.password.trim()) : null;
-
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      if (hashed) {
-        await pool.query(
-          `
-          INSERT INTO usuarios (id, nombre, email, password_hash, rol, estado, telefono, dependencia)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-          ON CONFLICT (id) DO UPDATE SET
-            nombre = EXCLUDED.nombre,
-            email = EXCLUDED.email,
-            password_hash = EXCLUDED.password_hash,
-            rol = EXCLUDED.rol,
-            estado = EXCLUDED.estado,
-            telefono = EXCLUDED.telefono,
-            dependencia = EXCLUDED.dependencia,
-            updated_at = NOW()
-          `,
-          [
-            user.id,
-            user.name,
-            user.email.toLowerCase(),
-            hashed,
-            dbRol,
-            user.status,
-            user.telefono || null,
-            user.dependencia || 'Comunidad PLAi',
-          ]
-        );
-      } else {
-        // Actualización sin modificar password_hash existente
-        const updated = await pool.query(
-          `
-          UPDATE usuarios SET
-            nombre = $1,
-            email = $2,
-            rol = $3,
-            estado = $4,
-            telefono = $5,
-            dependencia = $6,
-            updated_at = NOW()
-          WHERE id = $7
-          `,
-          [
-            user.name,
-            user.email.toLowerCase(),
-            dbRol,
-            user.status,
-            user.telefono || null,
-            user.dependencia || 'Comunidad PLAi',
-            user.id,
-          ]
-        );
-        if ((updated.rowCount ?? 0) === 0) {
-          throw new Error('Se requiere una contraseña para registrar un nuevo usuario.');
-        }
-      }
-      return {
-        id: user.id,
-        name: user.name,
-        email: user.email.toLowerCase(),
-        role: user.role,
-        status: user.status,
-        dependencia: user.dependencia,
-        telefono: user.telefono,
-        lastLogin: user.lastLogin,
-        reservations: user.reservations,
-      };
-    } catch (error) {
-      logger.error('Error al guardar usuario en PostgreSQL', { error: String(error) });
-      throw error;
-    }
-  }
-
-  const store = getMemoryStore();
-  const idx = store.usuarios.findIndex(
-    (u) => u.id === user.id || u.email.toLowerCase() === user.email.toLowerCase()
-  );
-  if (idx >= 0) {
-    store.usuarios[idx] = {
-      ...store.usuarios[idx],
-      ...user,
-      passwordHash: hashed || store.usuarios[idx].passwordHash,
-    };
-  } else {
-    if (!hashed) {
-      throw new Error('Se requiere una contraseña para registrar un nuevo usuario.');
-    }
-    store.usuarios.push({
-      ...user,
-      passwordHash: hashed,
-    });
-  }
+  await directus.upsertItem<UsuarioRow>('usuarios', user.id, {
+    id: user.id,
+    nombre: user.name,
+    email: user.email.toLowerCase(),
+    rol: dbRol,
+    estado: user.status,
+    telefono: user.telefono || null,
+    dependencia: user.dependencia || 'Comunidad PLAi',
+  });
   return {
     id: user.id,
     name: user.name,
-    email: user.email.toLowerCase(),
+    email: user.email,
     role: user.role,
     status: user.status,
     dependencia: user.dependencia,
@@ -1306,7 +724,7 @@ export async function upsertUsuarioInDB(
 }
 
 // ====================================================================
-// 7. AGENDA DE CURSOS Y TALLERES
+// 7. CURSOS Y AGENDA (colección: <prefix>cursos_agenda)
 // ====================================================================
 export interface CursoAgendaItem {
   id: string;
@@ -1329,88 +747,57 @@ interface CursoRow {
   id: string;
   titulo: string;
   tipo: string;
-  fecha: string | Date;
+  fecha: string;
   hora: string;
   lugar: string;
   asistentes: number;
   estado: CursoAgendaItem['estado'];
-  icon: string;
+  icon?: string | null;
   instructor: string;
   descripcion: string;
-  solicitante_nombre: string | null;
-  solicitante_email: string | null;
-  institucion: string | null;
+  solicitante_nombre?: string | null;
+  solicitante_email?: string | null;
+  institucion?: string | null;
 }
 
 export async function getCursosFromDB(): Promise<CursoAgendaItem[]> {
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      const { rows } = await pool.query<CursoRow>(
-        'SELECT * FROM cursos_agenda ORDER BY fecha ASC, created_at DESC'
-      );
-      return rows.map((r) => ({
-        id: r.id,
-        titulo: r.titulo,
-        tipo: r.tipo,
-        fecha:
-          r.fecha instanceof Date ? r.fecha.toISOString().split('T')[0] : String(r.fecha).split('T')[0],
-        hora: r.hora,
-        lugar: r.lugar,
-        asistentes: Number(r.asistentes || 1),
-        estado: r.estado,
-        icon: r.icon || '🎓',
-        instructor: r.instructor,
-        descripcion: r.descripcion,
-        solicitanteNombre: r.solicitante_nombre || undefined,
-        solicitanteEmail: r.solicitante_email || undefined,
-        institucion: r.institucion || undefined,
-      }));
-    } catch (error) {
-      logger.error('Error al consultar cursos en PostgreSQL', { error: String(error) });
-    }
-  }
-  return getMemoryStore().cursos;
+  const rows = await directus.getItems<CursoRow>('cursos_agenda', { sort: 'fecha' });
+  return rows.map((r) => ({
+    id: r.id,
+    titulo: r.titulo,
+    tipo: r.tipo,
+    fecha: String(r.fecha).split('T')[0],
+    hora: r.hora,
+    lugar: r.lugar,
+    asistentes: Number(r.asistentes || 1),
+    estado: r.estado,
+    icon: r.icon || '🎓',
+    instructor: r.instructor,
+    descripcion: r.descripcion,
+    solicitanteNombre: r.solicitante_nombre || undefined,
+    solicitanteEmail: r.solicitante_email || undefined,
+    institucion: r.institucion || undefined,
+  }));
 }
 
 export async function insertCursoInDB(curso: CursoAgendaItem): Promise<CursoAgendaItem> {
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      await pool.query(
-        `
-        INSERT INTO cursos_agenda (
-          id, titulo, tipo, fecha, hora, lugar, asistentes, estado, icon,
-          instructor, descripcion, solicitante_nombre, solicitante_email, institucion
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-        ON CONFLICT (id) DO NOTHING
-        `,
-        [
-          curso.id,
-          curso.titulo,
-          curso.tipo,
-          curso.fecha,
-          curso.hora,
-          curso.lugar,
-          curso.asistentes,
-          curso.estado,
-          curso.icon,
-          curso.instructor,
-          curso.descripcion,
-          curso.solicitanteNombre || null,
-          curso.solicitanteEmail || null,
-          curso.institucion || null,
-        ]
-      );
-    } catch (error) {
-      logger.error('Error al guardar curso en PostgreSQL', { error: String(error) });
-      throw error;
-    }
-  } else {
-    getMemoryStore().cursos.unshift(curso);
-  }
+  await directus.createItem<CursoRow>('cursos_agenda', {
+    id: curso.id,
+    titulo: curso.titulo,
+    tipo: curso.tipo,
+    fecha: curso.fecha,
+    hora: curso.hora,
+    lugar: curso.lugar,
+    asistentes: curso.asistentes,
+    estado: curso.estado,
+    icon: curso.icon || '🎓',
+    instructor: curso.instructor,
+    descripcion: curso.descripcion,
+    solicitante_nombre: curso.solicitanteNombre || null,
+    solicitante_email: curso.solicitanteEmail || null,
+    institucion: curso.institucion || null,
+  });
 
-  // Vincular solicitud de curso/visita en reservaciones para aprobación administrativa
   await insertReservacionInDB({
     id: `res-${Date.now()}`,
     folio: curso.id,
@@ -1434,7 +821,7 @@ export async function insertCursoInDB(curso: CursoAgendaItem): Promise<CursoAgen
 }
 
 // ====================================================================
-// 8. CONFIGURACIÓN GENERAL DEL SISTEMA
+// 8. CONFIGURACIÓN GENERAL DEL SISTEMA (colección: <prefix>configuracion)
 // ====================================================================
 export interface SystemConfig {
   labName: string;
@@ -1466,44 +853,23 @@ const initialSystemConfig: SystemConfig = {
   ],
 };
 
+interface ConfigRow {
+  id: string;
+  valor: SystemConfig;
+}
+
 export async function getSystemConfigFromDB(): Promise<SystemConfig> {
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      const { rows } = await pool.query<{ valor: SystemConfig }>(
-        `SELECT valor FROM configuracion_sistema WHERE clave = 'general' LIMIT 1`
-      );
-      if (rows[0]?.valor) {
-        return { ...initialSystemConfig, ...rows[0].valor };
-      }
-    } catch (error) {
-      logger.error('Error al consultar configuración en PostgreSQL', { error: String(error) });
-    }
+  const row = await directus.getItemById<ConfigRow>('configuracion', 'general');
+  if (row?.valor) {
+    return { ...initialSystemConfig, ...row.valor };
   }
-  return getMemoryStore().config;
+  return { ...initialSystemConfig };
 }
 
 export async function saveSystemConfigInDB(cfg: SystemConfig): Promise<SystemConfig> {
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      await pool.query(
-        `
-        INSERT INTO configuracion_sistema (clave, valor, updated_at)
-        VALUES ('general', $1::jsonb, NOW())
-        ON CONFLICT (clave) DO UPDATE SET
-          valor = EXCLUDED.valor,
-          updated_at = NOW()
-        `,
-        [JSON.stringify(cfg)]
-      );
-      return cfg;
-    } catch (error) {
-      logger.error('Error al guardar configuración en PostgreSQL', { error: String(error) });
-      throw error;
-    }
-  }
-
-  getMemoryStore().config = cfg;
+  await directus.upsertItem<ConfigRow>('configuracion', 'general', {
+    id: 'general',
+    valor: cfg,
+  });
   return cfg;
 }

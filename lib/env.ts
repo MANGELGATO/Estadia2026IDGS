@@ -10,7 +10,7 @@ import fs from 'node:fs';
  * Cumple con el estándar PLAi v1.0, secciones 5.2 y 6 (patrón VARIABLE_FILE).
  */
 export function getEnvSecret(name: string, fallback = ''): string {
-  // 1. VARIABLE_FILE explícita (p. ej. DATABASE_URL_FILE=/run/secrets/database_url)
+  // 1. VARIABLE_FILE explícita (p. ej. DIRECTUS_TOKEN_FILE=/run/secrets/directus_token)
   const fileVar = process.env[`${name}_FILE`];
   if (fileVar && fs.existsSync(fileVar)) {
     try {
@@ -40,7 +40,17 @@ export function getEnvSecret(name: string, fallback = ''): string {
 }
 
 /**
- * Configuración de entorno tipada de la aplicación (Estándar PLAi v1.0)
+ * Indica si Next.js se encuentra en fase de compilación (`next build`).
+ * Evita que la validación estricta de secretos de runtime aborte el `docker build`.
+ */
+export function isBuildPhase(): boolean {
+  return process.env.NEXT_PHASE === 'phase-production-build';
+}
+
+/**
+ * Configuración de entorno tipada de la aplicación.
+ * IMPORTANTE: Ningún endpoint de producción (Directus ni Keycloak) tiene valores
+ * por defecto que apunten a servidores reales para evitar escrituras accidentales desde local.
  */
 export const env = {
   get nodeEnv(): string {
@@ -56,28 +66,36 @@ export const env = {
   get siteUrl(): string {
     return process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
   },
+
+  // --- Directus CMS (sin default a producción para evitar escrituras accidentales) ---
   get directusUrl(): string {
-    return process.env.DIRECTUS_URL || 'https://admin.plai.mx';
+    return (process.env.DIRECTUS_URL || '').replace(/\/+$/, '');
   },
   get directusToken(): string {
     return getEnvSecret('DIRECTUS_TOKEN');
   },
-  // Keycloak OIDC / SSO Institucional PLAi
+  get directusCollectionPrefix(): string {
+    return process.env.DIRECTUS_COLLECTION_PREFIX || 'lab_recursos_';
+  },
+  get hasDirectusConfig(): boolean {
+    return Boolean(this.directusUrl && this.directusToken);
+  },
+
+  // --- Keycloak OIDC / SSO Institucional PLAi (sin secretos/URLs hardcodeados) ---
   get keycloakClientId(): string {
-    return getEnvSecret('KEYCLOAK_ID') || getEnvSecret('KEYCLOAK_CLIENT_ID') || 'plai-recursos';
+    return getEnvSecret('KEYCLOAK_ID') || getEnvSecret('KEYCLOAK_CLIENT_ID');
   },
   get keycloakClientSecret(): string {
     return getEnvSecret('KEYCLOAK_SECRET') || getEnvSecret('KEYCLOAK_CLIENT_SECRET');
   },
   get keycloakIssuer(): string {
-    return process.env.KEYCLOAK_ISSUER || 'https://auth.plai.mx/realms/plai';
+    return (process.env.KEYCLOAK_ISSUER || '').replace(/\/+$/, '');
   },
   get isKeycloakConfigured(): boolean {
-    return Boolean(
-      (process.env.KEYCLOAK_ISSUER || process.env.KEYCLOAK_ID || process.env.KEYCLOAK_ID_FILE) &&
-      (this.keycloakClientSecret || !this.isProduction)
-    );
+    return Boolean(this.keycloakIssuer && this.keycloakClientId && this.keycloakClientSecret);
   },
+
+  // --- NextAuth.js ---
   get nextAuthUrl(): string {
     return process.env.NEXTAUTH_URL || 'http://localhost:3000';
   },
@@ -86,40 +104,15 @@ export const env = {
     if (configured) {
       return configured;
     }
+    // Durante `next build` dentro del Dockerfile no existen Docker secrets montados
+    if (isBuildPhase()) {
+      return 'build-time-placeholder-never-used-at-runtime';
+    }
     if (this.isProduction) {
       throw new Error(
         'CRÍTICO: NEXTAUTH_SECRET es obligatorio en producción (usar Docker secret /run/secrets/nextauth_secret o NEXTAUTH_SECRET_FILE).'
       );
     }
     return 'plai-local-development-secret-only-change-in-production';
-  },
-  // PostgreSQL / Neon (Estándar PLAi: PostgreSQL 15/16)
-  get databaseUrl(): string {
-    return getEnvSecret('DATABASE_URL');
-  },
-  get dbHost(): string {
-    return process.env.PGHOST || process.env.DB_HOST || '';
-  },
-  get dbPort(): number {
-    const p = parseInt(process.env.PGPORT || process.env.DB_PORT || '5432', 10);
-    return Number.isNaN(p) ? 5432 : p;
-  },
-  get dbUser(): string {
-    return process.env.PGUSER || process.env.DB_USER || '';
-  },
-  get dbPassword(): string {
-    return getEnvSecret('PGPASSWORD') || getEnvSecret('DB_PASSWORD');
-  },
-  get dbName(): string {
-    return process.env.PGDATABASE || process.env.DB_NAME || 'plai_recursos';
-  },
-  get dbSsl(): boolean {
-    if (process.env.DB_SSL === 'true') return true;
-    if (process.env.DB_SSL === 'false') return false;
-    const url = this.databaseUrl.toLowerCase();
-    return url.includes('sslmode=require') || url.includes('neon.tech');
-  },
-  get hasDatabaseConfig(): boolean {
-    return Boolean(this.databaseUrl || (this.dbHost && this.dbUser));
   },
 };

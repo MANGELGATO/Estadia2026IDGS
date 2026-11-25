@@ -2,11 +2,15 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { UserCircle2, LogOut, ShieldCheck, User } from 'lucide-react';
 
 export default function NavAuthStatus() {
   const { data: session, status } = useSession();
+
+  const handleFederatedLogout = () => {
+    window.location.href = '/api/auth/federated-logout';
+  };
 
   if (status === 'loading') {
     return <div className="h-9 w-28 animate-pulse rounded-full bg-gray-200" />;
@@ -42,9 +46,10 @@ export default function NavAuthStatus() {
         </Link>
 
         <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
+          type="button"
+          onClick={handleFederatedLogout}
           className="flex items-center gap-1 rounded-full border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-          title="Cerrar Sesión"
+          title="Cerrar Sesión (SSO Keycloak)"
         >
           <LogOut size={13} />
           <span className="hidden md:inline">Salir</span>

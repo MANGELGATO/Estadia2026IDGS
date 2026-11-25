@@ -1,5 +1,4 @@
-import { env } from './env';
-import { getPool } from './db';
+import { directus } from './directus';
 import { logger } from './logger';
 
 export interface SuccessCase {
@@ -138,73 +137,51 @@ export const defaultCategoriesConfig: Record<string, CategoryConfig> = {
   },
 };
 
-declare global {
-  var __plaiCategoriesCache: Record<string, CategoryConfig> | undefined;
-}
-
-function getMemoryCategories(): Record<string, CategoryConfig> {
-  if (!global.__plaiCategoriesCache) {
-    global.__plaiCategoriesCache = structuredClone(defaultCategoriesConfig);
-  }
-  return global.__plaiCategoriesCache;
-}
-
 interface CategoriaRow {
   id: string;
   nombre: string;
   descripcion: string;
-  color: string;
-  plai_usage: string;
-  video_url: string;
-  beneficios: string[] | string;
-  casos_exito: SuccessCase[] | string;
-  updated_at: string | Date | null;
+  color?: string | null;
+  plai_usage?: string | null;
+  video_url?: string | null;
+  beneficios?: string[] | string | null;
+  casos_exito?: SuccessCase[] | string | null;
+  date_updated?: string | null;
 }
 
 /**
- * Lee la configuración centralizada de categorías desde PostgreSQL / Neon.
- * Si no hay base de datos configurada (ej. entorno de pruebas unitarias), usa memoria sin escribir en disco.
+ * Lee la configuración centralizada de categorías desde Directus (`<prefix>categorias`).
  */
 export async function getAllCategoriesConfig(): Promise<Record<string, CategoryConfig>> {
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      const { rows } = await pool.query<CategoriaRow>(
-        'SELECT id, nombre, descripcion, color, plai_usage, video_url, beneficios, casos_exito, updated_at FROM categorias ORDER BY id ASC'
-      );
-      if (rows.length > 0) {
-        const result: Record<string, CategoryConfig> = { ...defaultCategoriesConfig };
-        for (const r of rows) {
-          const benefits = Array.isArray(r.beneficios)
-            ? r.beneficios
-            : typeof r.beneficios === 'string'
-            ? JSON.parse(r.beneficios)
-            : [];
-          const successCases = Array.isArray(r.casos_exito)
-            ? r.casos_exito
-            : typeof r.casos_exito === 'string'
-            ? JSON.parse(r.casos_exito)
-            : [];
-          result[r.id] = {
-            id: r.id,
-            name: r.nombre,
-            description: r.descripcion,
-            color: r.color || '#0086ff',
-            plaiUsage: r.plai_usage,
-            videoUrl: r.video_url || '',
-            benefits,
-            successCases,
-            updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : undefined,
-          };
-        }
-        return result;
-      }
-    } catch (error) {
-      logger.error('Error al consultar categorías en PostgreSQL', { error: String(error) });
-    }
+  const rows = await directus.getItems<CategoriaRow>('categorias', { sort: 'id' });
+  const result: Record<string, CategoryConfig> = { ...defaultCategoriesConfig };
+
+  for (const r of rows) {
+    const benefits = Array.isArray(r.beneficios)
+      ? r.beneficios
+      : typeof r.beneficios === 'string'
+      ? JSON.parse(r.beneficios)
+      : [];
+    const successCases = Array.isArray(r.casos_exito)
+      ? r.casos_exito
+      : typeof r.casos_exito === 'string'
+      ? JSON.parse(r.casos_exito)
+      : [];
+
+    result[r.id] = {
+      id: r.id,
+      name: r.nombre,
+      description: r.descripcion,
+      color: r.color || '#0086ff',
+      plaiUsage: r.plai_usage || '',
+      videoUrl: r.video_url || '',
+      benefits,
+      successCases,
+      updatedAt: r.date_updated ? new Date(r.date_updated).toISOString() : undefined,
+    };
   }
 
-  return getMemoryCategories();
+  return result;
 }
 
 export async function getCategoryConfig(slug: string): Promise<CategoryConfig | null> {
@@ -236,46 +213,21 @@ export async function updateCategoryConfig(
     updatedAt: new Date().toISOString(),
   };
 
-  if (env.hasDatabaseConfig) {
-    try {
-      const pool = getPool();
-      await pool.query(
-        `
-        INSERT INTO categorias (id, nombre, descripcion, color, plai_usage, video_url, beneficios, casos_exito, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, NOW())
-        ON CONFLICT (id) DO UPDATE SET
-          nombre = EXCLUDED.nombre,
-          descripcion = EXCLUDED.descripcion,
-          color = EXCLUDED.color,
-          plai_usage = EXCLUDED.plai_usage,
-          video_url = EXCLUDED.video_url,
-          beneficios = EXCLUDED.beneficios,
-          casos_exito = EXCLUDED.casos_exito,
-          updated_at = NOW()
-        `,
-        [
-          updated.id,
-          updated.name,
-          updated.description,
-          updated.color || '#0086ff',
-          updated.plaiUsage,
-          updated.videoUrl || '',
-          JSON.stringify(updated.benefits || []),
-          JSON.stringify(updated.successCases || []),
-        ]
-      );
-      logger.info('Configuración de categoría persistida en PostgreSQL', {
-        slug,
-        updatedAt: updated.updatedAt,
-      });
-      return updated;
-    } catch (error) {
-      logger.error('Error al persistir categoría en PostgreSQL', { slug }, error);
-      throw error;
-    }
-  }
+  await directus.upsertItem<CategoriaRow>('categorias', slug, {
+    id: updated.id,
+    nombre: updated.name,
+    descripcion: updated.description,
+    color: updated.color || '#0086ff',
+    plai_usage: updated.plaiUsage,
+    video_url: updated.videoUrl || '',
+    beneficios: updated.benefits || [],
+    casos_exito: updated.successCases || [],
+  });
 
-  const cache = getMemoryCategories();
-  cache[slug] = updated;
+  logger.info('Configuración de categoría persistida en Directus', {
+    slug,
+    updatedAt: updated.updatedAt,
+  });
+
   return updated;
 }
