@@ -1,8 +1,24 @@
 import { directus } from './directus';
 import { generateEntityId } from './folio';
+import { mexicoLocalToUtcIso } from './dateMexico';
 import type { DeviceItem, AppItem } from './mockData';
 
 export type { DeviceItem };
+
+/**
+ * Error de conflicto de estado de negocio (HTTP 409 Conflict).
+ * Se lanza cuando se intenta reservar, entregar o liberar un equipo cuya transición
+ * de estado no es válida (ej. ya prestado, en mantenimiento o con préstamo activo).
+ */
+export class EquipoStateConflictError extends Error {
+  public readonly statusCode = 409;
+  public readonly code = 'EQUIPO_STATE_CONFLICT';
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'EquipoStateConflictError';
+  }
+}
 
 /**
  * Capa de persistencia 100% respaldada por la API oficial de Directus (admin.plai.mx).
@@ -47,25 +63,80 @@ function parseStringArray(val: unknown, fallback: string[]): string[] {
 
 function formatTimestamp(val: string | Date | null | undefined): string {
   if (!val) return '';
-  if (val instanceof Date) return val.toISOString().slice(0, 19).replace('T', ' ');
+  if (val instanceof Date) return val.toISOString();
   return String(val);
 }
 
 /**
- * Normaliza fechas provenientes de inputs (`YYYY-MM-DDTHH:mm` o `YYYY-MM-DD HH:mm:ss`)
- * a formato ISO 8601 válido para campos `timestamp` reales en Directus/PostgreSQL.
+ * Normaliza fechas provenientes de inputs locales de México (`YYYY-MM-DDTHH:mm` o `YYYY-MM-DD HH:mm:ss`)
+ * o timestamps ISO-8601 a UTC (`...Z`) para campos `timestamp` reales en Directus/PostgreSQL.
+ * Nunca depende de la zona horaria del contenedor.
  */
 function toIsoTimestamp(val: string | Date | null | undefined): string {
   if (!val) return new Date().toISOString();
-  if (val instanceof Date) return val.toISOString();
-  const trimmed = String(val).trim();
-  if (!trimmed) return new Date().toISOString();
-  const normalized = trimmed.includes('T') ? trimmed : trimmed.replace(' ', 'T');
-  const parsed = new Date(normalized);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString();
+  return mexicoLocalToUtcIso(val);
+}
+
+const VALID_EQUIPO_TRANSITIONS: Record<DeviceItem['status'], DeviceItem['status'][]> = {
+  Disponible: ['Reservado', 'En uso', 'En mantenimiento', 'Fuera de servicio', 'No disponible'],
+  Reservado: ['En uso', 'Disponible', 'En mantenimiento'],
+  'En uso': ['Disponible', 'En mantenimiento'],
+  'En mantenimiento': ['Disponible', 'Fuera de servicio'],
+  'Fuera de servicio': ['En mantenimiento', 'Disponible'],
+  'No disponible': ['Disponible', 'En mantenimiento'],
+};
+
+/**
+ * Comprueba si un equipo tiene un préstamo actualmente `Activo` en la bitácora de uso.
+ */
+export async function hasActiveBitacoraLoanInDB(equipoId: string): Promise<boolean> {
+  const activeLoans = await directus.getItems<BitacoraRow>('bitacora_uso', {
+    'filter[equipo_id][_eq]': equipoId,
+    'filter[estado_prestamo][_eq]': 'Activo',
+    limit: 1,
+  });
+  return activeLoans.length > 0;
+}
+
+/**
+ * Punto único y centralizado para transicionar el estado operativo de un equipo en Directus.
+ * Lee el estado actual en servidor y solo permite transiciones válidas:
+ * - Disponible -> Reservado (al aprobar)
+ * - Reservado / Disponible -> En uso (al entregar)
+ * - En uso -> Disponible / En mantenimiento (al devolver)
+ * - Reservado -> Disponible (al cancelar/rechazar una reservación previamente aprobada)
+ * Lanza `EquipoStateConflictError` (HTTP 409) si el estado actual no permite la transición.
+ */
+export async function transitionEquipoStatusInDB(
+  equipoId: string,
+  targetStatus: DeviceItem['status'],
+  options?: {
+    allowFrom?: DeviceItem['status'][];
+    contextLabel?: string;
   }
-  return trimmed;
+): Promise<EquipoRow> {
+  const current = await directus.getItemById<EquipoRow>('equipos', equipoId);
+  if (!current) {
+    throw new EquipoStateConflictError('El equipo seleccionado no existe en el inventario.');
+  }
+
+  const allowedSources = options?.allowFrom ?? VALID_EQUIPO_TRANSITIONS[current.estado];
+  const isAllowed = options?.allowFrom
+    ? options.allowFrom.includes(current.estado)
+    : VALID_EQUIPO_TRANSITIONS[current.estado]?.includes(targetStatus);
+
+  if (!isAllowed) {
+    const context = options?.contextLabel ? ` (${options.contextLabel})` : '';
+    throw new EquipoStateConflictError(
+      `El equipo ${current.codigo_plai} no puede pasar a "${targetStatus}"${context} porque su estado actual es "${current.estado}".`
+    );
+  }
+
+  void allowedSources;
+  const updated = await directus.updateItem<EquipoRow>('equipos', equipoId, {
+    estado: targetStatus,
+  });
+  return updated ?? { ...current, estado: targetStatus };
 }
 
 // ====================================================================
@@ -308,8 +379,47 @@ export async function getBitacoraFromDB(): Promise<BitacoraItem[]> {
 
 export async function insertBitacoraEntregaInDB(
   item: BitacoraItem,
-  reservaId?: string
+  reservaId?: string,
+  options?: { skipEquipoTransition?: boolean }
 ): Promise<boolean> {
+  if (item.equipoId) {
+    // Impedir doble préstamo activo sobre el mismo equipo
+    const alreadyLoaned = await hasActiveBitacoraLoanInDB(item.equipoId);
+    if (alreadyLoaned) {
+      throw new EquipoStateConflictError(
+        `El equipo ${item.codigoPlai} ya tiene un préstamo activo en la bitácora y no puede entregarse nuevamente.`
+      );
+    }
+
+    if (!options?.skipEquipoTransition) {
+      // Si el equipo está Reservado, verificar que pertenezca a esta reservación (si existe una aprobada)
+      const currentEquipo = await directus.getItemById<EquipoRow>('equipos', item.equipoId);
+      if (!currentEquipo) {
+        throw new EquipoStateConflictError(
+          `No se encontró el equipo ${item.codigoPlai} en el inventario.`
+        );
+      }
+
+      if (currentEquipo.estado === 'Reservado') {
+        const holdingReservas = await directus.getItems<ReservacionRow>('reservaciones', {
+          'filter[equipo_id][_eq]': item.equipoId,
+          'filter[estado][_eq]': 'Aprobada',
+        });
+        const ownedByAnother = holdingReservas.some((r) => !reservaId || r.id !== reservaId);
+        if (ownedByAnother) {
+          throw new EquipoStateConflictError(
+            `El equipo ${item.codigoPlai} está reservado por otra solicitud aprobada y no puede entregarse sin vincularla.`
+          );
+        }
+      }
+
+      await transitionEquipoStatusInDB(item.equipoId, 'En uso', {
+        allowFrom: reservaId ? ['Reservado', 'Disponible'] : ['Disponible', 'Reservado'],
+        contextLabel: 'registrar entrega en bitácora',
+      });
+    }
+  }
+
   await directus.createItem<BitacoraRow>('bitacora_uso', {
     id: item.id,
     equipo_id: item.equipoId,
@@ -327,11 +437,6 @@ export async function insertBitacoraEntregaInDB(
     incidencia_generada: false,
     admin_entrega: item.adminEntrega || 'Administrador PLAi',
   });
-
-  // Sincronizar estado del equipo en Directus
-  if (item.equipoId) {
-    await directus.updateItem<EquipoRow>('equipos', item.equipoId, { estado: 'En uso' });
-  }
 
   // Sincronizar reservación vinculada
   if (reservaId) {
@@ -356,6 +461,11 @@ export async function updateBitacoraDevolucionInDB(
     adminRecibe: string;
   }
 ): Promise<boolean> {
+  const existingLog = await directus.getItemById<BitacoraRow>('bitacora_uso', id);
+  if (!existingLog) {
+    return false;
+  }
+
   const estadoPrestamo = devolucion.incidenciaGenerada ? 'Con Incidencia' : 'Devuelto';
   const updated = await directus.updateItem<BitacoraRow>('bitacora_uso', id, {
     fecha_devolucion_real: toIsoTimestamp(devolucion.fechaDevolucionReal),
@@ -371,9 +481,18 @@ export async function updateBitacoraDevolucionInDB(
     const nuevoEstadoEquipo: DeviceItem['status'] = devolucion.incidenciaGenerada
       ? 'En mantenimiento'
       : 'Disponible';
-    await directus.updateItem<EquipoRow>('equipos', updated.equipo_id, {
-      estado: nuevoEstadoEquipo,
-    });
+
+    // Solo libera el equipo si actualmente está "En uso" y no quedan otros préstamos activos
+    const stillHasActiveLoan = await hasActiveBitacoraLoanInDB(updated.equipo_id);
+    if (!stillHasActiveLoan) {
+      const currentEq = await directus.getItemById<EquipoRow>('equipos', updated.equipo_id);
+      if (currentEq && currentEq.estado === 'En uso') {
+        await transitionEquipoStatusInDB(updated.equipo_id, nuevoEstadoEquipo, {
+          allowFrom: ['En uso'],
+          contextLabel: 'devolución en bitácora',
+        });
+      }
+    }
 
     // Completar reservaciones activas de ese equipo
     const activas = await directus.getItems<ReservacionRow>('reservaciones', {
@@ -440,17 +559,31 @@ interface ReservacionRow {
   date_created?: string | null;
 }
 
-export async function getReservacionesFromDB(filterByEmail?: string): Promise<ReservacionItem[]> {
+export async function getReservacionesFromDB(
+  filterByEmail?: string,
+  filterByUserId?: string
+): Promise<ReservacionItem[]> {
   const params: Record<string, string | number> = { sort: '-date_created' };
-  if (filterByEmail) {
-    params['filter[usuario_email][_icontains]'] = filterByEmail.trim().toLowerCase();
+  const normalizedEmail = filterByEmail?.trim().toLowerCase();
+  const normalizedUserId = filterByUserId?.trim();
+
+  if (normalizedEmail && !normalizedUserId) {
+    params['filter[usuario_email][_icontains]'] = normalizedEmail;
   }
+
   const rows = await directus.getItems<ReservacionRow>('reservaciones', params);
-  const filtered = filterByEmail
-    ? rows.filter(
-        (r) => r.usuario_email.toLowerCase() === filterByEmail.trim().toLowerCase()
-      )
-    : rows;
+  const filtered =
+    normalizedEmail || normalizedUserId
+      ? rows.filter((r) => {
+          const matchesId =
+            Boolean(normalizedUserId) &&
+            Boolean(r.usuario_keycloak_id) &&
+            r.usuario_keycloak_id === normalizedUserId;
+          const matchesEmail =
+            Boolean(normalizedEmail) && r.usuario_email.toLowerCase() === normalizedEmail;
+          return matchesId || matchesEmail;
+        })
+      : rows;
 
   return filtered.map((r) => ({
     id: r.id,
@@ -505,6 +638,98 @@ export async function updateReservacionInDB(
   id: string,
   update: Partial<ReservacionItem>
 ): Promise<boolean> {
+  const existing = await directus.getItemById<ReservacionRow>('reservaciones', id);
+  if (!existing) {
+    return false;
+  }
+
+  const prevEstado = existing.estado;
+  const nextEstado = update.estado ?? existing.estado;
+  const targetEquipoId = update.equipoId ?? existing.equipo_id ?? undefined;
+
+  // 1. Validar y aplicar transición de estado del equipo ANTES de guardar la reservación
+  if (update.estado && targetEquipoId) {
+    if (nextEstado === 'Aprobada') {
+      // Solo exige Disponible si aún no estaba Aprobada con ese mismo equipo
+      const alreadyApprovedSameDevice =
+        prevEstado === 'Aprobada' && existing.equipo_id === targetEquipoId;
+      if (!alreadyApprovedSameDevice) {
+        if (await hasActiveBitacoraLoanInDB(targetEquipoId)) {
+          throw new EquipoStateConflictError(
+            'El equipo seleccionado tiene un préstamo activo en bitácora y no puede aprobarse.'
+          );
+        }
+        await transitionEquipoStatusInDB(targetEquipoId, 'Reservado', {
+          allowFrom: ['Disponible'],
+          contextLabel: 'aprobar reservación',
+        });
+      }
+    } else if (nextEstado === 'En uso') {
+      const alreadyInUseSameDevice =
+        prevEstado === 'En uso' && existing.equipo_id === targetEquipoId;
+      if (!alreadyInUseSameDevice) {
+        if (await hasActiveBitacoraLoanInDB(targetEquipoId)) {
+          throw new EquipoStateConflictError(
+            'El equipo seleccionado ya tiene un préstamo activo en bitácora.'
+          );
+        }
+        // Si esta misma reservación ya estaba Aprobada con ese equipo, transiciona Reservado -> En uso.
+        // De lo contrario, exige que el equipo esté Disponible para no apropiarse de la reserva de otro usuario.
+        const ownedReservation = prevEstado === 'Aprobada' && existing.equipo_id === targetEquipoId;
+        await transitionEquipoStatusInDB(targetEquipoId, 'En uso', {
+          allowFrom: ownedReservation ? ['Reservado', 'Disponible'] : ['Disponible'],
+          contextLabel: 'registrar entrega de reservación',
+        });
+      }
+    } else if (nextEstado === 'Rechazada') {
+      // Rechazar una solicitud Pendiente NO debe tocar jamás el estado del equipo.
+      // Solo libera si esta misma reservación ya estaba Aprobada (tenía el equipo en Reservado)
+      // y no existe otro préstamo activo ni otra reservación que lo posea.
+      if (prevEstado === 'Aprobada' && existing.equipo_id === targetEquipoId) {
+        const currentEq = await directus.getItemById<EquipoRow>('equipos', targetEquipoId);
+        const hasLoan = await hasActiveBitacoraLoanInDB(targetEquipoId);
+        if (currentEq && currentEq.estado === 'Reservado' && !hasLoan) {
+          const otherHolders = await directus.getItems<ReservacionRow>('reservaciones', {
+            'filter[equipo_id][_eq]': targetEquipoId,
+            'filter[estado][_eq]': 'Aprobada',
+          });
+          if (!otherHolders.some((r) => r.id !== id)) {
+            await transitionEquipoStatusInDB(targetEquipoId, 'Disponible', {
+              allowFrom: ['Reservado'],
+              contextLabel: 'liberar equipo de reservación rechazada',
+            });
+          }
+        }
+      }
+    } else if (nextEstado === 'Completada') {
+      // Solo libera el equipo si esta misma reservación realmente lo tenía en uso o reservado,
+      // respetando estados como 'En mantenimiento' o préstamos activos de otra persona.
+      if (
+        (prevEstado === 'En uso' || prevEstado === 'Aprobada') &&
+        existing.equipo_id === targetEquipoId
+      ) {
+        const currentEq = await directus.getItemById<EquipoRow>('equipos', targetEquipoId);
+        const hasLoan = await hasActiveBitacoraLoanInDB(targetEquipoId);
+        if (currentEq && !hasLoan) {
+          const expectedSource: DeviceItem['status'] =
+            prevEstado === 'En uso' ? 'En uso' : 'Reservado';
+          if (currentEq.estado === expectedSource) {
+            const otherActive = await directus.getItems<ReservacionRow>('reservaciones', {
+              'filter[equipo_id][_eq]': targetEquipoId,
+              'filter[estado][_in]': 'Aprobada,En uso',
+            });
+            if (!otherActive.some((r) => r.id !== id)) {
+              await transitionEquipoStatusInDB(targetEquipoId, 'Disponible', {
+                allowFrom: [expectedSource],
+                contextLabel: 'completar reservación',
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
   const payload: Partial<ReservacionRow> = {};
   if (update.estado !== undefined) payload.estado = update.estado;
   if (update.equipoId !== undefined) payload.equipo_id = update.equipoId || null;
@@ -522,19 +747,7 @@ export async function updateReservacionInDB(
   if (update.horaFin !== undefined) payload.hora_fin = update.horaFin;
   if (update.actividad !== undefined) payload.actividad = update.actividad;
 
-  const updated = await directus.updateItem<ReservacionRow>('reservaciones', id, payload);
-
-  const equipoId = update.equipoId || updated?.equipo_id;
-  if (equipoId && update.estado) {
-    if (update.estado === 'Aprobada') {
-      await directus.updateItem<EquipoRow>('equipos', equipoId, { estado: 'Reservado' });
-    } else if (update.estado === 'En uso') {
-      await directus.updateItem<EquipoRow>('equipos', equipoId, { estado: 'En uso' });
-    } else if (update.estado === 'Completada' || update.estado === 'Rechazada') {
-      await directus.updateItem<EquipoRow>('equipos', equipoId, { estado: 'Disponible' });
-    }
-  }
-
+  await directus.updateItem<ReservacionRow>('reservaciones', id, payload);
   return true;
 }
 
@@ -755,11 +968,15 @@ export async function syncKeycloakUserInDB(params: {
   const normalizedEmail = params.email.trim().toLowerCase();
   const nowIso = new Date().toISOString();
 
+  // Seguridad: todo inicio de sesión exige correo verificado en Keycloak (email_verified === true)
+  if (!params.emailVerified) {
+    return { allowed: false, status: 'Inactivo', reason: 'email_unverified' };
+  }
+
   // 1. Buscar primero por ID exacto (`sub` de Keycloak)
   let existing = await directus.getItemById<UsuarioRow>('usuarios', params.id);
 
   // 2. Si no existe por `sub`, comprobar si existe un perfil pre-registrado por correo.
-  //    Seguridad: solo se vincula si Keycloak confirmó `email_verified: true`.
   if (!existing) {
     const byEmail = await directus.getItems<UsuarioRow>('usuarios', {
       'filter[email][_eq]': normalizedEmail,
@@ -769,9 +986,6 @@ export async function syncKeycloakUserInDB(params: {
     if (preRegistered) {
       if (preRegistered.estado === 'Inactivo') {
         return { allowed: false, status: 'Inactivo', reason: 'inactive' };
-      }
-      if (!params.emailVerified) {
-        return { allowed: false, status: 'Inactivo', reason: 'email_unverified' };
       }
       existing = preRegistered;
     }

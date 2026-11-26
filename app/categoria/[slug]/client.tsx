@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { mockDevices, DeviceItem } from '../../../lib/mockData';
+import { toYouTubeEmbedUrl } from '../../../lib/videoUrl';
+import { addDaysToYmd, getMexicoTodayYmd } from '../../../lib/dateMexico';
 import { ArrowLeft, Lightbulb, Target, CheckCircle2, Box, Layers, Printer, Sparkles, AlertCircle } from 'lucide-react';
 import EquipmentCard from '../../components/EquipmentCard';
 import EquipmentDetailModal from '../../components/EquipmentDetailModal';
@@ -130,12 +132,6 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
           }
         })
         .catch(() => {});
-
-      // 2. Fallback de localStorage
-      const savedVideo = typeof window !== 'undefined' ? localStorage.getItem(`category_video_${resolvedParams.slug}`) : null;
-      if (savedVideo) {
-        setVideoUrl(savedVideo);
-      }
     });
 
     return () => {
@@ -229,17 +225,11 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
               <div className="rounded-2xl border border-black/[0.08] bg-white p-8 shadow-[0_10px_40px_rgba(0,0,0,0.04)]">
                 <h3 className="mb-6 font-heading text-[1.2rem] font-extrabold text-navy">Casos de Éxito Destacados</h3>
                 <div className="flex items-center justify-center overflow-hidden rounded-2xl border border-black/[0.08] bg-white p-4 shadow-[0_4px_15px_rgba(0,0,0,0.03)]">
-                  {isLoaded && (
+                  {isLoaded && toYouTubeEmbedUrl(videoUrl) && (
                     <iframe
                       width="100%"
                       height="315"
-                      src={
-                        videoUrl.includes('watch?v=')
-                          ? videoUrl.replace('watch?v=', 'embed/')
-                          : videoUrl.includes('youtu.be/')
-                          ? videoUrl.replace('youtu.be/', 'www.youtube.com/embed/')
-                          : videoUrl
-                      }
+                      src={toYouTubeEmbedUrl(videoUrl) ?? undefined}
                       title="Video de categoría"
                       frameBorder="0"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -413,7 +403,7 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
                         const marcaColor = fd.get('marcaColor') as string;
                         const notas = fd.get('notas') as string;
                         const printerDevice = devices[0] || { id: 'eq-fab-001' };
-                        const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+                        const tomorrow = addDaysToYmd(getMexicoTodayYmd(), 1);
 
                         try {
                           const res = await fetch('/api/reservas', {

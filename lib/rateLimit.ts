@@ -24,19 +24,20 @@ export interface RateLimitResult {
   reset: number; // Unix timestamp en milisegundos cuando la ventana se libera
 }
 
-// Presets recomendados según la criticidad del endpoint
+// Presets dimensionados para grupos escolares / laboratorios detrás de una misma IP NAT.
+// La protección contra fuerza bruta de contraseñas la administra directamente Keycloak.
 export const RATE_LIMIT_LOGIN: RateLimitOptions = {
-  limit: 5, // Máximo 5 intentos por minuto para prevenir fuerza bruta
+  limit: 60, // Hasta 60 inicios de sesión POST/min por IP (salón completo en laboratorio)
   windowMs: 60 * 1000,
 };
 
 export const RATE_LIMIT_LOGIN_PAGE: RateLimitOptions = {
-  limit: 30, // Máximo 30 peticiones por minuto para la vista /login
+  limit: 120, // Hasta 120 vistas de /login por minuto por IP compartida
   windowMs: 60 * 1000,
 };
 
 export const RATE_LIMIT_MUTATION: RateLimitOptions = {
-  limit: 10, // Máximo 10 solicitudes de reservación o espacios por minuto por IP
+  limit: 30, // Hasta 30 solicitudes de reservación, espacios o cursos por minuto por IP
   windowMs: 60 * 1000,
 };
 

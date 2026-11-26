@@ -8,8 +8,6 @@ type Config = {
   labLocation: string;
   adminEmail: string;
   maintenanceAlertDays: number;
-  allowPublicView: boolean;
-  requireApproval: boolean;
   maxReservationHours: number;
   maxAdvanceDays: number;
 };
@@ -32,10 +30,8 @@ export default function ConfiguracionPage() {
   const [config, setConfig] = useState<Config>({
     labName: 'PLAi — Laboratorio de Innovación, Robótica y Tecnologías Inmersivas',
     labLocation: 'Torre C, Ciudad Creativa Digital, Guadalajara, Jalisco',
-    adminEmail: 'admin@plai.edu.mx',
+    adminEmail: 'plai.ayuda@plai.mx',
     maintenanceAlertDays: 30,
-    allowPublicView: true,
-    requireApproval: true,
     maxReservationHours: 2,
     maxAdvanceDays: 14,
   });
@@ -155,36 +151,9 @@ export default function ConfiguracionPage() {
               <span className="text-xs text-plai-muted">¿Con cuántos días de anticipación se puede reservar?</span>
             </div>
           </div>
-          <div className="mt-5 flex flex-col gap-5">
-            <label className="flex cursor-pointer items-start justify-between gap-4">
-              <div className="flex flex-1 flex-col gap-0.5">
-                <span className="text-xs font-bold uppercase tracking-wider text-navy">Requerir aprobación manual</span>
-                <span className="text-xs text-plai-muted">Si está activo, las reservaciones requieren ser aprobadas por un admin antes de confirmarse</span>
-              </div>
-              <div
-                className={`relative mt-0.5 h-[26px] w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${config.requireApproval ? 'bg-plai' : 'bg-gray-300'}`}
-                onClick={() => setConfig({ ...config, requireApproval: !config.requireApproval })}
-                role="switch"
-                aria-checked={config.requireApproval}
-              >
-                <div className={`absolute top-[3px] left-[3px] size-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${config.requireApproval ? 'translate-x-[22px]' : ''}`} />
-              </div>
-            </label>
-            <label className="flex cursor-pointer items-start justify-between gap-4">
-              <div className="flex flex-1 flex-col gap-0.5">
-                <span className="text-xs font-bold uppercase tracking-wider text-navy">Permitir vista pública del inventario</span>
-                <span className="text-xs text-plai-muted">Los usuarios no autenticados pueden ver el catálogo de recursos</span>
-              </div>
-              <div
-                className={`relative mt-0.5 h-[26px] w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${config.allowPublicView ? 'bg-plai' : 'bg-gray-300'}`}
-                onClick={() => setConfig({ ...config, allowPublicView: !config.allowPublicView })}
-                role="switch"
-                aria-checked={config.allowPublicView}
-              >
-                <div className={`absolute top-[3px] left-[3px] size-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${config.allowPublicView ? 'translate-x-[22px]' : ''}`} />
-              </div>
-            </label>
-          </div>
+          <p className="mt-4 rounded-lg border border-blue-100 bg-blue-50/50 px-3.5 py-2.5 text-xs text-plai-gray">
+            Política institucional fija: todas las solicitudes de préstamo requieren validación y aprobación manual por parte del equipo de PLAi, y el catálogo de equipamiento permanece visible públicamente.
+          </p>
         </div>
 
         {/* Maintenance */}

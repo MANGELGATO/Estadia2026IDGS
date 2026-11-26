@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       descripcion: data.descripcion,
       estado: data.estado,
       tecnicoResponsable: data.tecnicoResponsable || auth.user.name,
-      fechaReporte: data.fechaReporte || new Date().toISOString().slice(0, 19).replace('T', ' '),
+      fechaReporte: data.fechaReporte || new Date().toISOString(),
       accionesRealizadas: data.accionesRealizadas || undefined,
     };
 

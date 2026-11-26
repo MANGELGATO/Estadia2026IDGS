@@ -21,11 +21,18 @@ function getOriginSafe(rawUrl?: string): string | null {
   }
 }
 
+function isHtmlNavigation(request: NextRequest): boolean {
+  const accept = request.headers.get('accept') || '';
+  const secFetchMode = request.headers.get('sec-fetch-mode') || '';
+  return secFetchMode === 'navigate' || accept.includes('text/html');
+}
+
 /**
  * Construye una Content-Security-Policy estricta por petición en tiempo de ejecución:
  * - Elimina `'unsafe-inline'` de `script-src` usando un nonce criptográfico + `'strict-dynamic'`.
- * - Resuelve `KEYCLOAK_ISSUER` en runtime (cuando el contenedor ya tiene sus variables de entorno)
- *   para incluir el origen institucional de Keycloak en `connect-src` y `form-action`.
+ * - Resuelve `KEYCLOAK_ISSUER` en runtime para `connect-src` y `form-action`.
+ * - Declara `frame-src` exclusivamente para embeds oficiales de YouTube (sin comodines).
+ * - Mantiene `img-src 'self' data: blob:` alineado con rutas locales / `/api/media/*` en Zod.
  */
 export function buildCspHeader(nonce: string): string {
   const isProd = process.env.NODE_ENV === 'production';
@@ -52,6 +59,7 @@ export function buildCspHeader(nonce: string): string {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob:",
+    "frame-src https://www.youtube.com https://www.youtube-nocookie.com",
     `connect-src ${connectSrc}`,
     "object-src 'none'",
     "frame-ancestors 'none'",
@@ -65,19 +73,18 @@ export function buildCspHeader(nonce: string): string {
  * Proxy de seguridad de Next.js 16 (reemplazo normativo de middleware.ts).
  * - Genera CSP estricta con nonce único por petición y origen de Keycloak en runtime.
  * - Protege las rutas privadas `/admin/*` y `/usuario/*` verificando el JWT firmado por NextAuth.js.
- * - Aplica Rate Limiting y protección CSRF en endpoints sensibles (Estándar PLAi v1.0, Sección 7.3).
+ * - Aplica Rate Limiting (dimensionado para salones compartiendo NAT) y protección CSRF.
  */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const ip = getClientIp(request);
 
-  // 1. Rate Limiting en endpoints sensibles (Estándar PLAi v1.0, Sección 7.3)
-  const isAuthAttempt =
-    pathname.startsWith('/api/auth') &&
-    pathname !== '/api/auth/federated-logout' &&
-    (pathname.includes('/signin') || pathname.includes('/callback') || request.method === 'POST');
+  // 1. Rate Limiting en inicio de sesión: cuenta SOLO `POST /api/auth/signin*` (NO `/callback`).
+  //    La fuerza bruta de contraseñas la controla Keycloak; este límite protege la ruta NextAuth.
+  const isAuthSignInPost =
+    request.method === 'POST' && pathname.startsWith('/api/auth/signin');
 
-  if (isAuthAttempt) {
+  if (isAuthSignInPost) {
     const rate = checkRateLimit(`auth:${ip}`, RATE_LIMIT_LOGIN);
     if (!rate.success) {
       logger.warn('Rate limit excedido en endpoint de autenticación', {
@@ -85,13 +92,18 @@ export async function proxy(request: NextRequest) {
         ip,
         limit: rate.limit,
       });
+      if (isHtmlNavigation(request)) {
+        return NextResponse.redirect(new URL('/login?error=TooManyRequests', request.url));
+      }
       return createRateLimitResponse(rate);
     }
   }
 
   if (
     request.method === 'POST' &&
-    (pathname === '/api/reservas' || pathname === '/api/solicitudes-espacios')
+    (pathname === '/api/reservas' ||
+      pathname === '/api/solicitudes-espacios' ||
+      pathname === '/api/cursos')
   ) {
     // 1.1 Protección CSRF: validación de origen contra el host de la petición
     const origin = request.headers.get('origin');
@@ -134,7 +146,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname === '/login' && process.env.NODE_ENV === 'production') {
+  // Evitar bucle de redirección cuando el usuario ya viene redirigido a /login?error=TooManyRequests
+  const isRateLimitErrorView =
+    pathname === '/login' && request.nextUrl.searchParams.get('error') === 'TooManyRequests';
+
+  if (pathname === '/login' && !isRateLimitErrorView && process.env.NODE_ENV === 'production') {
     const rate = checkRateLimit(`login_page:${ip}`, RATE_LIMIT_LOGIN_PAGE);
     if (!rate.success) {
       logger.warn('Rate limit excedido en vista de inicio de sesión', {
@@ -142,7 +158,7 @@ export async function proxy(request: NextRequest) {
         ip,
         limit: rate.limit,
       });
-      return createRateLimitResponse(rate);
+      return NextResponse.redirect(new URL('/login?error=TooManyRequests', request.url));
     }
   }
 
@@ -212,5 +228,6 @@ export const config = {
     '/api/auth/:path*',
     '/api/reservas',
     '/api/solicitudes-espacios',
+    '/api/cursos',
   ],
 };

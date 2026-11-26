@@ -19,6 +19,7 @@ import {
   AlertCircle 
 } from 'lucide-react';
 import PrivacyPolicyModal from './PrivacyPolicyModal';
+import { getMexicoTodayYmd } from '../../lib/dateMexico';
 
 interface Props {
   device: DeviceItem;
@@ -376,7 +377,7 @@ export default function ReservationForm({ device, onClose }: Props) {
               className="w-full rounded-[0.65rem] border-[1.5px] border-black/[0.08] bg-white px-4 py-[0.7rem] font-body text-[0.9rem] text-navy outline-none transition-all duration-[250ms] focus:border-plai focus:ring-2 focus:ring-plai/10"
               required
               id="res-date"
-              min={new Date().toISOString().split('T')[0]}
+              min={getMexicoTodayYmd()}
               value={date}
               onChange={(e) => setDate(e.target.value)}
             />

@@ -15,6 +15,7 @@ import {
   RiRefreshLine
 } from 'react-icons/ri';
 import type { CategoryConfig, SuccessCase } from '../../../lib/categoriesConfig';
+import { toYouTubeEmbedUrl } from '../../../lib/videoUrl';
 
 const categoryTabs = [
   { id: 'realidad-virtual', name: 'Realidad Virtual', icon: '🥽' },
@@ -151,17 +152,12 @@ export default function CategoriasConfigPage() {
       const json = await res.json();
 
       if (json.success && json.category) {
-        // Actualizar estado local central
+        // Actualizar estado local central (sin respaldo en localStorage)
         const updatedAll = {
           ...categoriesData,
           [selectedCategory]: json.category
         };
         setCategoriesData(updatedAll);
-
-        // Guardar también en localStorage como caché instantáneo para cliente
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(`category_video_${selectedCategory}`, videoUrl);
-        }
 
         setStatusMessage({
           text: `¡Textos y multimedia de "${name}" guardados exitosamente en el servidor!`,
@@ -479,18 +475,12 @@ export default function CategoriasConfigPage() {
                 {/* Vista previa embebida del video */}
                 <div className="mt-4">
                   <span className="mb-2 block text-xs font-bold text-navy">Vista Previa:</span>
-                  {videoUrl ? (
+                  {toYouTubeEmbedUrl(videoUrl) ? (
                     <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-black">
                       <iframe
                         width="100%"
                         height="100%"
-                        src={
-                          videoUrl.includes('watch?v=')
-                            ? videoUrl.replace('watch?v=', 'embed/')
-                            : videoUrl.includes('youtu.be/')
-                            ? videoUrl.replace('youtu.be/', 'www.youtube.com/embed/')
-                            : videoUrl
-                        }
+                        src={toYouTubeEmbedUrl(videoUrl) ?? undefined}
                         title="Vista previa del video"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
@@ -498,7 +488,7 @@ export default function CategoriasConfigPage() {
                     </div>
                   ) : (
                     <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-xs text-plai-muted">
-                      Sin video configurado
+                      {videoUrl ? 'Ingresa un enlace válido de YouTube (https://www.youtube.com/watch?v=... o https://youtu.be/...)' : 'Sin video configurado'}
                     </div>
                   )}
                 </div>

@@ -227,18 +227,30 @@ export default function InventarioPage() {
     setDeletingEquipment(item);
   };
 
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch('/api/media', {
+        method: 'POST',
+        body: formData,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success && json.data?.url) {
+        setImagePreview(json.data.url);
+      } else {
+        alert(json.message || 'No fue posible subir la imagen al servidor.');
+      }
+    } catch {
+      alert('Error de conexión al subir la imagen.');
+    } finally {
+      e.target.value = '';
     }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
@@ -255,8 +267,8 @@ export default function InventarioPage() {
       .map(a => a.trim())
       .filter(Boolean);
 
-    const newItem: DeviceItem = {
-      id: editingItem ? editingItem.id : `eq-${Date.now()}`,
+    const payload: Partial<DeviceItem> = {
+      ...(editingItem ? { id: editingItem.id } : {}),
       name: (formData.get('name') as string).trim(),
       category: formData.get('category') as DeviceItem['category'],
       brand: (formData.get('brand') as string).trim(),
@@ -276,21 +288,30 @@ export default function InventarioPage() {
       apps: editingItem?.apps,
     };
 
-    // Persistir en MySQL (MAMP)
-    fetch('/api/equipos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newItem),
-    }).catch(err => {
-      console.error('Error al persistir en MySQL:', err);
-    });
+    try {
+      const res = await fetch('/api/equipos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success || !json.data) {
+        const firstErr = json.errors ? Object.values(json.errors).flat()[0] : null;
+        alert((firstErr as string) || json.message || 'No fue posible guardar el equipo.');
+        return;
+      }
 
-    if (editingItem) {
-      setData(data.map(d => d.id === editingItem.id ? newItem : d));
-    } else {
-      setData([newItem, ...data]);
+      const savedItem: DeviceItem = json.data;
+      if (editingItem) {
+        setData(data.map(d => d.id === editingItem.id ? savedItem : d));
+      } else {
+        setData([savedItem, ...data]);
+      }
+      setIsModalOpen(false);
+    } catch (err) {
+      console.error('Error al persistir equipo en Directus:', err);
+      alert('Error de conexión al guardar el equipo.');
     }
-    setIsModalOpen(false);
   };
 
   const modalElement = isModalOpen && mounted ? (
@@ -636,7 +657,7 @@ export default function InventarioPage() {
       : (selectedHistoryEquipment ? `${selectedHistoryEquipment.name} (${selectedHistoryEquipment.inventoryNumber})` : 'Recurso Tecnológico PLAi');
 
     const newEntry: UsageHistoryItem = {
-      id: `hist-${Date.now()}`,
+      id: `hist-${crypto.randomUUID()}`,
       deviceId: targetDeviceId || 'eq-general',
       deviceName: targetDeviceName,
       user: (formData.get('user') as string).trim(),

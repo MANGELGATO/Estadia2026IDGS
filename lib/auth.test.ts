@@ -136,4 +136,38 @@ describe('NextAuth.js + Keycloak OIDC Security (PLAi Standard v1.0)', () => {
     expect(enrichedUser?.role).toBe('admin');
     expect((session as unknown as Record<string, unknown>).idToken).toBeUndefined();
   });
+
+  it('rechaza en signIn cualquier cuenta cuyo email_verified no sea true con /login?error=EmailNotVerified', async () => {
+    const opts = getAuthOptions();
+    const signInCallback = opts.callbacks?.signIn;
+    expect(signInCallback).toBeDefined();
+
+    // Sin email_verified en profile ni en access_token -> rechazado
+    const deniedResult = await signInCallback!({
+      user: { id: 'kc-unverified-1', name: 'Sin Verificar', email: 'sinverificar@plai.mx', role: 'usuario' },
+      account: {
+        provider: 'keycloak',
+        type: 'oauth',
+        providerAccountId: 'kc-unverified-1',
+        access_token: makeFakeJwt({ sub: 'kc-unverified-1', email_verified: false }),
+      },
+      profile: { sub: 'kc-unverified-1', email_verified: false } as Record<string, unknown>,
+    } as Parameters<NonNullable<typeof signInCallback>>[0]);
+    expect(deniedResult).toBe('/login?error=EmailNotVerified');
+
+    // Con email_verified: true -> permitido (sin Directus configurado en test)
+    delete process.env.DIRECTUS_URL;
+    delete process.env.DIRECTUS_TOKEN;
+    const allowedResult = await signInCallback!({
+      user: { id: 'kc-verified-1', name: 'Verificado', email: 'verificado@plai.mx', role: 'usuario' },
+      account: {
+        provider: 'keycloak',
+        type: 'oauth',
+        providerAccountId: 'kc-verified-1',
+        access_token: makeFakeJwt({ sub: 'kc-verified-1', email_verified: true }),
+      },
+      profile: { sub: 'kc-verified-1', email_verified: true } as Record<string, unknown>,
+    } as Parameters<NonNullable<typeof signInCallback>>[0]);
+    expect(allowedResult).toBe(true);
+  });
 });

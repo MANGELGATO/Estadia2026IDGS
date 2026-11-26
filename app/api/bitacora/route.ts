@@ -5,6 +5,7 @@ import {
   updateBitacoraDevolucionInDB,
   getEquipoByCodigoPLAi,
   insertIncidenciaInDB,
+  EquipoStateConflictError,
   BitacoraItem,
   IncidenciaItem,
 } from '../../../lib/db';
@@ -104,6 +105,12 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    if (error instanceof EquipoStateConflictError) {
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: 409 }
+      );
+    }
     logger.error('Error al registrar entrega en bitácora', { path: '/api/bitacora' }, error);
     return NextResponse.json(
       { success: false, message: 'Error interno al registrar la entrega' },

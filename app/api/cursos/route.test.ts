@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET, POST } from './route';
+import { rateLimiter } from '../../../lib/rateLimit';
+import { addDaysToYmd, getMexicoTodayYmd } from '../../../lib/dateMexico';
 import * as nextAuth from 'next-auth';
 
 const mockCursos = [
@@ -54,6 +56,7 @@ describe('/api/cursos API Endpoint (privacidad PII y validación Zod)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    rateLimiter.reset();
     getServerSessionMock.mockResolvedValue({
       user: {
         id: 'kc-usr-1',
@@ -98,15 +101,33 @@ describe('/api/cursos API Endpoint (privacidad PII y validación Zod)', () => {
     expect(json.errors?.fecha).toBeDefined();
   });
 
-  it('crea curso válido con folio criptográfico único (201)', async () => {
+  it('crea curso válido con folio criptográfico único (201) y exige acceptPrivacy', async () => {
+    const futureDate = addDaysToYmd(getMexicoTodayYmd(), 5);
+
+    const noPrivacyRes = await POST(
+      new NextRequest('http://localhost:3000/api/cursos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          solicitanteNombre: 'Usuario Actual',
+          fecha: futureDate,
+          titulo: 'Taller de VR',
+          asistentes: 12,
+          acceptPrivacy: false,
+        }),
+      })
+    );
+    expect(noPrivacyRes.status).toBe(400);
+
     const req = new NextRequest('http://localhost:3000/api/cursos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         solicitanteNombre: 'Usuario Actual',
-        fecha: '2026-12-15',
+        fecha: futureDate,
         titulo: 'Taller de VR',
         asistentes: 12,
+        acceptPrivacy: true,
       }),
     });
 

@@ -23,6 +23,8 @@ function LoginFormContent() {
       ? 'Tu correo institucional aún no ha sido verificado en Keycloak. Verifica tu correo antes de ingresar.'
       : authErrorParam === 'ServiceUnavailable'
       ? 'El directorio institucional de PLAi no está disponible temporalmente. Intenta nuevamente en unos minutos.'
+      : authErrorParam === 'TooManyRequests'
+      ? 'Se alcanzó el límite temporal de inicios de sesión desde esta red. Espera unos segundos e intenta nuevamente.'
       : authErrorParam
       ? 'No fue posible completar la autenticación con Keycloak. Intenta nuevamente.'
       : null

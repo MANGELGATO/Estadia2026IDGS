@@ -1,9 +1,15 @@
+import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { spaceRequestSchema } from '../../../lib/validations/schemas';
 import { logger } from '../../../lib/logger';
-import { insertReservacionInDB, ReservacionItem } from '../../../lib/db';
+import {
+  getSystemConfigFromDB,
+  insertReservacionInDB,
+  ReservacionItem,
+} from '../../../lib/db';
 import { requireSession, isStaffRole } from '../../../lib/authGuard';
 import { generateEntityId, generateFolio } from '../../../lib/folio';
+import { addDaysToYmd, getMexicoTodayYmd } from '../../../lib/dateMexico';
 import {
   checkRateLimit,
   getClientIp,
@@ -21,7 +27,7 @@ const ESPACIO_NAMES: Record<string, string> = {
 };
 
 export async function POST(req: NextRequest) {
-  const reqId = req.headers.get('x-request-id') || `req-${Date.now()}`;
+  const reqId = req.headers.get('x-request-id') || `req-${crypto.randomUUID()}`;
   const ip = getClientIp(req);
 
   const rate = checkRateLimit(`espacio_route:${ip}`, RATE_LIMIT_MUTATION);
@@ -60,6 +66,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Validar fecha contra hoy (CDMX) y maxAdvanceDays de configuración
+    const sysConfig = await getSystemConfigFromDB();
+    const todayMexico = getMexicoTodayYmd();
+    if (parsed.data.fecha < todayMexico) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'No es posible solicitar espacios en fechas pasadas.',
+          errors: { fecha: ['La fecha no puede ser anterior al día de hoy.'] },
+        },
+        { status: 400 }
+      );
+    }
+
+    const maxAdvanceDays = Math.max(1, Number(sysConfig.maxAdvanceDays || 14));
+    const maxAllowedDate = addDaysToYmd(todayMexico, maxAdvanceDays);
+    if (parsed.data.fecha > maxAllowedDate) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Las solicitudes de espacio pueden realizarse con hasta ${maxAdvanceDays} días de anticipación.`,
+          errors: {
+            fecha: [`La fecha excede el límite máximo de ${maxAdvanceDays} días de anticipación.`],
+          },
+        },
+        { status: 400 }
+      );
+    }
+
     const folio = generateFolio('ESP');
     const espacioNombre = ESPACIO_NAMES[parsed.data.espacioId] || parsed.data.espacioId;
     const catSlug = parsed.data.espacioId.includes('robot')
@@ -84,8 +119,8 @@ export async function POST(req: NextRequest) {
       usuarioId: auth.user.id || undefined,
       usuarioNombre: parsed.data.nombreSolicitante,
       usuarioEmail: authoritativeEmail,
-      usuarioTelefono: body.telefono ? String(body.telefono) : undefined,
-      usuarioInstitucion: body.institucion || parsed.data.nombreSolicitante,
+      usuarioTelefono: parsed.data.telefono || undefined,
+      usuarioInstitucion: parsed.data.institucion || parsed.data.nombreSolicitante,
       fechaUso: parsed.data.fecha,
       horaInicio: parsed.data.hora,
       horaFin,
@@ -93,7 +128,7 @@ export async function POST(req: NextRequest) {
       estado: 'Pendiente',
       accesoriosIncluidos: 'Proyector 4K, Audio, Conectividad Wi-Fi Dedicada',
       condicionSalida: 'Excelente',
-      observacionesAdmin: `Solicitud de espacio físico (${espacioNombre}). Contacto: ${body.telefono || authoritativeEmail}.`,
+      observacionesAdmin: `Solicitud de espacio físico (${espacioNombre}). Contacto: ${parsed.data.telefono || authoritativeEmail}.`,
     };
 
     await insertReservacionInDB(nuevaReservaEspacio);

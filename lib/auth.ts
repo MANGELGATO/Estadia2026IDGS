@@ -134,14 +134,24 @@ export function getAuthOptions(): NextAuthOptions {
         if (!user.email) {
           return false;
         }
-        if (!env.hasDirectusConfig) {
-          return true;
-        }
 
         const profileObj = profile as Record<string, unknown> | undefined;
         const accessClaims = decodeJwtPayload(account?.access_token);
         const emailVerified =
           profileObj?.email_verified === true || accessClaims?.email_verified === true;
+
+        // Seguridad: rechazar CUALQUIER login cuyo correo no esté verificado en Keycloak,
+        // ya que las reservaciones y cursos se vinculan por correo y usuario_keycloak_id.
+        if (!emailVerified) {
+          logger.warn('Inicio de sesión denegado: correo no verificado en Keycloak', {
+            userId: user.id,
+          });
+          return '/login?error=EmailNotVerified';
+        }
+
+        if (!env.hasDirectusConfig) {
+          return true;
+        }
 
         const resolvedRole = resolveRoleFromKeycloakLogin(
           account?.access_token,

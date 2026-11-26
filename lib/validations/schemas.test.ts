@@ -88,6 +88,7 @@ describe('Esquemas de Validación Zod (PLAi Sec. 7.2)', () => {
         contactEmail: 'elena.vargas@udg.mx',
         participantsCount: 30,
         preferredDate: '2026-12-01',
+        acceptPrivacy: true,
       });
 
       expect(result.success).toBe(true);
@@ -101,6 +102,7 @@ describe('Esquemas de Validación Zod (PLAi Sec. 7.2)', () => {
         contactEmail: 'not-an-email',
         participantsCount: 10,
         preferredDate: '2026-12-01',
+        acceptPrivacy: true,
       });
 
       expect(result.success).toBe(false);

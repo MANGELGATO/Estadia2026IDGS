@@ -95,21 +95,20 @@ export default function ReservacionesPage() {
   const normalizeCat = (s?: string) =>
     (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/-/g, ' ').trim();
 
-  // Get available devices matching the category of the reservation
-  const getAvailableDevicesForCategory = (categoriaId?: string, currentEquipoId?: string) => {
+  // Ofrecer EXCLUSIVAMENTE dispositivos con estado 'Disponible' en la categoría
+  const getAvailableDevicesForCategory = (categoriaId?: string) => {
     if (!categoriaId) return [];
     const normCat = normalizeCat(categoriaId);
     return equipos.filter(eq => {
       const eqCat = normalizeCat(eq.category);
       const isSameCategory = eqCat.includes(normCat) || (normCat !== '' && normCat.includes(eqCat));
-      const isAvailableOrAssigned = eq.status === 'Disponible' || (currentEquipoId && eq.id === currentEquipoId);
-      return isSameCategory && isAvailableOrAssigned;
+      return isSameCategory && eq.status === 'Disponible';
     });
   };
 
   const handleOpenApproval = (item: ReservacionItem) => {
     setSelectedItem(item);
-    const available = getAvailableDevicesForCategory(item.categoriaId, item.equipoId);
+    const available = getAvailableDevicesForCategory(item.categoriaId);
     if (available.length > 0) {
       const preferred =
         available.find(eq => eq.id === item.equipoId || eq.inventoryNumber === item.codigoPlaiAsignado) ||
@@ -129,15 +128,22 @@ export default function ReservacionesPage() {
     e.preventDefault();
     if (!selectedItem) return;
 
+    if (!assigningDevice) {
+      setNotification({
+        text: 'No es posible aprobar con asignación: no hay dispositivos en estado Disponible para esta categoría.',
+        type: 'error',
+      });
+      return;
+    }
+
     const payload = {
       id: selectedItem.id,
       estado: 'Aprobada' as const,
-      equipoId: assigningDevice?.id || selectedItem.equipoId,
-      codigoPlaiAsignado: assigningDevice?.inventoryNumber || selectedItem.codigoPlaiAsignado || 'PLAI-AUTO-01',
+      equipoId: assigningDevice.id,
+      codigoPlaiAsignado: assigningDevice.inventoryNumber,
       accesoriosIncluidos: accesoriosText,
       condicionSalida: condicionSalida,
       observacionesAdmin: observacionesAdmin,
-      aprobadoPor: 'Administrador PLAi',
     };
 
     try {
@@ -146,6 +152,7 @@ export default function ReservacionesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      const json = await res.json().catch(() => ({}));
 
       if (res.ok) {
         setData(prev => prev.map(r => r.id === selectedItem.id ? { ...r, ...payload, estado: 'Aprobada' } : r));
@@ -156,7 +163,10 @@ export default function ReservacionesPage() {
         });
         fetchData();
       } else {
-        setNotification({ text: 'Error al aprobar y asignar dispositivo', type: 'error' });
+        setNotification({
+          text: json.message || 'Error al aprobar y asignar dispositivo',
+          type: 'error',
+        });
       }
     } catch (err) {
       console.error('Error al aprobar reservación:', err);
@@ -174,12 +184,18 @@ export default function ReservacionesPage() {
           registrarEntregaEnBitacora: true,
         }),
       });
+      const json = await res.json().catch(() => ({}));
       if (res.ok) {
         setNotification({
           text: `Salida registrada en Bitácora de Uso para ${item.folio} (${item.codigoPlaiAsignado || 'Equipo'}). Estado actualizado a "En uso".`,
           type: 'success',
         });
         fetchData();
+      } else {
+        setNotification({
+          text: json.message || 'No fue posible registrar la salida del dispositivo.',
+          type: 'error',
+        });
       }
     } catch (err) {
       console.error('Error al registrar salida:', err);
@@ -447,7 +463,7 @@ export default function ReservacionesPage() {
                 <label className="text-xs font-bold uppercase tracking-wider text-navy">
                   Dispositivo asignado (Detectados disponibles para el día y hora)
                 </label>
-                {getAvailableDevicesForCategory(selectedItem.categoriaId, selectedItem.equipoId).length > 0 ? (
+                {getAvailableDevicesForCategory(selectedItem.categoriaId).length > 0 ? (
                   <select
                     className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none focus:ring-2 focus:ring-plai/20"
                     value={assigningDevice?.id || ''}
@@ -460,7 +476,7 @@ export default function ReservacionesPage() {
                     }}
                     required
                   >
-                    {getAvailableDevicesForCategory(selectedItem.categoriaId, selectedItem.equipoId).map(eq => (
+                    {getAvailableDevicesForCategory(selectedItem.categoriaId).map(eq => (
                       <option key={eq.id} value={eq.id}>
                         {eq.name} (Código: {eq.inventoryNumber}) - {eq.brand} {eq.model}
                       </option>
@@ -528,7 +544,8 @@ export default function ReservacionesPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-md transition-all hover:bg-emerald-700"
+                  disabled={!assigningDevice}
+                  className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-md transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <RiCheckLine /> Confirmar Aprobación y Asignación
                 </button>

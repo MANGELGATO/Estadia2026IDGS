@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { validateTimeRange } from '../reservation';
+import { isAllowedVideoUrl } from '../videoUrl';
 
 // Regex para validación de fecha YYYY-MM-DD y hora HH:MM
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -28,6 +29,7 @@ export const reservationSchema = z
       .min(3, 'La actividad debe describir el motivo (mínimo 3 caracteres)')
       .max(250, 'La descripción de actividad no puede exceder 250 caracteres'),
     notes: z.string().trim().max(500, 'Las notas no pueden exceder 500 caracteres').optional().default(''),
+    accessories: z.array(z.string().trim().min(1).max(120)).max(20).optional(),
     acceptPrivacy: z
       .boolean()
       .refine((val) => val === true, 'Es obligatorio aceptar el Aviso de Privacidad institucional'),
@@ -81,21 +83,35 @@ export const courseRequestSchema = z.object({
     .max(100, 'El cupo máximo por solicitud es de 100 participantes'),
   preferredDate: z.string().regex(DATE_REGEX, 'La fecha preferida debe tener formato YYYY-MM-DD'),
   notes: z.string().trim().max(500).optional().default(''),
+  acceptPrivacy: z
+    .boolean()
+    .refine((val) => val === true, 'Es obligatorio aceptar el Aviso de Privacidad institucional'),
 });
 
 export type CourseRequestInput = z.infer<typeof courseRequestSchema>;
+
+export const ALLOWED_ESPACIO_IDS = [
+  'auditorio',
+  'aula-robotica',
+  'workshop-vr',
+  'sala-juntas',
+] as const;
 
 /**
  * Esquema de validación para solicitud de reservación de espacios de innovación
  */
 export const spaceRequestSchema = z.object({
-  espacioId: z.string().min(1, 'El identificador del espacio es obligatorio'),
+  espacioId: z.enum(ALLOWED_ESPACIO_IDS, {
+    message: 'El espacio seleccionado no corresponde a un espacio válido de PLAi',
+  }),
   nombreSolicitante: z
     .string()
     .trim()
     .min(3, 'El nombre debe contener al menos 3 caracteres')
     .max(100, 'Máximo 100 caracteres'),
   email: z.string().trim().email('Correo electrónico inválido'),
+  telefono: z.string().trim().max(30, 'El teléfono no puede exceder 30 caracteres').optional().or(z.literal('')),
+  institucion: z.string().trim().max(150, 'La institución no puede exceder 150 caracteres').optional().or(z.literal('')),
   fecha: z.string().regex(DATE_REGEX, 'Formato de fecha inválido (YYYY-MM-DD)'),
   hora: z.string().regex(TIME_REGEX, 'Formato de hora inválido (HH:MM)'),
   proposito: z
@@ -110,13 +126,29 @@ export const spaceRequestSchema = z.object({
 
 export type SpaceRequestInput = z.infer<typeof spaceRequestSchema>;
 
-const SAFE_URL_SCHEMA = z
+/**
+ * Rutas locales estrictas para imágenes (`/images/...` o `/api/media/<uuid>`).
+ * Alineado con la directiva CSP `img-src 'self' data: blob:` (sin dominios externos).
+ */
+const LOCAL_IMAGE_URL_SCHEMA = z
   .string()
   .trim()
-  .max(255, 'La URL no puede exceder 255 caracteres')
+  .max(255, 'La ruta de imagen no puede exceder 255 caracteres')
   .refine(
-    (val) => val === '' || val.startsWith('/') || /^https?:\/\//i.test(val),
-    'La URL debe ser una ruta relativa (/) o iniciar con http:// o https://'
+    (val) => val === '' || (val.startsWith('/') && !val.startsWith('//') && !/\s/.test(val)),
+    'Solo se permiten rutas locales válidas (ej. /images/... o /api/media/...)'
+  );
+
+/**
+ * URLs de video embebibles restringidas a YouTube (alineado con CSP `frame-src`).
+ */
+const YOUTUBE_VIDEO_URL_SCHEMA = z
+  .string()
+  .trim()
+  .max(255, 'La URL de video no puede exceder 255 caracteres')
+  .refine(
+    isAllowedVideoUrl,
+    'Solo se permiten enlaces HTTPS válidos de YouTube (https://www.youtube.com/... o https://youtu.be/...)'
   );
 
 /**
@@ -134,6 +166,9 @@ export const cursoPayloadSchema = z.object({
   solicitanteEmail: z.string().trim().email('Correo electrónico inválido').optional().or(z.literal('')),
   institucion: z.string().trim().max(150).optional(),
   icon: z.string().trim().max(20).optional(),
+  acceptPrivacy: z
+    .boolean()
+    .refine((val) => val === true, 'Es obligatorio aceptar el Aviso de Privacidad institucional'),
 });
 
 /**
@@ -168,7 +203,7 @@ export const equipoSchema = z.object({
   specs: z.array(z.string().trim().max(200)).max(30).optional().default([]),
   accessories: z.array(z.string().trim().max(200)).max(30).optional().default([]),
   imageEmoji: z.string().trim().max(20).optional().default('📦'),
-  imageUrl: SAFE_URL_SCHEMA.optional(),
+  imageUrl: LOCAL_IMAGE_URL_SCHEMA.optional(),
   responsible: z.string().trim().max(120).optional().default('Laboratorio de Innovación PLAi'),
   observations: z.string().trim().max(1000).optional(),
   dateAdded: z.string().trim().max(40).optional(),
@@ -186,8 +221,8 @@ export const aplicacionSchema = z.object({
   platform: z.enum(['Meta Quest', 'PC', 'Meta Quest + PC']),
   ageRating: z.string().trim().max(40).optional().default('Todas las edades'),
   description: z.string().trim().max(1000).optional().default('Sin descripción'),
-  imageUrl: SAFE_URL_SCHEMA.optional(),
-  iconUrl: SAFE_URL_SCHEMA.optional(),
+  imageUrl: LOCAL_IMAGE_URL_SCHEMA.optional(),
+  iconUrl: LOCAL_IMAGE_URL_SCHEMA.optional(),
   devicesInstalled: z.coerce.number().int().min(0).max(500).optional().default(1),
   status: z.enum(['Activa', 'Inactiva']).optional().default('Activa'),
 });
@@ -286,7 +321,7 @@ export const categoryUpdateSchema = z.object({
   name: z.string().trim().min(2).max(100).optional(),
   description: z.string().trim().max(1000).optional(),
   plaiUsage: z.string().trim().max(2000).optional(),
-  videoUrl: SAFE_URL_SCHEMA.optional(),
+  videoUrl: YOUTUBE_VIDEO_URL_SCHEMA.optional(),
   color: z
     .string()
     .trim()

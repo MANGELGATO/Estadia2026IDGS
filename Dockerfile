@@ -4,7 +4,7 @@
 # sin gestores de paquetes (ni apk ni npm) en runtime, HEALTHCHECK, init (tini) y apagado limpio.
 # Recomendado: fijar el digest (@sha256:...) de la imagen base al publicar en el registro PLAi.
 
-ARG NODE_IMAGE=node:22-alpine3.23
+ARG NODE_IMAGE=node:22-alpine3.24
 ARG PNPM_VERSION=11.28.5
 
 # ---------- Etapa 1: dependencias ----------

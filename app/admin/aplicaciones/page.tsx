@@ -142,22 +142,36 @@ export default function AplicacionesPage() {
     }
   };
 
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch('/api/media', {
+        method: 'POST',
+        body: formData,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success && json.data?.url) {
+        setImagePreview(json.data.url);
+      } else {
+        alert(json.message || 'No fue posible subir la imagen al servidor.');
+      }
+    } catch {
+      alert('Error de conexión al subir la imagen.');
+    } finally {
+      e.target.value = '';
     }
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const item: Application = {
-      id: editingItem ? editingItem.id : `app-${Date.now()}`,
+    const resolvedImage =
+      imagePreview.trim() || (fd.get('imageUrl') as string)?.trim() || '/images/apps/default.png';
+    const payload: Partial<Application> = {
+      ...(editingItem ? { id: editingItem.id } : {}),
       name: (fd.get('name') as string).trim(),
       developer: (fd.get('developer') as string).trim(),
       version: (fd.get('version') as string).trim() || '1.0',
@@ -167,36 +181,33 @@ export default function AplicacionesPage() {
       description: (fd.get('description') as string).trim(),
       devicesInstalled: parseInt(fd.get('devicesInstalled') as string, 10) || 1,
       status: ((fd.get('status') as AppStatus) || 'Activa'),
-      imageUrl: imagePreview || (fd.get('imageUrl') as string)?.trim() || '/images/apps/default.png',
-      iconUrl: imagePreview || (fd.get('imageUrl') as string)?.trim() || '/images/apps/default.png',
+      imageUrl: resolvedImage,
+      iconUrl: resolvedImage,
     };
 
     try {
       const res = await fetch('/api/aplicaciones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(item),
+        body: JSON.stringify(payload),
       });
+      const json = await res.json().catch(() => ({}));
 
-      if (res.ok) {
+      if (res.ok && json.success && json.data) {
+        const saved: Application = json.data;
         if (editingItem) {
-          setData(prev => prev.map(d => d.id === editingItem.id ? item : d));
+          setData(prev => prev.map(d => d.id === editingItem.id ? saved : d));
         } else {
-          setData(prev => [item, ...prev]);
+          setData(prev => [saved, ...prev]);
         }
         setIsModalOpen(false);
       } else {
-        alert('Error al guardar la aplicación');
+        const firstErr = json.errors ? Object.values(json.errors).flat()[0] : null;
+        alert((firstErr as string) || json.message || 'Error al guardar la aplicación');
       }
     } catch (err) {
       console.error('Error al persistir app:', err);
-      // Fallback local
-      if (editingItem) {
-        setData(prev => prev.map(d => d.id === editingItem.id ? item : d));
-      } else {
-        setData(prev => [item, ...prev]);
-      }
-      setIsModalOpen(false);
+      alert('Error de conexión al guardar la aplicación.');
     }
   };
 
@@ -445,7 +456,7 @@ export default function AplicacionesPage() {
                       className="w-full flex-1 rounded-lg border border-gray-300 px-3.5 py-2 text-sm text-gray-800 transition-all focus:border-plai focus:outline-none" 
                       value={imagePreview} 
                       onChange={e => setImagePreview(e.target.value)} 
-                      placeholder="URL de imagen (ej. /images/apps/beat-saber.png o https://...)" 
+                      placeholder="Ruta local de imagen (ej. /images/apps/beat-saber.png o subir archivo)" 
                     />
                     <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-plai/30 bg-plai/10 px-4 py-2 text-xs font-bold text-plai transition-all hover:bg-plai hover:text-white">
                       <RiUploadCloud2Line className="text-base" /> Subir archivo

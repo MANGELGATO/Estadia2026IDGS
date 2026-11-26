@@ -3,7 +3,14 @@ import { getCursosFromDB, insertCursoInDB, CursoAgendaItem } from '../../../lib/
 import { requireSession, isStaffRole } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
 import { generateFolio } from '../../../lib/folio';
+import { getMexicoTodayYmd } from '../../../lib/dateMexico';
 import { courseRequestSchema, cursoPayloadSchema } from '../../../lib/validations/schemas';
+import {
+  checkRateLimit,
+  getClientIp,
+  createRateLimitResponse,
+  RATE_LIMIT_MUTATION,
+} from '../../../lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,6 +71,17 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+  const rate = checkRateLimit(`cursos_route:${ip}`, RATE_LIMIT_MUTATION);
+  if (!rate.success) {
+    logger.warn('Rate limit excedido en POST /api/cursos', {
+      path: '/api/cursos',
+      ip,
+      status: 429,
+    });
+    return createRateLimitResponse(rate);
+  }
+
   const auth = await requireSession();
   if (auth.errorResponse) return auth.errorResponse;
 
@@ -142,6 +160,18 @@ export async function POST(req: NextRequest) {
         institucion: d.institucion || 'Comunidad PLAi',
         icon: d.icon || '🎓',
       };
+    }
+
+    const todayMexico = getMexicoTodayYmd();
+    if (normalizedInput.fecha < todayMexico) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'La fecha tentativa no puede ser anterior al día de hoy.',
+          errors: { fecha: ['La fecha no puede ser anterior al día de hoy.'] },
+        },
+        { status: 400 }
+      );
     }
 
     const authoritativeEmail = isStaffRole(auth.user.role)

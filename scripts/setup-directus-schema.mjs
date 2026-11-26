@@ -666,8 +666,24 @@ async function provisionServiceAccount() {
       }
     }
   }
+
+  // Permisos mínimos sobre `directus_files` para subir y servir imágenes vía /api/media (solo create + read)
+  for (const action of ['create', 'read']) {
+    const key = `directus_files:${action}`;
+    if (!existingPermsMap.has(key)) {
+      const permRes = await api('POST', '/permissions', {
+        policy: policyId,
+        collection: 'directus_files',
+        action,
+        fields: ['*'],
+      });
+      assertOk(permRes, `POST /permissions (${key})`);
+      permsCreated += 1;
+    }
+  }
+
   console.log(
-    `  [PERMS]   Permisos mínimos verificados para ${COLLECTIONS.length} colecciones (${permsCreated} nuevos, ${permsRevoked} revocados).`
+    `  [PERMS]   Permisos mínimos verificados para ${COLLECTIONS.length} colecciones + directus_files (${permsCreated} nuevos, ${permsRevoked} revocados).`
   );
 
   // 4. Usuario de servicio dedicado (verifica rol/estado y soporta rotación con --rotate-token)

@@ -1,20 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
 import { getEquiposFromDB, insertEquipoInDB, deleteEquipoInDB } from '../../../lib/db';
 import { DeviceItem } from '../../../lib/mockData';
-import { requireSession } from '../../../lib/authGuard';
+import { requireSession, isStaffRole } from '../../../lib/authGuard';
+import { getAuthOptions } from '../../../lib/auth';
 import { logger } from '../../../lib/logger';
 import { generateEntityId } from '../../../lib/folio';
 import { equipoSchema } from '../../../lib/validations/schemas';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Devuelve una versión pública reducida del equipo para visitantes y usuarios estándar,
+ * ocultando metadatos internos sensibles (`serialNumber`, `observations`, `responsible`).
+ */
+function sanitizeEquipoForPublic(device: DeviceItem): DeviceItem {
+  const {
+    serialNumber: _sn,
+    observations: _obs,
+    responsible: _resp,
+    ...publicFields
+  } = device;
+  void _sn;
+  void _obs;
+  void _resp;
+  return publicFields;
+}
+
 export async function GET() {
   try {
+    const session = await getServerSession(getAuthOptions());
+    const viewerIsStaff = Boolean(session?.user && isStaffRole(session.user.role));
     const equipos = await getEquiposFromDB();
+    const payload = viewerIsStaff ? equipos : equipos.map(sanitizeEquipoForPublic);
     return NextResponse.json({
       success: true,
-      data: equipos,
-      total: equipos.length,
+      data: payload,
+      total: payload.length,
     });
   } catch (error) {
     logger.error('Error al obtener equipos en Directus', { path: '/api/equipos' }, error);

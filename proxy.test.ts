@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { proxy, buildCspHeader } from './proxy';
 import * as jwt from 'next-auth/jwt';
-import { rateLimiter } from './lib/rateLimit';
+import { rateLimiter, RATE_LIMIT_LOGIN, RATE_LIMIT_MUTATION } from './lib/rateLimit';
 
 vi.mock('next-auth/jwt', () => ({
   getToken: vi.fn(),
@@ -81,18 +81,29 @@ describe('Proxy Security and RBAC (Next.js 16)', () => {
   });
 
   describe('Rate Limiting en Proxy (Sección 7.3 Estándar PLAi)', () => {
-    it('bloquea intentos de fuerza bruta en /api/auth con código 429 tras exceder el límite', async () => {
-      // RATE_LIMIT_LOGIN permite 5 peticiones
-      for (let i = 0; i < 5; i++) {
-        const req = new NextRequest('http://localhost:3000/api/auth/signin', {
+    it('cuenta solo POST /api/auth/signin (no /callback) y bloquea al superar RATE_LIMIT_LOGIN', async () => {
+      // GET /callback nunca debe descontar del límite de login grupal
+      for (let i = 0; i < 10; i++) {
+        const cbReq = new NextRequest('http://localhost:3000/api/auth/callback/keycloak', {
+          method: 'GET',
+          headers: { 'x-forwarded-for': '192.168.1.100' },
+        });
+        const cbRes = await proxy(cbReq);
+        expect(cbRes.status).not.toBe(429);
+      }
+
+      for (let i = 0; i < RATE_LIMIT_LOGIN.limit; i++) {
+        const req = new NextRequest('http://localhost:3000/api/auth/signin/keycloak', {
+          method: 'POST',
           headers: { 'x-forwarded-for': '192.168.1.100' },
         });
         const res = await proxy(req);
         expect(res.status).not.toBe(429);
       }
 
-      // La petición 6 debe ser bloqueada con 429
-      const blockedReq = new NextRequest('http://localhost:3000/api/auth/signin', {
+      // Al exceder el límite en API JSON responde 429
+      const blockedReq = new NextRequest('http://localhost:3000/api/auth/signin/keycloak', {
+        method: 'POST',
         headers: { 'x-forwarded-for': '192.168.1.100' },
       });
       const blockedRes = await proxy(blockedReq);
@@ -102,11 +113,22 @@ describe('Proxy Security and RBAC (Next.js 16)', () => {
       expect(data.success).toBe(false);
       expect(data.error).toBe('Too Many Requests');
       expect(blockedRes.headers.get('Retry-After')).toBeDefined();
+
+      // En navegación HTML redirige a /login?error=TooManyRequests en lugar de JSON crudo
+      const navReq = new NextRequest('http://localhost:3000/api/auth/signin/keycloak', {
+        method: 'POST',
+        headers: {
+          'x-forwarded-for': '192.168.1.100',
+          accept: 'text/html',
+        },
+      });
+      const navRes = await proxy(navReq);
+      expect(navRes.status).toBe(307);
+      expect(navRes.headers.get('location')).toBe('http://localhost:3000/login?error=TooManyRequests');
     });
 
-    it('bloquea saturación en formulario público POST /api/reservas con código 429 tras 10 peticiones', async () => {
-      // RATE_LIMIT_MUTATION permite 10 peticiones
-      for (let i = 0; i < 10; i++) {
+    it('bloquea saturación en formularios públicos POST /api/reservas y /api/cursos al superar RATE_LIMIT_MUTATION', async () => {
+      for (let i = 0; i < RATE_LIMIT_MUTATION.limit; i++) {
         const req = new NextRequest('http://localhost:3000/api/reservas', {
           method: 'POST',
           headers: { 'x-forwarded-for': '192.168.1.200' },
@@ -115,14 +137,26 @@ describe('Proxy Security and RBAC (Next.js 16)', () => {
         expect(res.status).not.toBe(429);
       }
 
-      const blockedReq = new NextRequest('http://localhost:3000/api/reservas', {
+      const blockedReq = new NextRequest('http://localhost:3000/api/cursos', {
         method: 'POST',
         headers: { 'x-forwarded-for': '192.168.1.200' },
       });
       const blockedRes = await proxy(blockedReq);
 
       expect(blockedRes.status).toBe(429);
-      expect(blockedRes.headers.get('X-RateLimit-Limit')).toBe('10');
+      expect(blockedRes.headers.get('X-RateLimit-Limit')).toBe(String(RATE_LIMIT_MUTATION.limit));
+    });
+
+    it('rechaza POST /api/cursos con origen cruzado (protección CSRF)', async () => {
+      const req = new NextRequest('https://recursos.plai.mx/api/cursos', {
+        method: 'POST',
+        headers: {
+          host: 'recursos.plai.mx',
+          origin: 'https://atacante.evil',
+        },
+      });
+      const res = await proxy(req);
+      expect(res.status).toBe(403);
     });
 
     it('no aplica limitación de mutaciones a peticiones GET hacia /api/reservas', async () => {
@@ -174,6 +208,7 @@ describe('Proxy Security and RBAC (Next.js 16)', () => {
 
       const csp = buildCspHeader('test-nonce-123');
       expect(csp).toContain("script-src 'self' 'nonce-test-nonce-123' 'strict-dynamic'");
+      expect(csp).toContain("frame-src https://www.youtube.com https://www.youtube-nocookie.com");
       expect(csp).toContain("connect-src 'self' https://auth.institucional.plai.mx");
       expect(csp).toContain("form-action 'self' https://auth.institucional.plai.mx");
     });

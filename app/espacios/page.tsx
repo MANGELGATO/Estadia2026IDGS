@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Users, Calendar, Building, ShieldCheck, CheckCircle2, Clock, User } from 'lucide-react';
 import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
+import { getMexicoTodayYmd } from '../../lib/dateMexico';
 
 const espaciosMock = [
   {
@@ -244,7 +245,7 @@ export default function EspaciosPage() {
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="flex flex-col gap-1">
                       <label className="flex items-center gap-1 font-heading text-[0.85rem] font-semibold text-navy"><Calendar size={14}/> Fecha deseada</label>
-                      <input name="fecha" type="date" min={new Date().toISOString().split('T')[0]} className="w-full rounded-xl border border-black/[0.08] bg-[#F4F6F9] px-4 py-3 text-[0.9rem] outline-none transition-all focus:border-plai focus:ring-2 focus:ring-plai/10" required />
+                      <input name="fecha" type="date" min={getMexicoTodayYmd()} className="w-full rounded-xl border border-black/[0.08] bg-[#F4F6F9] px-4 py-3 text-[0.9rem] outline-none transition-all focus:border-plai focus:ring-2 focus:ring-plai/10" required />
                     </div>
                     <div className="flex flex-col gap-1">
                       <label className="flex items-center gap-1 font-heading text-[0.85rem] font-semibold text-navy"><Clock size={14}/> Hora de inicio</label>

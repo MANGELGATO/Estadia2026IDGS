@@ -11,9 +11,9 @@
 #   1. Red externa de Traefik/Gateway: reenvía tráfico TLS directo (passthrough)
 #      al puerto 8443 del servicio `nginx-plai-recursos`.
 #   2. `plai_isolated_backend` (internal: true, encrypted: true): red privada y
-#      cifrada entre `nginx-plai-recursos` y `app:3000`. `app` NO publica puertos.
+#      cifrada entre `nginx-plai-recursos` y `plai-recursos-app:3000`. La app NO publica puertos.
 #   3. `plai_app_egress` (encrypted: true): red de salida controlada para que
-#      `app` alcance Keycloak OIDC y la API de Directus (admin.plai.mx).
+#      `plai-recursos-app` alcance Keycloak OIDC y la API de Directus (admin.plai.mx).
 # ==============================================================================
 
 services:
@@ -89,7 +89,7 @@ services:
       - plai_gateway_net
       - plai_isolated_backend
 
-  app:
+  plai-recursos-app:
     image: ${REGISTRY:?Debes exportar REGISTRY}/plai-recursos-espacios:${VERSION:-1.0.0}
     read_only: true
     cap_drop:

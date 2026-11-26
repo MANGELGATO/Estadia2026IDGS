@@ -13,6 +13,7 @@ import {
 } from 'react-icons/ri';
 import StatCard from '../../components/admin/StatCard';
 import type { BitacoraItem, DeviceItem, ReservacionItem } from '../../../lib/db';
+import { formatMexicoDateTime, getMexicoDateTimeLocalInput } from '../../../lib/dateMexico';
 
 export default function BitacoraPage() {
   const [logs, setLogs] = useState<BitacoraItem[]>([]);
@@ -191,7 +192,7 @@ export default function BitacoraPage() {
 
   const openReturnModal = (log: BitacoraItem) => {
     setSelectedLogForReturn(log);
-    const now = new Date().toISOString().slice(0, 16);
+    const now = getMexicoDateTimeLocalInput();
     setDevolucionFechaReal(now);
     setDevolucionCondicion('Excelente');
     setDevolucionAccesorios('Todos los accesorios devueltos en orden');
@@ -232,10 +233,10 @@ export default function BitacoraPage() {
 
         <button
           onClick={() => {
-            const now = new Date().toISOString().slice(0, 16);
+            const now = getMexicoDateTimeLocalInput();
             setEntregaFecha(now);
-            const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 16);
-            setEntregaFechaEstimada(tomorrow);
+            const inTwoHours = getMexicoDateTimeLocalInput(new Date(), 2 * 60 * 60 * 1000);
+            setEntregaFechaEstimada(inTwoHours);
             setIsEntregaModalOpen(true);
           }}
           className="flex cursor-pointer items-center gap-2 rounded-xl bg-plai px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-plai-hover"
@@ -333,14 +334,14 @@ export default function BitacoraPage() {
                     </td>
 
                     <td className="px-5 py-4 whitespace-nowrap text-xs text-gray-700">
-                      <div>{log.fechaEntrega ? log.fechaEntrega.replace('T', ' ').slice(0, 16) : ''}</div>
+                      <div>{formatMexicoDateTime(log.fechaEntrega)}</div>
                       <span className="text-[10px] text-gray-400">Entrega: {log.adminEntrega}</span>
                     </td>
 
                     <td className="px-5 py-4 whitespace-nowrap text-xs">
-                      <div className="text-gray-500">Est: {log.fechaDevolucionEstimada ? log.fechaDevolucionEstimada.replace('T', ' ').slice(0, 16) : ''}</div>
+                      <div className="text-gray-500">Est: {formatMexicoDateTime(log.fechaDevolucionEstimada)}</div>
                       {log.fechaDevolucionReal ? (
-                        <div className="font-bold text-emerald-700">Real: {String(log.fechaDevolucionReal).replace('T', ' ').slice(0, 16)}</div>
+                        <div className="font-bold text-emerald-700">Real: {formatMexicoDateTime(log.fechaDevolucionReal)}</div>
                       ) : (
                         <span className="text-[10px] font-semibold text-amber-600">Pendiente de retorno</span>
                       )}

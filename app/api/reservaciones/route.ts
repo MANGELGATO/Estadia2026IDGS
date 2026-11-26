@@ -5,11 +5,13 @@ import {
   updateReservacionInDB,
   getEquiposFromDB,
   insertBitacoraEntregaInDB,
+  EquipoStateConflictError,
   ReservacionItem,
   BitacoraItem,
 } from '../../../lib/db';
 import { requireSession, isStaffRole } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
+import { mexicoLocalToUtcIso } from '../../../lib/dateMexico';
 import { reservacionUpdateSchema } from '../../../lib/validations/schemas';
 
 export const dynamic = 'force-dynamic';
@@ -29,8 +31,11 @@ export async function GET() {
 
   try {
     // El personal (admin / colaborador) consulta todas; un usuario final solo ve sus propias reservaciones
-    const filterEmail = isStaffRole(auth.user.role) ? undefined : auth.user.email;
-    const reservaciones = await getReservacionesFromDB(filterEmail);
+    const staff = isStaffRole(auth.user.role);
+    const reservaciones = await getReservacionesFromDB(
+      staff ? undefined : auth.user.email,
+      staff ? undefined : auth.user.id
+    );
     return NextResponse.json({
       success: true,
       data: reservaciones,
@@ -81,12 +86,19 @@ export async function PUT(req: NextRequest) {
 
     const allReservas = await getReservacionesFromDB();
     const reserva = allReservas.find((r) => r.id === id);
+    if (!reserva) {
+      return NextResponse.json(
+        { success: false, message: `No se encontró la reservación con ID "${id}".` },
+        { status: 404 }
+      );
+    }
+
     const allEquipos = await getEquiposFromDB();
 
-    let resolvedEquipoId = equipoId || reserva?.equipoId;
-    let resolvedCodigo = codigoPlaiAsignado || reserva?.codigoPlaiAsignado;
+    let resolvedEquipoId = equipoId || reserva.equipoId;
+    let resolvedCodigo = codigoPlaiAsignado || reserva.codigoPlaiAsignado;
 
-    if (estado === 'Aprobada' && !resolvedCodigo && reserva) {
+    if (estado === 'Aprobada' && !resolvedCodigo) {
       const catNorm = normalizeStr(reserva.categoriaId);
       const disponible =
         allEquipos.find((e) => e.id === reserva.equipoId && e.status === 'Disponible') ||
@@ -105,9 +117,7 @@ export async function PUT(req: NextRequest) {
 
     if (resolvedCodigo && !resolvedEquipoId) {
       const targetCode = resolvedCodigo.toLowerCase();
-      const eq = allEquipos.find(
-        (e) => e.inventoryNumber.toLowerCase() === targetCode
-      );
+      const eq = allEquipos.find((e) => e.inventoryNumber.toLowerCase() === targetCode);
       if (eq) resolvedEquipoId = eq.id;
     } else if (resolvedEquipoId && !resolvedCodigo) {
       const eq = allEquipos.find((e) => e.id === resolvedEquipoId);
@@ -129,17 +139,26 @@ export async function PUT(req: NextRequest) {
       ...(actividad ? { actividad } : {}),
     };
 
-    await updateReservacionInDB(id, updatePayload);
+    const updatedOk = await updateReservacionInDB(id, updatePayload);
+    if (!updatedOk) {
+      return NextResponse.json(
+        { success: false, message: `No se encontró la reservación con ID "${id}".` },
+        { status: 404 }
+      );
+    }
 
-    if ((estado === 'En uso' || registrarEntregaEnBitacora) && reserva) {
+    if (estado === 'En uso' || registrarEntregaEnBitacora) {
       const assignedDevice = allEquipos.find(
         (e) =>
           (resolvedCodigo && e.inventoryNumber.toLowerCase() === resolvedCodigo.toLowerCase()) ||
           (resolvedEquipoId && e.id === resolvedEquipoId)
       );
       if (assignedDevice) {
-        const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
-        const estReturn = `${fechaUso || reserva.fechaUso} ${(horaFin || reserva.horaFin || '14:00').slice(0, 5)}:00`;
+        const nowUtcIso = new Date().toISOString();
+        const estDate = fechaUso || reserva.fechaUso;
+        const estTime = (horaFin || reserva.horaFin || '14:00').slice(0, 5);
+        const estReturnUtcIso = mexicoLocalToUtcIso(estDate, estTime);
+
         const bitItem: BitacoraItem = {
           id: `bit-${crypto.randomUUID()}`,
           equipoId: assignedDevice.id,
@@ -148,8 +167,8 @@ export async function PUT(req: NextRequest) {
           usuarioNombre: usuarioNombre || reserva.usuarioNombre,
           usuarioEmail: reserva.usuarioEmail,
           usuarioDependencia: reserva.usuarioInstitucion || 'Comunidad PLAi',
-          fechaEntrega: nowStr,
-          fechaDevolucionEstimada: estReturn,
+          fechaEntrega: nowUtcIso,
+          fechaDevolucionEstimada: estReturnUtcIso,
           estadoPrestamo: 'Activo',
           condicionEntrega: (condicionSalida ||
             reserva.condicionSalida ||
@@ -162,7 +181,10 @@ export async function PUT(req: NextRequest) {
           observacionesEntrega: `Entrega vinculada a reservación ${reserva.folio}: ${actividad || reserva.actividad}`,
           adminEntrega: auth.user.name,
         };
-        await insertBitacoraEntregaInDB(bitItem, id);
+        // updateReservacionInDB ya validó y transicionó el equipo a 'En uso'
+        await insertBitacoraEntregaInDB(bitItem, id, {
+          skipEquipoTransition: estado === 'En uso',
+        });
       }
     }
 
@@ -179,6 +201,12 @@ export async function PUT(req: NextRequest) {
       data: { id, ...updatePayload },
     });
   } catch (error) {
+    if (error instanceof EquipoStateConflictError) {
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: 409 }
+      );
+    }
     logger.error('Error al actualizar reservación', { path: '/api/reservaciones' }, error);
     return NextResponse.json(
       { success: false, message: 'Error interno al actualizar la reservación' },

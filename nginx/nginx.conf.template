@@ -80,7 +80,8 @@ ${SET_REAL_IP_FROM_DIRECTIVES}  real_ip_header proxy_protocol;
     image/svg+xml;
 
   limit_req_zone $binary_remote_addr zone=general_limit:10m rate=20r/s;
-  limit_req_zone $binary_remote_addr zone=auth_limit:10m rate=5r/s;
+  # Dimensionado para salones completos detrás de una misma IP NAT (Keycloak protege fuerza bruta)
+  limit_req_zone $binary_remote_addr zone=auth_limit:10m rate=20r/s;
 
   # --------------------------------------------------------------------------
   # Puerto 8080: EXCLUSIVAMENTE healthcheck local y redirección a HTTPS.
@@ -139,9 +140,9 @@ ${SET_REAL_IP_FROM_DIRECTIVES}  real_ip_header proxy_protocol;
     ssl_session_cache shared:SSL:10m;
     ssl_session_tickets off;
 
-    # DNS interno de Docker Swarm para resolución dinámica del servicio `app`
+    # DNS interno de Docker Swarm para resolución dinámica del servicio `plai-recursos-app`
     resolver 127.0.0.11 valid=10s ipv6=off;
-    set $upstream_app http://app:3000;
+    set $upstream_app http://plai-recursos-app:3000;
 
     # Cabeceras de seguridad complementarias sobre HTTPS
     add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
@@ -185,12 +186,12 @@ ${SET_REAL_IP_FROM_DIRECTIVES}  real_ip_header proxy_protocol;
       access_log off;
     }
 
-    # Endpoints de autenticación (rate limiting estricto + protocolo HTTPS fijo)
+    # Endpoints de autenticación (dimensionado para salones en NAT + protocolo HTTPS fijo)
     location /api/auth/ {
       limit_except GET POST HEAD OPTIONS {
         deny all;
       }
-      limit_req zone=auth_limit burst=10 nodelay;
+      limit_req zone=auth_limit burst=40 nodelay;
       proxy_pass $upstream_app;
       proxy_http_version 1.1;
       proxy_set_header Upgrade $http_upgrade;

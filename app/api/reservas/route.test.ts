@@ -1,11 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { POST } from './route';
 import { NextRequest } from 'next/server';
-import { rateLimiter } from '../../../lib/rateLimit';
+import { rateLimiter, RATE_LIMIT_MUTATION } from '../../../lib/rateLimit';
+import { addDaysToYmd, getMexicoTodayYmd } from '../../../lib/dateMexico';
 import * as nextAuth from 'next-auth';
 
 vi.mock('../../../lib/directus', () => ({
   directus: {
+    getItemById: vi.fn(async (collection: string) => {
+      if (collection === 'configuracion') {
+        return {
+          id: 'general',
+          valor: {
+            maxReservationHours: 2,
+            maxAdvanceDays: 14,
+          },
+        };
+      }
+      return null;
+    }),
     getItems: vi.fn(async (collection: string) => {
       if (collection === 'equipos') {
         return [
@@ -65,14 +78,16 @@ describe('POST /api/reservas Route Handler', () => {
   });
 
   it('procesa una reservación válida y responde con código 201', async () => {
+    const validDate = addDaysToYmd(getMexicoTodayYmd(), 2);
     const payload = {
       deviceId: 'vr-01',
       userName: 'Laura Martinez',
-      date: '2026-11-10',
+      date: validDate,
       startTime: '11:00',
       endTime: '12:30',
       activity: 'Desarrollo de entorno inmersivo',
       notes: 'Requiere mandos cargados',
+      accessories: ['2 Controladores Touch Plus'],
       acceptPrivacy: true,
     };
 
@@ -119,18 +134,57 @@ describe('POST /api/reservas Route Handler', () => {
     expect(data.errors.userName).toBeDefined();
   });
 
+  it('rechaza fechas pasadas y fechas que exceden maxAdvanceDays con 400', async () => {
+    const pastDate = addDaysToYmd(getMexicoTodayYmd(), -2);
+    const pastRes = await POST(
+      new NextRequest('http://localhost:3000/api/reservas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: 'vr-01',
+          userName: 'Laura Martinez',
+          date: pastDate,
+          startTime: '10:00',
+          endTime: '11:00',
+          activity: 'Práctica pasada',
+          acceptPrivacy: true,
+        }),
+      })
+    );
+    expect(pastRes.status).toBe(400);
+
+    const tooFarDate = addDaysToYmd(getMexicoTodayYmd(), 30);
+    const farRes = await POST(
+      new NextRequest('http://localhost:3000/api/reservas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: 'vr-01',
+          userName: 'Laura Martinez',
+          date: tooFarDate,
+          startTime: '10:00',
+          endTime: '11:00',
+          activity: 'Práctica muy lejana',
+          acceptPrivacy: true,
+        }),
+      })
+    );
+    expect(farRes.status).toBe(400);
+  });
+
   it('rechaza peticiones con código 429 cuando un cliente excede el rate limit normativo', async () => {
+    const validDate = addDaysToYmd(getMexicoTodayYmd(), 3);
     const payload = {
       deviceId: 'vr-01',
       userName: 'Carlos Gomez',
-      date: '2026-11-12',
+      date: validDate,
       startTime: '10:00',
       endTime: '11:00',
       activity: 'Pruebas de software',
       acceptPrivacy: true,
     };
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < RATE_LIMIT_MUTATION.limit; i++) {
       const req = new NextRequest('http://localhost:3000/api/reservas', {
         method: 'POST',
         headers: {

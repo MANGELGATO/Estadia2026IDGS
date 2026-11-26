@@ -1,9 +1,16 @@
+import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { reservationSchema } from '../../../lib/validations/schemas';
 import { logger } from '../../../lib/logger';
-import { getEquiposFromDB, insertReservacionInDB, ReservacionItem } from '../../../lib/db';
+import {
+  getEquiposFromDB,
+  getSystemConfigFromDB,
+  insertReservacionInDB,
+  ReservacionItem,
+} from '../../../lib/db';
 import { requireSession, isStaffRole } from '../../../lib/authGuard';
 import { generateEntityId, generateFolio } from '../../../lib/folio';
+import { addDaysToYmd, getMexicoTodayYmd } from '../../../lib/dateMexico';
 import {
   checkRateLimit,
   getClientIp,
@@ -13,8 +20,13 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+function timeToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
 export async function POST(req: NextRequest) {
-  const reqId = req.headers.get('x-request-id') || `req-${Date.now()}`;
+  const reqId = req.headers.get('x-request-id') || `req-${crypto.randomUUID()}`;
   const ip = getClientIp(req);
 
   const rate = checkRateLimit(`reserva_route:${ip}`, RATE_LIMIT_MUTATION);
@@ -48,6 +60,54 @@ export async function POST(req: NextRequest) {
           success: false,
           message: 'Los datos enviados no cumplen con las reglas normativas de reservación.',
           errors: parsed.error.flatten().fieldErrors,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Aplicar configuración real del sistema en servidor: fechas pasadas, maxAdvanceDays y maxReservationHours
+    const sysConfig = await getSystemConfigFromDB();
+    const todayMexico = getMexicoTodayYmd();
+
+    if (parsed.data.date < todayMexico) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'No es posible registrar reservaciones en fechas pasadas.',
+          errors: { date: ['La fecha de reservación no puede ser anterior a hoy.'] },
+        },
+        { status: 400 }
+      );
+    }
+
+    const maxAdvanceDays = Math.max(1, Number(sysConfig.maxAdvanceDays || 14));
+    const maxAllowedDate = addDaysToYmd(todayMexico, maxAdvanceDays);
+    if (parsed.data.date > maxAllowedDate) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Las reservaciones solo pueden realizarse con hasta ${maxAdvanceDays} días de anticipación.`,
+          errors: {
+            date: [`La fecha excede el límite máximo de ${maxAdvanceDays} días de anticipación.`],
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    const maxReservationHours = Math.max(1, Number(sysConfig.maxReservationHours || 2));
+    const durationMinutes =
+      timeToMinutes(parsed.data.endTime) - timeToMinutes(parsed.data.startTime);
+    if (durationMinutes <= 0 || durationMinutes > maxReservationHours * 60) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `La duración máxima permitida por reservación es de ${maxReservationHours} hora(s).`,
+          errors: {
+            endTime: [
+              `La duración máxima configurada para préstamos es de ${maxReservationHours} hora(s).`,
+            ],
+          },
         },
         { status: 400 }
       );
@@ -91,8 +151,8 @@ export async function POST(req: NextRequest) {
       actividad: parsed.data.activity,
       estado: 'Pendiente',
       accesoriosIncluidos:
-        Array.isArray(body.accessories) && body.accessories.length > 0
-          ? body.accessories.join(', ')
+        parsed.data.accessories && parsed.data.accessories.length > 0
+          ? parsed.data.accessories.join(', ')
           : device?.accessories
           ? device.accessories.join(', ')
           : 'Equipo base con accesorios originales',
