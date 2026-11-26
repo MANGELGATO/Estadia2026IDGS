@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { reservationSchema, courseRequestSchema, spaceRequestSchema } from './schemas';
+import {
+  reservationSchema,
+  courseRequestSchema,
+  spaceRequestSchema,
+  reservacionUpdateSchema,
+  usuarioUpsertSchema,
+} from './schemas';
 
 describe('Esquemas de Validación Zod (PLAi Sec. 7.2)', () => {
   describe('reservationSchema', () => {
@@ -114,6 +120,49 @@ describe('Esquemas de Validación Zod (PLAi Sec. 7.2)', () => {
       });
 
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe('reservacionUpdateSchema', () => {
+    it('acepta actualización válida de estado y entrega en bitácora', () => {
+      const result = reservacionUpdateSchema.safeParse({
+        id: 'res-001',
+        estado: 'En uso',
+        registrarEntregaEnBitacora: true,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('rechaza estado no permitido o fecha malformada', () => {
+      const result = reservacionUpdateSchema.safeParse({
+        id: 'res-001',
+        estado: 'Hackeada',
+        fechaUso: '15/11/2026',
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('usuarioUpsertSchema', () => {
+    it('valida perfil operativo válido con status por defecto Activo', () => {
+      const result = usuarioUpsertSchema.safeParse({
+        name: 'Laura Méndez',
+        email: 'laura@plai.mx',
+        dependencia: 'Laboratorio IA',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.status).toBe('Activo');
+      }
+    });
+
+    it('rechaza correo inválido o estado no permitido', () => {
+      const result = usuarioUpsertSchema.safeParse({
+        name: 'Laura Méndez',
+        email: 'correo-invalido',
+        status: 'Suspendido',
+      });
+      expect(result.success).toBe(false);
     });
   });
 });

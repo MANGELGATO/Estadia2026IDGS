@@ -17,8 +17,9 @@ RUN chmod +x /usr/local/bin/nginx-entrypoint.sh \
 USER 101
 
 ENV ALLOWED_HOST=localhost \
-    SSL_CERT_FILE=/run/secrets/plai_recursos_tls_cert \
-    SSL_KEY_FILE=/run/secrets/plai_recursos_tls_key
+    SSL_CERT_FILE=/etc/nginx/ssl/fullchain.pem \
+    SSL_KEY_FILE=/etc/nginx/ssl/privkey.pem \
+    TRUSTED_PROXY_CIDR=10.0.0.0/8
 
 EXPOSE 8443 8080
 

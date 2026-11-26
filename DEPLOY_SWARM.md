@@ -33,7 +33,8 @@ Antes de desplegar, reemplaza **todas** las cadenas en MAYÚSCULAS (`AQUI_HACER_
    ```
    - Vincula el rol y la policy en Directus 11 mediante la tabla intermedia **`directus_access`** (`POST /access` con `{ role, policy }`).
    - Aplica **mínimo privilegio**: otorga `delete` **únicamente** en `lab_recursos_equipos` y `lab_recursos_aplicaciones` (donde la app realmente borra registros) y revoca cualquier `delete` sobrante en las otras 8 colecciones (solo `create`, `read`, `update`).
-   - **No imprime el token en consola/logs:** lo guarda con permisos `0600` en la ruta indicada por `--token-out` (por defecto `.directus-service-token.tmp`) y ejecuta automáticamente una **prueba de humo** (`GET /items/lab_recursos_equipos?limit=1` → HTTP `200`).
+   - **No imprime el token en consola/logs:** lo guarda con permisos `0600` fuera del repositorio (por defecto en `os.tmpdir()`, o en la ruta indicada por `--token-out`; además `.dockerignore` excluye `.directus-service-token*` y `*.tmp`) y ejecuta automáticamente una **prueba de humo** (`GET /items/lab_recursos_equipos?limit=1` → HTTP `200`).
+   - **Endurecimiento de policy existente:** si la policy de servicio ya existía, el script verifica y garantiza que `app_access` y `admin_access` permanezcan en `false`.
    - **Rotación de token ante filtración:** ejecuta el mismo comando añadiendo `--rotate-token` (o `ROTATE_SERVICE_TOKEN=true`), crea un nuevo secret o actualiza el servicio, y destruye el archivo temporal con `shred -u`.
 
 2. **Cargar catálogo inicial oficial:**
@@ -92,11 +93,13 @@ En cada renovación automática de Let's Encrypt, el script de renovación de PL
 
 ## 5. Topología de Red, HSTS, Rate Limiting y Seguridad Swarm
 
-- **`plai_gateway_net` (externa):** Conecta Traefik exclusivamente con `nginx-plai-recursos:8443` mediante **TLS passthrough**.
+- **`plai_gateway_net` (externa):** Conecta Traefik exclusivamente con `nginx-plai-recursos:8443` mediante **TLS passthrough + PROXY protocol v2**.
+  - NGINX declara `listen 8443 ssl proxy_protocol` en ambos servidores del puerto `8443`, `set_real_ip_from ${TRUSTED_PROXY_CIDR}` (rango CIDR de la red overlay de Traefik) y `real_ip_header proxy_protocol`.
+  - **Despliegue coordinado:** en el `dynamic.yml` de Traefik debe activarse `proxyProtocol.version: 2` para el servicio `plai-recursos_nginx-plai-recursos:8443` en el mismo despliegue (si uno se activa sin el otro, el handshake TLS falla).
 - **`plai_isolated_backend` (`internal: true`, `encrypted: true`):** Red privada, aislada y cifrada entre `nginx-plai-recursos` y `app:3000`.
 - **`plai_app_egress` (`encrypted: true`):** Tráfico saliente desde `app` hacia Keycloak y Directus sin puertos publicados.
 - **HSTS único:** `Strict-Transport-Security` se envía **exclusivamente desde NGINX** (capa TLS `8443`) y no se duplica desde Next.js.
-- **Rate Limiting resistente a spoofing:** NGINX sobrescribe `X-Real-IP` y `X-Forwarded-For` únicamente con `$remote_addr` (nunca `$proxy_add_x_forwarded_for`), y `getClientIp` prioriza `x-real-ip` para impedir que un cliente evada el límite inyectando IPs falsas.
+- **Rate Limiting por IP real (sin spoofing ni límite global):** Gracias a PROXY protocol v2 + `set_real_ip_from`, `$remote_addr` en NGINX corresponde a la IP real del usuario final (no a la IP interna de Traefik). NGINX sobrescribe `X-Real-IP` y `X-Forwarded-For` únicamente con `$remote_addr` (nunca `$proxy_add_x_forwarded_for`), aplicando límites independientes por usuario tanto en NGINX como en Next.js `proxy.ts`.
 - **Healthcheck de arranque:** `app` usa `start_period: 40s` (alineado con el arranque de Next.js con `0.50 CPU`).
 
 ---

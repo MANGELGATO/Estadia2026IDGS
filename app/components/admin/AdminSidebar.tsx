@@ -18,6 +18,7 @@ import {
   RiGamepadLine,
 } from "react-icons/ri";
 import { useSession } from "next-auth/react";
+import { triggerFederatedLogout } from "../../../lib/federatedLogout";
 
 const navSections = [
   {
@@ -63,7 +64,7 @@ export default function AdminSidebar() {
   const userInitial = userName.charAt(0).toUpperCase();
 
   const handleSignOut = () => {
-    window.location.href = "/api/auth/federated-logout";
+    void triggerFederatedLogout();
   };
 
   return (

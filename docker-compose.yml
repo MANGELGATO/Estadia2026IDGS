@@ -32,6 +32,9 @@ services:
       ALLOWED_HOST: AQUI_HACER_CAMBIOS_CORRESPONDIENTES_CON_DOMINIO_INSTITUCIONAL_PLAI
       SSL_CERT_FILE: /etc/nginx/ssl/fullchain.pem
       SSL_KEY_FILE: /etc/nginx/ssl/privkey.pem
+      # Rango CIDR de la red overlay de Traefik (plai_gateway_net) para validar PROXY protocol v2.
+      # Ajustar al CIDR exacto de la red overlay en producción (acepta varios separados por coma/espacio).
+      TRUSTED_PROXY_CIDR: 10.0.0.0/8
     volumes:
       # Certificados TLS en el host (alineado con el script de renovación Let's Encrypt de PLAi).
       # El directorio del host debe ser legible por UID 101 (nginx) y se monta read-only.
@@ -78,8 +81,10 @@ services:
           memory: 64M
       restart_policy:
         condition: on-failure
-      # Nota: Configurar el router TCP con TLS passthrough en el file provider de Traefik
-      # apuntando a `plai-recursos_nginx-plai-recursos:8443` (HostSNI del dominio PLAi).
+      # Nota: Configurar el router TCP con TLS passthrough + PROXY protocol v2
+      # (`proxyProtocol.version: 2`) en el dynamic.yml de Traefik apuntando a
+      # `plai-recursos_nginx-plai-recursos:8443` (HostSNI del dominio PLAi).
+      # Ambos cambios (listen ... proxy_protocol y dynamic.yml) deben activarse juntos.
     networks:
       - plai_gateway_net
       - plai_isolated_backend

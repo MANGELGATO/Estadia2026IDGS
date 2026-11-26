@@ -303,3 +303,49 @@ export const categoryUpdateSchema = z.object({
     .max(15)
     .optional(),
 });
+
+/**
+ * Validación estricta de PUT /api/reservaciones
+ */
+export const reservacionUpdateSchema = z.object({
+  id: z.string().trim().min(1, 'El ID de la reservación es obligatorio').max(64),
+  estado: z
+    .enum(['Pendiente', 'Aprobada', 'Rechazada', 'En uso', 'Completada'])
+    .optional(),
+  equipoId: z.string().trim().max(64).optional(),
+  codigoPlaiAsignado: z.string().trim().max(80).optional(),
+  accesoriosIncluidos: z.string().trim().max(500).optional(),
+  condicionSalida: z
+    .enum(['Excelente', 'Bueno', 'Regular'])
+    .optional()
+    .or(z.literal('')),
+  observacionesAdmin: z.string().trim().max(1000).optional(),
+  usuarioNombre: z.string().trim().min(2).max(120).optional(),
+  fechaUso: z.string().regex(DATE_REGEX, 'La fecha debe tener formato YYYY-MM-DD').optional(),
+  horaInicio: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, 'La hora de inicio debe tener formato HH:MM')
+    .optional(),
+  horaFin: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, 'La hora de fin debe tener formato HH:MM')
+    .optional(),
+  actividad: z.string().trim().min(2).max(250).optional(),
+  registrarEntregaEnBitacora: z.boolean().optional(),
+});
+
+/**
+ * Validación estricta de POST / PUT /api/usuarios
+ */
+export const usuarioUpsertSchema = z.object({
+  id: z.string().trim().min(1).max(128).optional(),
+  name: z
+    .string()
+    .trim()
+    .min(2, 'El nombre debe contener al menos 2 caracteres')
+    .max(120, 'El nombre no puede exceder 120 caracteres'),
+  email: z.string().trim().email('Formato de correo electrónico inválido').max(150),
+  status: z.enum(['Activo', 'Inactivo']).optional().default('Activo'),
+  dependencia: z.string().trim().max(150).optional(),
+  telefono: z.string().trim().max(30).optional().or(z.literal('')),
+});

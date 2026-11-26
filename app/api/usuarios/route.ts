@@ -1,7 +1,9 @@
+import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUsuariosFromDB, upsertUsuarioInDB, UsuarioItem } from '../../../lib/db';
 import { requireSession } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
+import { usuarioUpsertSchema } from '../../../lib/validations/schemas';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,19 +39,23 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, name, email, status, dependencia, telefono } = body;
-
-    if (!name || !email) {
+    const parsed = usuarioUpsertSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { success: false, message: 'Nombre y correo electrónico son obligatorios' },
+        {
+          success: false,
+          message: 'Datos de perfil de usuario inválidos',
+          errors: parsed.error.flatten().fieldErrors,
+        },
         { status: 400 }
       );
     }
 
-    const normalizedEmail = String(email).trim().toLowerCase();
+    const { id, name, email, status, dependencia, telefono } = parsed.data;
+    const normalizedEmail = email.toLowerCase();
     const existingList = await getUsuariosFromDB();
     const existing = existingList.find(
-      (u) => (id && u.id === String(id)) || u.email.toLowerCase() === normalizedEmail
+      (u) => (id && u.id === id) || u.email.toLowerCase() === normalizedEmail
     );
 
     // El rol efectivo proviene de Keycloak; conservar el último rol sincronizado (o 'Usuario Final' si es pre-registro)
@@ -68,13 +74,13 @@ export async function POST(req: NextRequest) {
     }
 
     const user: UsuarioItem = {
-      id: existing?.id || (id ? String(id) : `usr-${Date.now()}`),
-      name: String(name).trim(),
+      id: existing?.id || id || `usr-${crypto.randomUUID()}`,
+      name,
       email: normalizedEmail,
       role: preservedRole,
-      status: status === 'Inactivo' ? 'Inactivo' : 'Activo',
-      dependencia: dependencia ? String(dependencia).trim() : 'Comunidad PLAi',
-      telefono: telefono ? String(telefono).trim() : undefined,
+      status,
+      dependencia: dependencia || 'Comunidad PLAi',
+      telefono: telefono || undefined,
       lastLogin: existing?.lastLogin || 'Pendiente de primer acceso SSO',
       reservations: existing?.reservations || 0,
     };

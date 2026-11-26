@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getReservacionesFromDB,
@@ -9,6 +10,7 @@ import {
 } from '../../../lib/db';
 import { requireSession, isStaffRole } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
+import { reservacionUpdateSchema } from '../../../lib/validations/schemas';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +51,18 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
+    const parsed = reservacionUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Datos inválidos para actualizar la reservación',
+          errors: parsed.error.flatten().fieldErrors,
+        },
+        { status: 400 }
+      );
+    }
+
     const {
       id,
       estado,
@@ -63,14 +77,7 @@ export async function PUT(req: NextRequest) {
       horaFin,
       actividad,
       registrarEntregaEnBitacora,
-    } = body;
-
-    if (!id) {
-      return NextResponse.json(
-        { success: false, message: 'El ID de la reservación es obligatorio' },
-        { status: 400 }
-      );
-    }
+    } = parsed.data;
 
     const allReservas = await getReservacionesFromDB();
     const reserva = allReservas.find((r) => r.id === id);
@@ -97,8 +104,9 @@ export async function PUT(req: NextRequest) {
     }
 
     if (resolvedCodigo && !resolvedEquipoId) {
+      const targetCode = resolvedCodigo.toLowerCase();
       const eq = allEquipos.find(
-        (e) => e.inventoryNumber.toLowerCase() === resolvedCodigo.toLowerCase()
+        (e) => e.inventoryNumber.toLowerCase() === targetCode
       );
       if (eq) resolvedEquipoId = eq.id;
     } else if (resolvedEquipoId && !resolvedCodigo) {
@@ -133,7 +141,7 @@ export async function PUT(req: NextRequest) {
         const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
         const estReturn = `${fechaUso || reserva.fechaUso} ${(horaFin || reserva.horaFin || '14:00').slice(0, 5)}:00`;
         const bitItem: BitacoraItem = {
-          id: `bit-${Date.now()}`,
+          id: `bit-${crypto.randomUUID()}`,
           equipoId: assignedDevice.id,
           codigoPlai: assignedDevice.inventoryNumber,
           equipoNombre: assignedDevice.name,

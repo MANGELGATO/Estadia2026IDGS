@@ -4,21 +4,13 @@ import React from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { UserCircle2, LogOut, ShieldCheck, User } from 'lucide-react';
+import { triggerFederatedLogout } from '../../lib/federatedLogout';
 
 export default function NavAuthStatus() {
   const { data: session, status } = useSession();
 
-  const handleFederatedLogout = async () => {
-    try {
-      const res = await fetch('/api/auth/federated-logout', {
-        method: 'POST',
-        credentials: 'same-origin',
-      });
-      const data = await res.json().catch(() => ({}));
-      window.location.href = typeof data.logoutUrl === 'string' ? data.logoutUrl : '/login';
-    } catch {
-      window.location.href = '/login';
-    }
+  const handleFederatedLogout = () => {
+    void triggerFederatedLogout();
   };
 
   if (status === 'loading') {

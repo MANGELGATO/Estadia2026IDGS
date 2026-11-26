@@ -19,6 +19,7 @@
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 const CLI_ARGS = process.argv.slice(2);
@@ -39,7 +40,7 @@ const ROTATE_TOKEN =
 const TOKEN_OUT_FILE =
   getArgValue('--token-out') ||
   process.env.SERVICE_TOKEN_OUT_FILE ||
-  path.resolve(process.cwd(), '.directus-service-token.tmp');
+  path.join(os.tmpdir(), 'plai-recursos-directus-service-token.tmp');
 
 if (!DIRECTUS_URL || !DIRECTUS_ADMIN_TOKEN) {
   console.error(
@@ -575,7 +576,8 @@ async function provisionServiceAccount() {
   );
   assertOk(policyCheck, `GET /policies (${SERVICE_POLICY_NAME})`);
 
-  let policyId = policyCheck.json?.data?.[0]?.id;
+  const existingPolicy = policyCheck.json?.data?.[0];
+  let policyId = existingPolicy?.id;
   if (!policyId) {
     const policyCreated = await api('POST', '/policies', {
       name: SERVICE_POLICY_NAME,
@@ -586,8 +588,19 @@ async function provisionServiceAccount() {
     assertOk(policyCreated, `POST /policies (${SERVICE_POLICY_NAME})`);
     policyId = policyCreated.json?.data?.id;
     console.log(`  [POLICY]  Creada policy "${SERVICE_POLICY_NAME}" (${policyId})`);
+  } else if (existingPolicy.app_access !== false || existingPolicy.admin_access !== false) {
+    const policyPatched = await api('PATCH', `/policies/${encodeURIComponent(policyId)}`, {
+      app_access: false,
+      admin_access: false,
+    });
+    assertOk(policyPatched, `PATCH /policies/${policyId} (restaurar app_access=false, admin_access=false)`);
+    console.log(
+      `  [POLICY]  Policy "${SERVICE_POLICY_NAME}" (${policyId}) endurecida: app_access=false, admin_access=false.`
+    );
   } else {
-    console.log(`  [POLICY]  Policy "${SERVICE_POLICY_NAME}" ya existe (${policyId})`);
+    console.log(
+      `  [POLICY]  Policy "${SERVICE_POLICY_NAME}" ya existe (${policyId}) con app_access=false y admin_access=false.`
+    );
   }
 
   // 2.1 Vínculo explícito rol <-> policy en directus_access (/access)

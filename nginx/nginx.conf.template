@@ -43,9 +43,15 @@ http {
     ''      '';
   }
 
+  # PROXY protocol v2 desde Traefik (TLS passthrough):
+  # Solo confía en el rango de la red overlay de Traefik para extraer la IP real del cliente
+  # y reflejarla en $remote_addr / $binary_remote_addr (tanto para limit_req como para Next.js).
+${SET_REAL_IP_FROM_DIRECTIVES}  real_ip_header proxy_protocol;
+
   log_format plai_json escape=json '{'
     '"timestamp":"$time_iso8601",'
     '"remote_addr":"$remote_addr",'
+    '"proxy_addr":"$realip_remote_addr",'
     '"host":"$host",'
     '"request_method":"$request_method",'
     '"request_uri":"$request_uri",'
@@ -109,16 +115,17 @@ http {
   }
 
   # --------------------------------------------------------------------------
-  # Puerto 8443: Terminación TLS directa (Traefik TCP/TLS passthrough)
+  # Puerto 8443: Terminación TLS directa (Traefik TCP/TLS passthrough + PROXY protocol v2)
+  # Requiere `proxyProtocol.version: 2` en el dynamic.yml de Traefik.
   # --------------------------------------------------------------------------
   server {
-    listen 8443 ssl default_server;
+    listen 8443 ssl default_server proxy_protocol;
     server_name _;
     ssl_reject_handshake on;
   }
 
   server {
-    listen 8443 ssl;
+    listen 8443 ssl proxy_protocol;
     http2 on;
     server_name ${ALLOWED_HOST};
 
