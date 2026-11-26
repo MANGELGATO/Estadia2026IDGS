@@ -6,7 +6,10 @@ import { RiCalendarCheckLine, RiCheckLine, RiCloseLine, RiTimeLine, RiEyeLine } 
 import StatCard from '../../components/admin/StatCard';
 import { ReservacionItem } from '../../../lib/db';
 import { DeviceItem } from '../../../lib/mockData';
-import { getAllowedReservationSelectOptions } from '../../../lib/reservationState';
+import {
+  getAllowedReservationSelectOptions,
+  reservationRequiresEquipment,
+} from '../../../lib/reservationState';
 
 const statusConfig: Record<string, { bg: string; color: string; label: string }> = {
   Pendiente:   { bg: 'rgba(245,158,11,0.12)',  color: '#D97706', label: 'Pendiente' },
@@ -208,10 +211,73 @@ export default function ReservacionesPage() {
     setIsEditOpen(true);
   };
 
+  const handleApproveNonEquipment = async (item: ReservacionItem) => {
+    try {
+      const res = await fetch('/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: item.id,
+          estado: 'Aprobada',
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setNotification({
+          text: `Solicitud de espacio/actividad ${item.folio} aprobada correctamente.`,
+          type: 'success',
+        });
+        fetchData();
+      } else {
+        setNotification({
+          text: json.message || 'No fue posible aprobar la solicitud.',
+          type: 'error',
+        });
+      }
+    } catch (err) {
+      console.error('Error al aprobar espacio/curso:', err);
+    }
+  };
+
+  const handleCompleteNonEquipment = async (item: ReservacionItem) => {
+    try {
+      const res = await fetch('/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: item.id,
+          estado: 'Completada',
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setNotification({
+          text: `Solicitud ${item.folio} marcada como Completada.`,
+          type: 'success',
+        });
+        fetchData();
+      } else {
+        setNotification({
+          text: json.message || 'No fue posible completar la solicitud.',
+          type: 'error',
+        });
+      }
+    } catch (err) {
+      console.error('Error al completar espacio/curso:', err);
+    }
+  };
+
   const handleSaveEdit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedItem) return;
     const fd = new FormData(e.currentTarget);
+    const requiresEquipment = reservationRequiresEquipment(selectedItem);
+    const selectedEquipoId = requiresEquipment
+      ? ((fd.get('equipoId') as string)?.trim() || undefined)
+      : undefined;
+    const matchedDevice = selectedEquipoId
+      ? equipos.find((eq) => eq.id === selectedEquipoId)
+      : undefined;
 
     const updated: Partial<ReservacionItem> = {
       usuarioNombre: (fd.get('usuarioNombre') as string).trim(),
@@ -220,7 +286,12 @@ export default function ReservacionesPage() {
       horaFin: fd.get('horaFin') as string,
       actividad: (fd.get('actividad') as string).trim(),
       estado: fd.get('estado') as ReservacionItem['estado'],
-      codigoPlaiAsignado: (fd.get('codigoPlaiAsignado') as string)?.trim() || undefined,
+      ...(requiresEquipment && selectedEquipoId
+        ? {
+            equipoId: selectedEquipoId,
+            codigoPlaiAsignado: matchedDevice?.inventoryNumber || selectedItem.codigoPlaiAsignado,
+          }
+        : {}),
       accesoriosIncluidos: (fd.get('accesoriosIncluidos') as string)?.trim() || undefined,
       condicionSalida: fd.get('condicionSalida') as string,
       observacionesAdmin: (fd.get('observacionesAdmin') as string)?.trim() || undefined,
@@ -232,6 +303,7 @@ export default function ReservacionesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: selectedItem.id, ...updated }),
       });
+      const json = await res.json().catch(() => ({}));
 
       if (res.ok) {
         setData(prev => prev.map(r => r.id === selectedItem.id ? { ...r, ...updated } : r));
@@ -239,7 +311,7 @@ export default function ReservacionesPage() {
         setNotification({ text: `Cambios guardados en reservación ${selectedItem.folio}.`, type: 'success' });
         fetchData();
       } else {
-        setNotification({ text: 'Error al guardar cambios', type: 'error' });
+        setNotification({ text: json.message || 'Error al guardar cambios', type: 'error' });
       }
     } catch (err) {
       console.error('Error al editar reservación:', err);
@@ -331,22 +403,46 @@ export default function ReservacionesPage() {
       render: (_, item: ReservacionItem) => (
         <div className="flex items-center gap-1.5 whitespace-nowrap">
           {item.estado === 'Pendiente' ? (
-            <button
-              onClick={() => handleOpenApproval(item)}
-              className="flex cursor-pointer items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700"
-              title="Aprobar y asignar dispositivo disponible"
-            >
-              <RiCheckLine /> Asignar
-            </button>
+            reservationRequiresEquipment(item) ? (
+              <button
+                onClick={() => handleOpenApproval(item)}
+                className="flex cursor-pointer items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700"
+                title="Aprobar y asignar dispositivo disponible"
+              >
+                <RiCheckLine /> Asignar
+              </button>
+            ) : (
+              <button
+                onClick={() => handleApproveNonEquipment(item)}
+                className="flex cursor-pointer items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700"
+                title="Aprobar solicitud de espacio o actividad"
+              >
+                <RiCheckLine /> Aprobar
+              </button>
+            )
           ) : null}
 
           {item.estado === 'Aprobada' ? (
             <button
               onClick={() => handleRegistrarSalida(item)}
               className="flex cursor-pointer items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm transition-all hover:bg-indigo-700"
-              title="Entregar dispositivo y abrir registro en Bitácora de Uso"
+              title={
+                reservationRequiresEquipment(item)
+                  ? 'Entregar dispositivo y abrir registro en Bitácora de Uso'
+                  : 'Marcar espacio/actividad como En uso'
+              }
             >
-              <RiCheckLine /> Entregar
+              <RiCheckLine /> {reservationRequiresEquipment(item) ? 'Entregar' : 'Iniciar'}
+            </button>
+          ) : null}
+
+          {item.estado === 'En uso' && !reservationRequiresEquipment(item) ? (
+            <button
+              onClick={() => handleCompleteNonEquipment(item)}
+              className="flex cursor-pointer items-center gap-1 rounded-md bg-slate-700 px-2.5 py-1 text-xs font-bold text-white shadow-sm transition-all hover:bg-slate-800"
+              title="Finalizar solicitud de espacio o actividad"
+            >
+              <RiCheckLine /> Finalizar
             </button>
           ) : null}
 
@@ -589,13 +685,15 @@ export default function ReservacionesPage() {
                   className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm text-gray-800"
                   defaultValue={selectedItem.estado}
                 >
-                  {getAllowedReservationSelectOptions(selectedItem.estado).map((opt) => (
+                  {getAllowedReservationSelectOptions(selectedItem.estado, {
+                    requiresEquipment: reservationRequiresEquipment(selectedItem),
+                  }).map((opt) => (
                     <option key={opt} value={opt}>
                       {opt}
                     </option>
                   ))}
                 </select>
-                {selectedItem.estado === 'En uso' && (
+                {selectedItem.estado === 'En uso' && reservationRequiresEquipment(selectedItem) && (
                   <p className="text-[11px] text-indigo-700">
                     Para marcar como Completada, registra la devolución desde el módulo de Bitácora.
                   </p>
@@ -637,15 +735,39 @@ export default function ReservacionesPage() {
               </div>
 
               <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-navy">Código PLAi Asignado</label>
-                <input
-                  type="text"
-                  name="codigoPlaiAsignado"
-                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm text-gray-800 font-mono read-only:bg-gray-100 read-only:text-gray-500"
-                  defaultValue={selectedItem.codigoPlaiAsignado || ''}
-                  readOnly={selectedItem.estado === 'En uso'}
-                  placeholder="Ej. 5151000013-1"
-                />
+                <label className="text-xs font-bold uppercase tracking-wider text-navy">
+                  {reservationRequiresEquipment(selectedItem)
+                    ? 'Equipo Físico Asignado'
+                    : 'Espacio / Actividad (sin equipo físico)'}
+                </label>
+                {reservationRequiresEquipment(selectedItem) ? (
+                  <select
+                    name="equipoId"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm text-gray-800 disabled:bg-gray-100 disabled:text-gray-500"
+                    defaultValue={selectedItem.equipoId || ''}
+                    disabled={selectedItem.estado === 'En uso'}
+                  >
+                    <option value="">-- Sin equipo asignado --</option>
+                    {equipos
+                      .filter(
+                        (eq) =>
+                          eq.id === selectedItem.equipoId || eq.status === 'Disponible'
+                      )
+                      .map((eq) => (
+                        <option key={eq.id} value={eq.id}>
+                          {eq.name} — {eq.inventoryNumber} ({eq.category}
+                          {eq.id === selectedItem.equipoId ? ' · Actual' : ' · Disponible'})
+                        </option>
+                      ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    readOnly
+                    value={selectedItem.codigoPlaiAsignado || 'Espacio / Sesión Formativa'}
+                    className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3.5 py-2 text-sm text-gray-600 font-mono"
+                  />
+                )}
               </div>
 
               <div className="flex flex-col gap-1.5 sm:col-span-2">

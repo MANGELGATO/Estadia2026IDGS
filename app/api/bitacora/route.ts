@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
 
     const item: BitacoraItem = {
       id: generateEntityId('bit'),
+      reservacionId: data.reservaId,
       equipoId: equipo.id,
       codigoPlai: equipo.inventoryNumber,
       equipoNombre: equipo.name,
@@ -148,7 +149,7 @@ export async function PUT(req: NextRequest) {
       descripcionIncidencia,
     } = parsed.data;
 
-    await updateBitacoraDevolucionInDB(id, {
+    const closedLog = await updateBitacoraDevolucionInDB(id, {
       fechaDevolucionReal,
       condicionDevolucion,
       accesoriosDevueltos: accesoriosDevueltos || 'Completos',
@@ -157,40 +158,50 @@ export async function PUT(req: NextRequest) {
       adminRecibe: auth.user.name,
     });
 
+    if (!closedLog) {
+      return NextResponse.json(
+        { success: false, message: `No se encontró el préstamo en bitácora con ID "${id}".` },
+        { status: 404 }
+      );
+    }
+
     if (incidenciaGenerada) {
-      const logs = await getBitacoraFromDB();
-      const item = logs.find((b) => b.id === id);
-      if (item) {
-        const incidencia: IncidenciaItem = {
-          id: generateEntityId('inc'),
-          folio: generateFolio('INC'),
-          equipoId: item.equipoId,
-          codigoPlai: item.codigoPlai,
-          equipoNombre: item.equipoNombre,
-          origen: 'Devolución de Préstamo',
-          tipoFalla: 'Daño Físico',
-          severidad: 'Media',
-          descripcion:
-            descripcionIncidencia ||
-            observacionesDevolucion ||
-            'Incidencia detectada durante la revisión de retorno del dispositivo.',
-          estado: 'Reportada',
-          tecnicoResponsable: auth.user.name,
-          fechaReporte: fechaDevolucionReal,
-        };
-        await insertIncidenciaInDB(incidencia);
-        logger.info('Incidencia automática generada desde bitácora de devolución', {
-          folio: incidencia.folio,
-          actor: auth.user.email,
-        });
-      }
+      const incidencia: IncidenciaItem = {
+        id: generateEntityId('inc'),
+        folio: generateFolio('INC'),
+        equipoId: closedLog.equipoId,
+        codigoPlai: closedLog.codigoPlai,
+        equipoNombre: closedLog.equipoNombre,
+        origen: 'Devolución de Préstamo',
+        tipoFalla: 'Daño Físico',
+        severidad: 'Media',
+        descripcion:
+          descripcionIncidencia ||
+          observacionesDevolucion ||
+          'Incidencia detectada durante la revisión de retorno del dispositivo.',
+        estado: 'Reportada',
+        tecnicoResponsable: auth.user.name,
+        fechaReporte: fechaDevolucionReal,
+      };
+      await insertIncidenciaInDB(incidencia);
+      logger.info('Incidencia automática generada desde bitácora de devolución', {
+        folio: incidencia.folio,
+        actor: auth.user.email,
+      });
     }
 
     return NextResponse.json({
       success: true,
       message: 'Devolución registrada exitosamente en la bitácora',
+      data: closedLog,
     });
   } catch (error) {
+    if (error instanceof EquipoStateConflictError) {
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: 409 }
+      );
+    }
     logger.error('Error al registrar devolución en bitácora', { path: '/api/bitacora' }, error);
     return NextResponse.json(
       { success: false, message: 'Error interno al registrar devolución' },

@@ -2,7 +2,10 @@ import { directus } from './directus';
 import { generateEntityId } from './folio';
 import { mexicoLocalToUtcIso } from './dateMexico';
 import { extractMediaFileId, deleteDirectusMediaFile } from './directusMedia';
-import { validateReservacionTransition } from './reservationState';
+import {
+  reservationRequiresEquipment,
+  validateReservacionTransition,
+} from './reservationState';
 import type { DeviceItem, AppItem } from './mockData';
 
 export type { DeviceItem };
@@ -358,6 +361,7 @@ export async function deleteAplicacionInDB(id: string): Promise<boolean> {
 // ====================================================================
 export interface BitacoraItem {
   id: string;
+  reservacionId?: string;
   equipoId: string;
   codigoPlai: string;
   equipoNombre: string;
@@ -382,6 +386,7 @@ export interface BitacoraItem {
 
 interface BitacoraRow {
   id: string;
+  reservacion_id?: string | null;
   equipo_id: string;
   codigo_plai: string;
   equipo_nombre: string;
@@ -404,12 +409,10 @@ interface BitacoraRow {
   date_created?: string | null;
 }
 
-export async function getBitacoraFromDB(): Promise<BitacoraItem[]> {
-  const rows = await directus.getItems<BitacoraRow>('bitacora_uso', {
-    sort: '-fecha_entrega',
-  });
-  return rows.map((r) => ({
+function mapBitacoraRow(r: BitacoraRow): BitacoraItem {
+  return {
     id: r.id,
+    reservacionId: r.reservacion_id || undefined,
     equipoId: r.equipo_id,
     codigoPlai: r.codigo_plai,
     equipoNombre: r.equipo_nombre,
@@ -432,7 +435,14 @@ export async function getBitacoraFromDB(): Promise<BitacoraItem[]> {
     adminEntrega: r.admin_entrega,
     adminRecibe: r.admin_recibe || undefined,
     createdAt: r.date_created || undefined,
-  }));
+  };
+}
+
+export async function getBitacoraFromDB(): Promise<BitacoraItem[]> {
+  const rows = await directus.getItems<BitacoraRow>('bitacora_uso', {
+    sort: '-fecha_entrega',
+  });
+  return rows.map(mapBitacoraRow);
 }
 
 export async function insertBitacoraEntregaInDB(
@@ -478,8 +488,11 @@ export async function insertBitacoraEntregaInDB(
     }
   }
 
+  const linkedReservacionId = reservaId || item.reservacionId || null;
+
   await directus.createItem<BitacoraRow>('bitacora_uso', {
     id: item.id,
+    reservacion_id: linkedReservacionId,
     equipo_id: item.equipoId,
     codigo_plai: item.codigoPlai,
     equipo_nombre: item.equipoNombre,
@@ -497,8 +510,8 @@ export async function insertBitacoraEntregaInDB(
   });
 
   // Sincronizar reservación vinculada
-  if (reservaId) {
-    await directus.updateItem<ReservacionRow>('reservaciones', reservaId, {
+  if (linkedReservacionId) {
+    await directus.updateItem<ReservacionRow>('reservaciones', linkedReservacionId, {
       estado: 'En uso',
       codigo_plai_asignado: item.codigoPlai,
       equipo_id: item.equipoId,
@@ -518,10 +531,17 @@ export async function updateBitacoraDevolucionInDB(
     incidenciaGenerada?: boolean;
     adminRecibe: string;
   }
-): Promise<boolean> {
+): Promise<BitacoraItem | null> {
   const existingLog = await directus.getItemById<BitacoraRow>('bitacora_uso', id);
   if (!existingLog) {
-    return false;
+    return null;
+  }
+
+  // Impide doble devolución por doble clic o pestaña desactualizada (HTTP 409)
+  if (existingLog.estado_prestamo !== 'Activo') {
+    throw new EquipoStateConflictError(
+      `El préstamo "${id}" ya fue cerrado anteriormente con estado "${existingLog.estado_prestamo}" y no puede devolverse nuevamente.`
+    );
   }
 
   const estadoPrestamo = devolucion.incidenciaGenerada ? 'Con Incidencia' : 'Devuelto';
@@ -535,36 +555,64 @@ export async function updateBitacoraDevolucionInDB(
     admin_recibe: devolucion.adminRecibe,
   });
 
-  if (updated?.equipo_id) {
+  const mergedRow: BitacoraRow = updated ?? {
+    ...existingLog,
+    fecha_devolucion_real: toIsoTimestamp(devolucion.fechaDevolucionReal),
+    condicion_devolucion: devolucion.condicionDevolucion || null,
+    accesorios_devueltos: devolucion.accesoriosDevueltos,
+    observaciones_devolucion: devolucion.observacionesDevolucion || null,
+    incidencia_generada: Boolean(devolucion.incidenciaGenerada),
+    estado_prestamo: estadoPrestamo,
+    admin_recibe: devolucion.adminRecibe,
+  };
+
+  if (mergedRow.equipo_id) {
     const nuevoEstadoEquipo: DeviceItem['status'] = devolucion.incidenciaGenerada
       ? 'En mantenimiento'
       : 'Disponible';
 
     // Solo libera el equipo si actualmente está "En uso" y no quedan otros préstamos activos
-    const stillHasActiveLoan = await hasActiveBitacoraLoanInDB(updated.equipo_id);
+    const stillHasActiveLoan = await hasActiveBitacoraLoanInDB(mergedRow.equipo_id);
     if (!stillHasActiveLoan) {
-      const currentEq = await directus.getItemById<EquipoRow>('equipos', updated.equipo_id);
+      const currentEq = await directus.getItemById<EquipoRow>('equipos', mergedRow.equipo_id);
       if (currentEq && currentEq.estado === 'En uso') {
-        await transitionEquipoStatusInDB(updated.equipo_id, nuevoEstadoEquipo, {
+        await transitionEquipoStatusInDB(mergedRow.equipo_id, nuevoEstadoEquipo, {
           allowFrom: ['En uso'],
           contextLabel: 'devolución en bitácora',
         });
       }
     }
 
-    // Completar reservaciones activas de ese equipo
-    const activas = await directus.getItems<ReservacionRow>('reservaciones', {
-      'filter[equipo_id][_eq]': updated.equipo_id,
-      'filter[estado][_eq]': 'En uso',
-    });
-    for (const res of activas) {
-      await directus.updateItem<ReservacionRow>('reservaciones', res.id, {
-        estado: 'Completada',
+    // Completar EXCLUSIVAMENTE la reservación vinculada a esta entrada de bitácora
+    if (existingLog.reservacion_id) {
+      const linkedReserva = await directus.getItemById<ReservacionRow>(
+        'reservaciones',
+        existingLog.reservacion_id
+      );
+      if (linkedReserva && linkedReserva.estado === 'En uso') {
+        await directus.updateItem<ReservacionRow>('reservaciones', linkedReserva.id, {
+          estado: 'Completada',
+        });
+      }
+    } else if (!stillHasActiveLoan) {
+      // Compatibilidad con registros históricos sin reservacion_id:
+      // solo cierra reservaciones "En uso" del mismo equipo y mismo correo de usuario
+      const activas = await directus.getItems<ReservacionRow>('reservaciones', {
+        'filter[equipo_id][_eq]': mergedRow.equipo_id,
+        'filter[estado][_eq]': 'En uso',
       });
+      const targetEmail = (existingLog.usuario_email || '').trim().toLowerCase();
+      for (const res of activas) {
+        if (!targetEmail || res.usuario_email.trim().toLowerCase() === targetEmail) {
+          await directus.updateItem<ReservacionRow>('reservaciones', res.id, {
+            estado: 'Completada',
+          });
+        }
+      }
     }
   }
 
-  return true;
+  return mapBitacoraRow(mergedRow);
 }
 
 // ====================================================================
@@ -704,11 +752,30 @@ export async function updateReservacionInDB(
   const prevEstado = existing.estado;
   const nextEstado = update.estado ?? existing.estado;
   const targetEquipoId = update.equipoId ?? existing.equipo_id ?? undefined;
+  const requiresEquipment = reservationRequiresEquipment({
+    id: existing.id,
+    folio: existing.folio,
+    codigoPlaiAsignado: update.codigoPlaiAsignado ?? existing.codigo_plai_asignado,
+    actividad: update.actividad ?? existing.actividad,
+  });
+
+  // Comprobar si existe un préstamo activo en bitácora (para distinguir En uso con/sin préstamo)
+  const hasActiveLoan = targetEquipoId ? await hasActiveBitacoraLoanInDB(targetEquipoId) : false;
 
   // 0. Validar la máquina de estados de la reservación ANTES de tocar equipos o Directus
-  const estadoValidation = validateReservacionTransition(prevEstado, nextEstado);
+  const estadoValidation = validateReservacionTransition(prevEstado, nextEstado, {
+    requiresEquipment,
+    hasActiveBitacoraLoan: hasActiveLoan,
+  });
   if (!estadoValidation.valid) {
     throw new EquipoStateConflictError(estadoValidation.message);
+  }
+
+  // Las reservaciones de equipo NO pueden aprobarse ni pasar a "En uso" sin un equipo físico válido
+  if (requiresEquipment && (nextEstado === 'Aprobada' || nextEstado === 'En uso') && !targetEquipoId) {
+    throw new EquipoStateConflictError(
+      `No se puede cambiar la reservación ${existing.folio} a "${nextEstado}" sin asignar un equipo físico disponible del inventario.`
+    );
   }
 
   // Mientras una reservación está "En uso", no se puede cambiar el equipo asignado
@@ -724,7 +791,7 @@ export async function updateReservacionInDB(
   }
 
   // 1. Validar y aplicar transición de estado del equipo ANTES de guardar la reservación
-  if (nextEstado && targetEquipoId) {
+  if (requiresEquipment && nextEstado && targetEquipoId) {
     if (nextEstado === 'Aprobada') {
       // Solo exige Disponible si aún no estaba Aprobada con ese mismo equipo
       const alreadyApprovedSameDevice =

@@ -370,4 +370,152 @@ describe('PUT /api/reservaciones — Máquina de estados de equipos (integridad)
     );
     expect(reopen.status).toBe(409);
   });
+
+  it('sincroniza equipoId al cambiar codigoPlaiAsignado y rechaza códigos inexistentes o contradictorios con 400', async () => {
+    state.equipos.push({
+      id: 'vr-02',
+      categoria_id: 'realidad-virtual',
+      nombre: 'Meta Quest 3 #2',
+      marca: 'Meta',
+      modelo: 'Quest 3',
+      codigo_plai: '5151000013-2',
+      estado: 'Disponible',
+      ubicacion: 'Laboratorio VR',
+      especificaciones: ['512 GB'],
+      accesorios: ['2 Controles'],
+    });
+
+    // Aprobar res-1 con vr-01
+    const approve1 = await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 'res-1', estado: 'Aprobada', equipoId: 'vr-01' }),
+      })
+    );
+    expect(approve1.status).toBe(200);
+    expect(state.equipos.find((e) => e.id === 'vr-01')?.estado).toBe('Reservado');
+
+    // Cambiar solo codigoPlaiAsignado al de vr-02: debe sincronizar equipo_id a vr-02 y liberar vr-01
+    const reassign = await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: 'res-1',
+          estado: 'Aprobada',
+          codigoPlaiAsignado: '5151000013-2',
+        }),
+      })
+    );
+    expect(reassign.status).toBe(200);
+    expect(state.reservaciones[0].equipo_id).toBe('vr-02');
+    expect(state.reservaciones[0].codigo_plai_asignado).toBe('5151000013-2');
+    expect(state.equipos.find((e) => e.id === 'vr-01')?.estado).toBe('Disponible');
+    expect(state.equipos.find((e) => e.id === 'vr-02')?.estado).toBe('Reservado');
+
+    // Código inexistente -> 400
+    const unknownCode = await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: 'res-1',
+          estado: 'Aprobada',
+          codigoPlaiAsignado: 'NO-EXISTE-999',
+        }),
+      })
+    );
+    expect(unknownCode.status).toBe(400);
+
+    // Código que no coincide con equipoId -> 400
+    const mismatch = await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: 'res-1',
+          estado: 'Aprobada',
+          equipoId: 'vr-01',
+          codigoPlaiAsignado: '5151000013-2',
+        }),
+      })
+    );
+    expect(mismatch.status).toBe(400);
+  });
+
+  it('rechaza con 409 aprobar una reservación de equipo sin dispositivo disponible y permite cerrar espacios desde "En uso"', async () => {
+    // Reservación de equipo sin equipo asignado y sin ningún equipo Disponible en su categoría
+    state.equipos[0].estado = 'En mantenimiento';
+    state.reservaciones.push({
+      id: 'res-sin-equipo',
+      folio: 'RES-20261126-ABCDEF12',
+      categoria_id: 'realidad-virtual',
+      equipo_id: null,
+      codigo_plai_asignado: null,
+      usuario_keycloak_id: 'kc-usr-3',
+      usuario_nombre: 'Usuario Tres',
+      usuario_email: 'tres@plai.mx',
+      fecha_uso: '2026-12-01',
+      hora_inicio: '10:00',
+      hora_fin: '12:00',
+      actividad: 'Práctica VR sin equipo',
+      estado: 'Pendiente',
+    });
+
+    const approveWithoutDevice = await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 'res-sin-equipo', estado: 'Aprobada' }),
+      })
+    );
+    expect(approveWithoutDevice.status).toBe(409);
+
+    // Reservación de espacio físico (sin equipo): Pendiente -> Aprobada -> En uso -> Completada
+    state.reservaciones.push({
+      id: 'esp-1',
+      folio: 'ESP-20261126-11223344',
+      categoria_id: 'computo-multimedia',
+      equipo_id: null,
+      codigo_plai_asignado: 'ESPACIO-AUDITORIO',
+      usuario_keycloak_id: 'kc-usr-4',
+      usuario_nombre: 'Usuario Cuatro',
+      usuario_email: 'cuatro@plai.mx',
+      fecha_uso: '2026-12-01',
+      hora_inicio: '10:00',
+      hora_fin: '12:00',
+      actividad: '[ESPACIO: Auditorio Principal] Conferencia',
+      estado: 'Pendiente',
+    });
+
+    const espApprove = await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 'esp-1', estado: 'Aprobada' }),
+      })
+    );
+    expect(espApprove.status).toBe(200);
+
+    const espStart = await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 'esp-1', estado: 'En uso' }),
+      })
+    );
+    expect(espStart.status).toBe(200);
+    expect(state.bitacora_uso).toHaveLength(0);
+
+    const espComplete = await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 'esp-1', estado: 'Completada' }),
+      })
+    );
+    expect(espComplete.status).toBe(200);
+    expect(state.reservaciones.find((r) => r.id === 'esp-1')?.estado).toBe('Completada');
+  });
 });

@@ -249,6 +249,7 @@ const COLLECTIONS = [
     schema: {},
     fields: [
       { field: 'id', type: 'string', schema: { is_primary_key: true, max_length: 64 }, meta: { interface: 'input', required: true } },
+      { field: 'reservacion_id', type: 'string', schema: { max_length: 64 }, meta: { interface: 'select-dropdown-m2o', note: 'Reservación asociada al préstamo físico' } },
       { field: 'equipo_id', type: 'string', schema: { max_length: 64 }, meta: { interface: 'select-dropdown-m2o' } },
       { field: 'codigo_plai', type: 'string', schema: { max_length: 80 }, meta: { interface: 'input' } },
       { field: 'equipo_nombre', type: 'string', schema: { max_length: 150 }, meta: { interface: 'input' } },
@@ -453,6 +454,7 @@ const RELATIONS = [
   { collection: c('equipos'), field: 'categoria_id', related_collection: c('categorias') },
   { collection: c('reservaciones'), field: 'categoria_id', related_collection: c('categorias') },
   { collection: c('reservaciones'), field: 'equipo_id', related_collection: c('equipos') },
+  { collection: c('bitacora_uso'), field: 'reservacion_id', related_collection: c('reservaciones') },
   { collection: c('bitacora_uso'), field: 'equipo_id', related_collection: c('equipos') },
   { collection: c('incidencias'), field: 'equipo_id', related_collection: c('equipos') },
 ];

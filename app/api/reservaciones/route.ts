@@ -12,6 +12,7 @@ import {
 import { requireSession, isStaffRole } from '../../../lib/authGuard';
 import { logger } from '../../../lib/logger';
 import { mexicoLocalToUtcIso } from '../../../lib/dateMexico';
+import { reservationRequiresEquipment } from '../../../lib/reservationState';
 import { reservacionUpdateSchema } from '../../../lib/validations/schemas';
 
 export const dynamic = 'force-dynamic';
@@ -94,46 +95,103 @@ export async function PUT(req: NextRequest) {
     }
 
     const allEquipos = await getEquiposFromDB();
+    const requiresEquipment = reservationRequiresEquipment({
+      id: reserva.id,
+      folio: reserva.folio,
+      codigoPlaiAsignado: reserva.codigoPlaiAsignado,
+      actividad: reserva.actividad,
+    });
 
-    let resolvedEquipoId = equipoId || reserva.equipoId;
-    let resolvedCodigo = codigoPlaiAsignado || reserva.codigoPlaiAsignado;
+    const effectiveEstado =
+      estado ?? (registrarEntregaEnBitacora && reserva.estado !== 'En uso' ? 'En uso' : undefined);
 
-    if (estado === 'Aprobada' && !resolvedCodigo) {
-      const catNorm = normalizeStr(reserva.categoriaId);
-      const disponible =
-        allEquipos.find((e) => e.id === reserva.equipoId && e.status === 'Disponible') ||
-        allEquipos.find((e) => {
+    let resolvedEquipoId: string | undefined = reserva.equipoId;
+    let resolvedCodigo: string | undefined = reserva.codigoPlaiAsignado;
+
+    if (requiresEquipment) {
+      const providedCode = codigoPlaiAsignado?.trim() || undefined;
+      const providedId = equipoId?.trim() || undefined;
+
+      if (providedCode && providedId) {
+        const eqById = allEquipos.find((e) => e.id === providedId);
+        const eqByCode = allEquipos.find(
+          (e) => e.inventoryNumber.toLowerCase() === providedCode.toLowerCase()
+        );
+        if (!eqById || !eqByCode) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `El equipo o código PLAi "${providedCode}" no existe en el inventario.`,
+            },
+            { status: 400 }
+          );
+        }
+        if (eqById.id !== eqByCode.id) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `El código PLAi "${providedCode}" no coincide con el equipo seleccionado (${providedId}).`,
+            },
+            { status: 400 }
+          );
+        }
+        resolvedEquipoId = eqById.id;
+        resolvedCodigo = eqById.inventoryNumber;
+      } else if (providedCode) {
+        const eqByCode = allEquipos.find(
+          (e) => e.inventoryNumber.toLowerCase() === providedCode.toLowerCase()
+        );
+        if (!eqByCode) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `El código PLAi "${providedCode}" no corresponde a ningún equipo del inventario.`,
+            },
+            { status: 400 }
+          );
+        }
+        resolvedEquipoId = eqByCode.id;
+        resolvedCodigo = eqByCode.inventoryNumber;
+      } else if (providedId) {
+        const eqById = allEquipos.find((e) => e.id === providedId);
+        if (!eqById) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `El equipo "${providedId}" no existe en el inventario.`,
+            },
+            { status: 400 }
+          );
+        }
+        resolvedEquipoId = eqById.id;
+        resolvedCodigo = eqById.inventoryNumber;
+      }
+
+      // Si se aprueba una reservación de equipo aún sin asignar, intentar asignar un disponible de la categoría
+      if (effectiveEstado === 'Aprobada' && !resolvedEquipoId) {
+        const catNorm = normalizeStr(reserva.categoriaId);
+        const disponible = allEquipos.find((e) => {
           const eqCatNorm = normalizeStr(e.category);
           return (
             e.status === 'Disponible' &&
             (eqCatNorm.includes(catNorm) || (catNorm !== '' && catNorm.includes(eqCatNorm)))
           );
         });
-      if (disponible) {
-        resolvedEquipoId = disponible.id;
-        resolvedCodigo = disponible.inventoryNumber;
+        if (disponible) {
+          resolvedEquipoId = disponible.id;
+          resolvedCodigo = disponible.inventoryNumber;
+        }
       }
     }
 
-    if (resolvedCodigo && !resolvedEquipoId) {
-      const targetCode = resolvedCodigo.toLowerCase();
-      const eq = allEquipos.find((e) => e.inventoryNumber.toLowerCase() === targetCode);
-      if (eq) resolvedEquipoId = eq.id;
-    } else if (resolvedEquipoId && !resolvedCodigo) {
-      const eq = allEquipos.find((e) => e.id === resolvedEquipoId);
-      if (eq) resolvedCodigo = eq.inventoryNumber;
-    }
-
-    const effectiveEstado =
-      estado ?? (registrarEntregaEnBitacora && reserva.estado !== 'En uso' ? 'En uso' : undefined);
     const isTransitioningToEnUso =
       reserva.estado !== 'En uso' &&
       (effectiveEstado === 'En uso' || Boolean(registrarEntregaEnBitacora));
 
     const updatePayload: Partial<ReservacionItem> = {
       ...(effectiveEstado ? { estado: effectiveEstado } : {}),
-      ...(resolvedEquipoId ? { equipoId: resolvedEquipoId } : {}),
-      ...(resolvedCodigo ? { codigoPlaiAsignado: resolvedCodigo } : {}),
+      ...(requiresEquipment && resolvedEquipoId ? { equipoId: resolvedEquipoId } : {}),
+      ...(requiresEquipment && resolvedCodigo ? { codigoPlaiAsignado: resolvedCodigo } : {}),
       ...(accesoriosIncluidos !== undefined ? { accesoriosIncluidos } : {}),
       ...(condicionSalida ? { condicionSalida } : {}),
       ...(observacionesAdmin !== undefined ? { observacionesAdmin } : {}),
@@ -153,14 +211,10 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    // Registrar entrega en bitácora SOLO cuando la reservación CAMBIA hacia "En uso",
-    // nunca en ediciones posteriores de una reservación que ya estaba "En uso".
-    if (isTransitioningToEnUso) {
-      const assignedDevice = allEquipos.find(
-        (e) =>
-          (resolvedCodigo && e.inventoryNumber.toLowerCase() === resolvedCodigo.toLowerCase()) ||
-          (resolvedEquipoId && e.id === resolvedEquipoId)
-      );
+    // Registrar entrega en bitácora SOLO cuando una reservación DE EQUIPO cambia hacia "En uso",
+    // nunca en ediciones posteriores ni en solicitudes de espacio/curso sin equipo físico.
+    if (isTransitioningToEnUso && requiresEquipment) {
+      const assignedDevice = allEquipos.find((e) => e.id === resolvedEquipoId);
       if (assignedDevice) {
         const nowUtcIso = new Date().toISOString();
         const estDate = fechaUso || reserva.fechaUso;
@@ -169,6 +223,7 @@ export async function PUT(req: NextRequest) {
 
         const bitItem: BitacoraItem = {
           id: `bit-${crypto.randomUUID()}`,
+          reservacionId: id,
           equipoId: assignedDevice.id,
           codigoPlai: assignedDevice.inventoryNumber,
           equipoNombre: assignedDevice.name,
