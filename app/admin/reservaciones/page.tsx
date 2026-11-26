@@ -6,6 +6,7 @@ import { RiCalendarCheckLine, RiCheckLine, RiCloseLine, RiTimeLine, RiEyeLine } 
 import StatCard from '../../components/admin/StatCard';
 import { ReservacionItem } from '../../../lib/db';
 import { DeviceItem } from '../../../lib/mockData';
+import { getAllowedReservationSelectOptions } from '../../../lib/reservationState';
 
 const statusConfig: Record<string, { bg: string; color: string; label: string }> = {
   Pendiente:   { bg: 'rgba(245,158,11,0.12)',  color: '#D97706', label: 'Pendiente' },
@@ -588,12 +589,17 @@ export default function ReservacionesPage() {
                   className="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm text-gray-800"
                   defaultValue={selectedItem.estado}
                 >
-                  <option value="Pendiente">Pendiente</option>
-                  <option value="Aprobada">Aprobada</option>
-                  <option value="En uso">En uso</option>
-                  <option value="Completada">Completada</option>
-                  <option value="Rechazada">Rechazada</option>
+                  {getAllowedReservationSelectOptions(selectedItem.estado).map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
                 </select>
+                {selectedItem.estado === 'En uso' && (
+                  <p className="text-[11px] text-indigo-700">
+                    Para marcar como Completada, registra la devolución desde el módulo de Bitácora.
+                  </p>
+                )}
               </div>
 
               <div className="flex flex-col gap-1.5">
@@ -635,8 +641,9 @@ export default function ReservacionesPage() {
                 <input
                   type="text"
                   name="codigoPlaiAsignado"
-                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm text-gray-800 font-mono"
+                  className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-sm text-gray-800 font-mono read-only:bg-gray-100 read-only:text-gray-500"
                   defaultValue={selectedItem.codigoPlaiAsignado || ''}
+                  readOnly={selectedItem.estado === 'En uso'}
                   placeholder="Ej. 5151000013-1"
                 />
               </div>

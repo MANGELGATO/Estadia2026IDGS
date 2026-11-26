@@ -34,6 +34,7 @@ const PREFIX = process.env.DIRECTUS_COLLECTION_PREFIX || 'lab_recursos_';
 const SERVICE_ROLE_NAME = process.env.DIRECTUS_SERVICE_ROLE || `${PREFIX}service`;
 const SERVICE_POLICY_NAME = process.env.DIRECTUS_SERVICE_POLICY || `${PREFIX}service_policy`;
 const SERVICE_USER_EMAIL = process.env.DIRECTUS_SERVICE_EMAIL || 'svc-lab-recursos@plai.mx';
+const MEDIA_FOLDER_NAME = (process.env.DIRECTUS_MEDIA_FOLDER || 'lab_recursos').trim();
 const SKIP_SERVICE_ACCOUNT = process.env.SKIP_SERVICE_ACCOUNT === 'true';
 const ROTATE_TOKEN =
   CLI_ARGS.includes('--rotate-token') || process.env.ROTATE_SERVICE_TOKEN === 'true';
@@ -525,7 +526,7 @@ function writeTokenSecurely(token) {
   }
 }
 
-async function verifyServiceToken(token) {
+async function verifyServiceToken(token, expectedFolderId) {
   const testCollection = c('equipos');
   const res = await fetch(`${DIRECTUS_URL}/items/${encodeURIComponent(testCollection)}?limit=1`, {
     method: 'GET',
@@ -542,6 +543,33 @@ async function verifyServiceToken(token) {
     process.exit(1);
   }
   console.log(`  [VERIFY]  Token de servicio verificado: GET /items/${testCollection} -> HTTP 200 OK.`);
+
+  if (expectedFolderId) {
+    const filesRes = await fetch(`${DIRECTUS_URL}/files?fields=id,folder&limit=10`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!filesRes.ok) {
+      console.error(
+        `  [ERROR] Prueba de humo falló: GET /files recibió HTTP ${filesRes.status} con el token de servicio.`
+      );
+      process.exit(1);
+    }
+    const filesJson = await filesRes.json().catch(() => null);
+    const leaked = (filesJson?.data || []).filter((f) => f.folder !== expectedFolderId);
+    if (leaked.length > 0) {
+      console.error(
+        `  [ERROR] Fallo de aislamiento: el token de servicio pudo ver ${leaked.length} archivo(s) fuera de la carpeta "${MEDIA_FOLDER_NAME}" (${expectedFolderId}).`
+      );
+      process.exit(1);
+    }
+    console.log(
+      `  [VERIFY]  Aislamiento de archivos verificado: GET /files solo expone la carpeta "${MEDIA_FOLDER_NAME}" (${expectedFolderId}).`
+    );
+  }
 }
 
 async function provisionServiceAccount() {
@@ -667,24 +695,98 @@ async function provisionServiceAccount() {
     }
   }
 
-  // Permisos mínimos sobre `directus_files` para subir y servir imágenes vía /api/media (solo create + read)
-  for (const action of ['create', 'read']) {
-    const key = `directus_files:${action}`;
-    if (!existingPermsMap.has(key)) {
-      const permRes = await api('POST', '/permissions', {
+  // 3.1 Carpeta exclusiva de medios en Directus (`directus_folders`) para aislar archivos del ecosistema compartido
+  const folderCheck = await api(
+    'GET',
+    `/folders?filter[name][_eq]=${encodeURIComponent(MEDIA_FOLDER_NAME)}&filter[parent][_null]=true&limit=1`
+  );
+  assertOk(folderCheck, `GET /folders (${MEDIA_FOLDER_NAME})`);
+
+  let mediaFolderId = folderCheck.json?.data?.[0]?.id;
+  if (!mediaFolderId) {
+    const folderCreated = await api('POST', '/folders', {
+      name: MEDIA_FOLDER_NAME,
+    });
+    assertOk(folderCreated, `POST /folders (${MEDIA_FOLDER_NAME})`);
+    mediaFolderId = folderCreated.json?.data?.id;
+    console.log(`  [FOLDER]  Creada carpeta exclusiva de medios "${MEDIA_FOLDER_NAME}" (${mediaFolderId}).`);
+  } else {
+    console.log(`  [FOLDER]  Carpeta exclusiva de medios "${MEDIA_FOLDER_NAME}" ya existe (${mediaFolderId}).`);
+  }
+
+  // 3.2 Permisos estrictamente aislados sobre `directus_folders` y `directus_files` (solo carpeta `mediaFolderId`)
+  //     Si ya existían permisos previos sin filtro, se actualizan con PATCH para cerrar cualquier exposición.
+  const folderFilter = { folder: { _eq: mediaFolderId } };
+  const scopedMediaPerms = [
+    {
+      collection: 'directus_folders',
+      action: 'read',
+      payload: {
+        policy: policyId,
+        collection: 'directus_folders',
+        action: 'read',
+        fields: ['id', 'name'],
+        permissions: { id: { _eq: mediaFolderId } },
+      },
+    },
+    {
+      collection: 'directus_files',
+      action: 'read',
+      payload: {
         policy: policyId,
         collection: 'directus_files',
-        action,
+        action: 'read',
         fields: ['*'],
-      });
+        permissions: folderFilter,
+      },
+    },
+    {
+      collection: 'directus_files',
+      action: 'create',
+      payload: {
+        policy: policyId,
+        collection: 'directus_files',
+        action: 'create',
+        fields: ['*'],
+        validation: folderFilter,
+        presets: { folder: mediaFolderId },
+      },
+    },
+    {
+      collection: 'directus_files',
+      action: 'delete',
+      payload: {
+        policy: policyId,
+        collection: 'directus_files',
+        action: 'delete',
+        permissions: folderFilter,
+      },
+    },
+  ];
+
+  let permsUpdated = 0;
+  for (const spec of scopedMediaPerms) {
+    const key = `${spec.collection}:${spec.action}`;
+    const existingPerm = existingPermsMap.get(key);
+    if (!existingPerm) {
+      const permRes = await api('POST', '/permissions', spec.payload);
       assertOk(permRes, `POST /permissions (${key})`);
       permsCreated += 1;
+    } else {
+      const patchRes = await api(
+        'PATCH',
+        `/permissions/${encodeURIComponent(existingPerm.id)}`,
+        spec.payload
+      );
+      assertOk(patchRes, `PATCH /permissions/${existingPerm.id} (${key} con filtro de carpeta)`);
+      permsUpdated += 1;
     }
   }
 
   console.log(
-    `  [PERMS]   Permisos mínimos verificados para ${COLLECTIONS.length} colecciones + directus_files (${permsCreated} nuevos, ${permsRevoked} revocados).`
+    `  [PERMS]   Permisos mínimos verificados para ${COLLECTIONS.length} colecciones + medios aislados en "${MEDIA_FOLDER_NAME}" (${permsCreated} nuevos, ${permsUpdated} reforzados, ${permsRevoked} revocados).`
   );
+  console.log(`  [ENV]     Opcional en docker-compose.yml: DIRECTUS_MEDIA_FOLDER_ID=${mediaFolderId}`);
 
   // 4. Usuario de servicio dedicado (verifica rol/estado y soporta rotación con --rotate-token)
   const userCheck = await api(
@@ -743,7 +845,7 @@ async function provisionServiceAccount() {
   // 5. Prueba de humo contra la API con el token generado/rotado (o VERIFY_SERVICE_TOKEN si se provee)
   const tokenToVerify = activeServiceToken || process.env.VERIFY_SERVICE_TOKEN || '';
   if (tokenToVerify) {
-    await verifyServiceToken(tokenToVerify);
+    await verifyServiceToken(tokenToVerify, mediaFolderId);
   }
 }
 

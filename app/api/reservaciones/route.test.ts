@@ -257,4 +257,117 @@ describe('PUT /api/reservaciones — Máquina de estados de equipos (integridad)
     );
     expect(res.status).toBe(404);
   });
+
+  it('permite editar una reservación ya "En uso" sin dar 409 ni duplicar entrada de bitácora', async () => {
+    // 1. Aprobar y entregar res-1
+    await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: 'res-1',
+          estado: 'Aprobada',
+          equipoId: 'vr-01',
+          codigoPlaiAsignado: '5151000013-1',
+        }),
+      })
+    );
+    await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: 'res-1',
+          estado: 'En uso',
+          registrarEntregaEnBitacora: true,
+        }),
+      })
+    );
+    expect(state.bitacora_uso).toHaveLength(1);
+
+    // 2. Editar observaciones/horario mandando el formulario completo (que siempre envía estado: 'En uso')
+    const editRes = await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: 'res-1',
+          estado: 'En uso',
+          observacionesAdmin: 'Se agregó adaptador USB-C adicional',
+          horaFin: '12:30',
+        }),
+      })
+    );
+    expect(editRes.status).toBe(200);
+    // No se creó una segunda bitácora duplicada
+    expect(state.bitacora_uso).toHaveLength(1);
+    expect(state.equipos[0].estado).toBe('En uso');
+  });
+
+  it('valida la máquina de estados de la reservación y rechaza transiciones ilegales con 409', async () => {
+    // Aprobar res-1 (Pendiente -> Aprobada)
+    const approve = await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: 'res-1',
+          estado: 'Aprobada',
+          equipoId: 'vr-01',
+          codigoPlaiAsignado: '5151000013-1',
+        }),
+      })
+    );
+    expect(approve.status).toBe(200);
+
+    // Intentar regresar Aprobada -> Pendiente -> 409 (evita dejar equipo atorado en Reservado)
+    const backToPending = await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 'res-1', estado: 'Pendiente' }),
+      })
+    );
+    expect(backToPending.status).toBe(409);
+    expect(state.reservaciones[0].estado).toBe('Aprobada');
+
+    // Pasar Aprobada -> En uso
+    const toInUse = await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 'res-1', estado: 'En uso' }),
+      })
+    );
+    expect(toInUse.status).toBe(200);
+
+    // Intentar pasar En uso -> Completada manualmente (sin devolución en Bitácora) -> 409
+    const manualComplete = await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 'res-1', estado: 'Completada' }),
+      })
+    );
+    expect(manualComplete.status).toBe(409);
+    expect(state.reservaciones[0].estado).toBe('En uso');
+    expect(state.equipos[0].estado).toBe('En uso');
+
+    // Rechazar res-2 (Pendiente -> Rechazada) y luego intentar reabrirla -> 409
+    await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 'res-2', estado: 'Rechazada' }),
+      })
+    );
+    const reopen = await PUT(
+      new NextRequest('http://localhost:3000/api/reservaciones', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 'res-2', estado: 'Aprobada' }),
+      })
+    );
+    expect(reopen.status).toBe(409);
+  });
 });

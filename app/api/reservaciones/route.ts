@@ -124,8 +124,14 @@ export async function PUT(req: NextRequest) {
       if (eq) resolvedCodigo = eq.inventoryNumber;
     }
 
+    const effectiveEstado =
+      estado ?? (registrarEntregaEnBitacora && reserva.estado !== 'En uso' ? 'En uso' : undefined);
+    const isTransitioningToEnUso =
+      reserva.estado !== 'En uso' &&
+      (effectiveEstado === 'En uso' || Boolean(registrarEntregaEnBitacora));
+
     const updatePayload: Partial<ReservacionItem> = {
-      ...(estado ? { estado } : {}),
+      ...(effectiveEstado ? { estado: effectiveEstado } : {}),
       ...(resolvedEquipoId ? { equipoId: resolvedEquipoId } : {}),
       ...(resolvedCodigo ? { codigoPlaiAsignado: resolvedCodigo } : {}),
       ...(accesoriosIncluidos !== undefined ? { accesoriosIncluidos } : {}),
@@ -147,7 +153,9 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    if (estado === 'En uso' || registrarEntregaEnBitacora) {
+    // Registrar entrega en bitácora SOLO cuando la reservación CAMBIA hacia "En uso",
+    // nunca en ediciones posteriores de una reservación que ya estaba "En uso".
+    if (isTransitioningToEnUso) {
       const assignedDevice = allEquipos.find(
         (e) =>
           (resolvedCodigo && e.inventoryNumber.toLowerCase() === resolvedCodigo.toLowerCase()) ||
@@ -183,7 +191,7 @@ export async function PUT(req: NextRequest) {
         };
         // updateReservacionInDB ya validó y transicionó el equipo a 'En uso'
         await insertBitacoraEntregaInDB(bitItem, id, {
-          skipEquipoTransition: estado === 'En uso',
+          skipEquipoTransition: effectiveEstado === 'En uso',
         });
       }
     }

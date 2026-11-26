@@ -65,7 +65,7 @@ export default function EspaciosPage() {
       espacioId: activeEspacio.id,
       nombreSolicitante: (fd.get('nombreSolicitante') as string)?.trim() || session?.user?.name || 'Solicitante PLAi',
       email: (fd.get('correo') as string)?.trim() || session?.user?.email || 'user@plai.edu.mx',
-      telefono: (fd.get('telefono') as string)?.trim() || '33 1410 1620',
+      telefono: (fd.get('telefono') as string)?.trim() || '',
       fecha: fd.get('fecha') as string,
       hora: fd.get('horaInicio') as string,
       proposito: (fd.get('proposito') as string)?.trim(),
@@ -238,7 +238,7 @@ export default function EspaciosPage() {
                     </div>
                     <div className="flex flex-col gap-1">
                       <label className="font-heading text-[0.85rem] font-semibold text-navy">Teléfono (10 dígitos)</label>
-                      <input name="telefono" type="tel" defaultValue="3314101620" className="w-full rounded-xl border border-black/[0.08] bg-[#F4F6F9] px-4 py-3 text-[0.9rem] outline-none transition-all focus:border-plai focus:ring-2 focus:ring-plai/10" required placeholder="33 1410 1620" />
+                      <input name="telefono" type="tel" defaultValue="" className="w-full rounded-xl border border-black/[0.08] bg-[#F4F6F9] px-4 py-3 text-[0.9rem] outline-none transition-all focus:border-plai focus:ring-2 focus:ring-plai/10" required placeholder="Ej. 33 1234 5678" />
                     </div>
                   </div>
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSession } from '../../../lib/authGuard';
 import { env } from '../../../lib/env';
 import { logger } from '../../../lib/logger';
+import { resolveMediaFolderId } from '../../../lib/directusMedia';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,12 +61,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const folderId = await resolveMediaFolderId();
+
     const safeFileName = (file.name || 'imagen-plai')
       .replace(/[^a-zA-Z0-9._-]/g, '_')
       .slice(0, 120);
 
     const bytes = await file.arrayBuffer();
     const outboundForm = new FormData();
+    // IMPORTANTE en Directus multipart POST /files: `folder` y `title` DEBEN ir antes de `file`
+    outboundForm.append('folder', folderId);
     outboundForm.append('title', safeFileName);
     outboundForm.append('file', new Blob([bytes], { type: file.type }), safeFileName);
 

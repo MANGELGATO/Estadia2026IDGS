@@ -25,18 +25,29 @@ describe('Esquemas de Validación Zod (PLAi Sec. 7.2)', () => {
       expect(result.success).toBe(true);
     });
 
-    it('rechaza una reservación cuyo préstamo excede las 2 horas reglamentarias', () => {
-      const invalidData = {
+    it('acepta una reservación de 3 horas en el esquema estructural (el límite operativo real lo valida /api/reservas con maxReservationHours)', () => {
+      const threeHoursData = {
         ...validData,
         startTime: '10:00',
-        endTime: '13:00', // 3 horas
+        endTime: '13:00',
+      };
+
+      const result = reservationSchema.safeParse(threeHoursData);
+      expect(result.success).toBe(true);
+    });
+
+    it('rechaza una reservación que excede el tope técnico absoluto de 8 horas', () => {
+      const invalidData = {
+        ...validData,
+        startTime: '08:00',
+        endTime: '17:00', // 9 horas
       };
 
       const result = reservationSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
       if (!result.success) {
         const error = result.error.flatten().fieldErrors.endTime;
-        expect(error?.[0]).toMatch(/tiempo máximo de préstamo es de 2 horas/i);
+        expect(error?.[0]).toMatch(/8 horas/i);
       }
     });
 

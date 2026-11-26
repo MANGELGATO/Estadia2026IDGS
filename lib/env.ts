@@ -82,6 +82,12 @@ export const env = {
   get directusCollectionPrefix(): string {
     return process.env.DIRECTUS_COLLECTION_PREFIX || 'lab_recursos_';
   },
+  get directusMediaFolderName(): string {
+    return (process.env.DIRECTUS_MEDIA_FOLDER || 'lab_recursos').trim();
+  },
+  get directusMediaFolderId(): string {
+    return (process.env.DIRECTUS_MEDIA_FOLDER_ID || '').trim();
+  },
   get hasDirectusConfig(): boolean {
     return Boolean(this.directusUrl && this.directusToken);
   },

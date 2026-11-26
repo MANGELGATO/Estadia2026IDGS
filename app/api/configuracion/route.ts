@@ -6,7 +6,34 @@ import { systemConfigSchema } from '../../../lib/validations/schemas';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const isPublicScope = searchParams.get('scope') === 'public';
+
+  if (isPublicScope) {
+    try {
+      const config = await getSystemConfigFromDB();
+      return NextResponse.json({
+        success: true,
+        data: {
+          maxReservationHours: config.maxReservationHours,
+          maxAdvanceDays: config.maxAdvanceDays,
+          allowPublicView: config.allowPublicView,
+        },
+      });
+    } catch (error) {
+      logger.error(
+        'Error al consultar parámetros públicos de configuración',
+        { path: '/api/configuracion?scope=public' },
+        error
+      );
+      return NextResponse.json(
+        { success: false, message: 'Error al consultar configuración pública' },
+        { status: 500 }
+      );
+    }
+  }
+
   const auth = await requireSession(['admin']);
   if (auth.errorResponse) return auth.errorResponse;
 

@@ -48,20 +48,39 @@ export default function ReservationForm({ device, onClose }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [selectedAccessories, setSelectedAccessories] = useState<string[]>(device.accessories || []);
+  const [maxReservationHours, setMaxReservationHours] = useState<number>(2);
 
   // Control interactivo de archivos adjuntos
   const [ineFrontName, setIneFrontName] = useState<string | null>(null);
   const [ineBackName, setIneBackName] = useState<string | null>(null);
   const [responsivaDocName, setResponsivaDocName] = useState<string | null>(null);
 
+  useEffect(() => {
+    let active = true;
+    fetch('/api/configuracion?scope=public')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        const hrs = Number(json?.data?.maxReservationHours);
+        if (active && Number.isFinite(hrs) && hrs >= 1 && hrs <= 8) {
+          setMaxReservationHours(hrs);
+        }
+      })
+      .catch(() => {
+        // Conserva el valor por defecto (2 horas)
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleEndTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newEnd = e.target.value;
     if (startTime && newEnd) {
-      const result = validateTimeRange(startTime, newEnd);
+      const result = validateTimeRange(startTime, newEnd, maxReservationHours * 60);
       if (!result.valid) {
         setTimeError(
           result.reason === 'too-long'
-            ? "El tiempo máximo de préstamo es de 2 horas. Por favor selecciona un horario menor."
+            ? `El tiempo máximo de préstamo es de ${maxReservationHours} horas. Por favor selecciona un horario menor.`
             : "La hora de fin debe ser mayor a la hora de inicio."
         );
         setEndTime('');
@@ -81,12 +100,16 @@ export default function ReservationForm({ device, onClose }: Props) {
     const endM = endTotal % 60;
     if (endH >= 24) return;
     const formattedEnd = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-    const validation = validateTimeRange(startTime, formattedEnd);
+    const validation = validateTimeRange(startTime, formattedEnd, maxReservationHours * 60);
     if (validation.valid) {
       setTimeError(null);
       setEndTime(formattedEnd);
     } else {
-      setTimeError(validation.reason === 'too-long' ? 'El tiempo máximo de préstamo es de 2 horas. Por favor selecciona un horario menor.' : 'La hora de fin debe ser mayor a la hora de inicio.');
+      setTimeError(
+        validation.reason === 'too-long'
+          ? `El tiempo máximo de préstamo es de ${maxReservationHours} horas. Por favor selecciona un horario menor.`
+          : 'La hora de fin debe ser mayor a la hora de inicio.'
+      );
       setEndTime('');
     }
   };

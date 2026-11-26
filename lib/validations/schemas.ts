@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { validateTimeRange } from '../reservation';
+import { ABSOLUTE_MAX_LOAN_MINUTES, validateTimeRange } from '../reservation';
 import { isAllowedVideoUrl } from '../videoUrl';
 
 // Regex para validación de fecha YYYY-MM-DD y hora HH:MM
@@ -7,8 +7,10 @@ const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /**
- * Esquema Zod de validación estricta para reservación de equipamiento tecnológico
- * Cumple con la regla de negocio normativa de préstamo máximo de 2 horas (Sección 7.2)
+ * Esquema Zod de validación estructural para reservación de equipamiento tecnológico.
+ * Valida que `endTime > startTime` y no exceda el tope técnico máximo configurable (8 horas).
+ * El límite operativo vigente (`maxReservationHours`, configurado en Directus, default 2 h)
+ * se aplica dinámicamente en `POST /api/reservas` después de leer la configuración del sistema.
  */
 export const reservationSchema = z
   .object({
@@ -36,12 +38,12 @@ export const reservationSchema = z
   })
   .superRefine((data, ctx) => {
     if (data.startTime && data.endTime) {
-      const result = validateTimeRange(data.startTime, data.endTime);
+      const result = validateTimeRange(data.startTime, data.endTime, ABSOLUTE_MAX_LOAN_MINUTES);
       if (!result.valid) {
         if (result.reason === 'too-long') {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: 'El tiempo máximo de préstamo es de 2 horas. Por favor selecciona un horario menor.',
+            message: 'El tiempo máximo de préstamo no puede superar las 8 horas.',
             path: ['endTime'],
           });
         } else {

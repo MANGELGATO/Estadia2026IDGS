@@ -1,6 +1,8 @@
 import { directus } from './directus';
 import { generateEntityId } from './folio';
 import { mexicoLocalToUtcIso } from './dateMexico';
+import { extractMediaFileId, deleteDirectusMediaFile } from './directusMedia';
+import { validateReservacionTransition } from './reservationState';
 import type { DeviceItem, AppItem } from './mockData';
 
 export type { DeviceItem };
@@ -106,6 +108,12 @@ export async function hasActiveBitacoraLoanInDB(equipoId: string): Promise<boole
  * - En uso -> Disponible / En mantenimiento (al devolver)
  * - Reservado -> Disponible (al cancelar/rechazar una reservación previamente aprobada)
  * Lanza `EquipoStateConflictError` (HTTP 409) si el estado actual no permite la transición.
+ *
+ * Nota sobre concurrencia: Directus REST API no expone transacciones SQL multi-petición ni
+ * bloqueos pesimistas (`SELECT ... FOR UPDATE`), por lo que la verificación lectura-escritura
+ * es optimista. A escala operativa de un laboratorio (pocos administradores simultáneos) es
+ * aceptable; si llegaran dos aprobaciones exactamente al mismo milisegundo sobre el mismo equipo,
+ * la segunda sobrescribiría el estado y se reflejaría en la bitácora/reservaciones.
  */
 export async function transitionEquipoStatusInDB(
   equipoId: string,
@@ -120,7 +128,6 @@ export async function transitionEquipoStatusInDB(
     throw new EquipoStateConflictError('El equipo seleccionado no existe en el inventario.');
   }
 
-  const allowedSources = options?.allowFrom ?? VALID_EQUIPO_TRANSITIONS[current.estado];
   const isAllowed = options?.allowFrom
     ? options.allowFrom.includes(current.estado)
     : VALID_EQUIPO_TRANSITIONS[current.estado]?.includes(targetStatus);
@@ -132,11 +139,38 @@ export async function transitionEquipoStatusInDB(
     );
   }
 
-  void allowedSources;
   const updated = await directus.updateItem<EquipoRow>('equipos', equipoId, {
     estado: targetStatus,
   });
   return updated ?? { ...current, estado: targetStatus };
+}
+
+/**
+ * Elimina un archivo en Directus Files si ya no está referenciado por ningún equipo ni aplicación.
+ * Evita acumular imágenes huérfanas en el Directus compartido (`admin.plai.mx`).
+ */
+async function cleanupOrphanMediaIfUnused(imageUrl?: string | null): Promise<void> {
+  const fileId = extractMediaFileId(imageUrl);
+  if (!fileId || !imageUrl) return;
+
+  try {
+    const [equiposUsing, appsUsing] = await Promise.all([
+      directus.getItems<EquipoRow>('equipos', {
+        'filter[imagen_url][_eq]': imageUrl,
+        limit: 1,
+      }),
+      directus.getItems<AplicacionRow>('aplicaciones', {
+        'filter[imagen_url][_eq]': imageUrl,
+        limit: 1,
+      }),
+    ]);
+
+    if (equiposUsing.length === 0 && appsUsing.length === 0) {
+      await deleteDirectusMediaFile(fileId);
+    }
+  } catch {
+    // Best-effort: nunca debe romper la operación principal de inventario/aplicaciones
+  }
 }
 
 // ====================================================================
@@ -200,6 +234,9 @@ export async function getEquiposFromDB(): Promise<DeviceItem[]> {
 
 export async function insertEquipoInDB(item: DeviceItem): Promise<boolean> {
   const categoriaId = CATEGORY_TO_ID_MAP[item.category] || 'realidad-virtual';
+  const previous = await directus.getItemById<EquipoRow>('equipos', item.id);
+  const nextImageUrl = item.imageUrl || null;
+
   await directus.upsertItem<EquipoRow>('equipos', item.id, {
     id: item.id,
     categoria_id: categoriaId,
@@ -214,15 +251,24 @@ export async function insertEquipoInDB(item: DeviceItem): Promise<boolean> {
     especificaciones: item.specs,
     accesorios: item.accessories,
     imagen_emoji: item.imageEmoji || '📦',
-    imagen_url: item.imageUrl || null,
+    imagen_url: nextImageUrl,
     responsable: item.responsible || 'Laboratorio de Innovación PLAi',
     observaciones: item.observations || null,
   });
+
+  if (previous?.imagen_url && previous.imagen_url !== nextImageUrl) {
+    await cleanupOrphanMediaIfUnused(previous.imagen_url);
+  }
+
   return true;
 }
 
 export async function deleteEquipoInDB(id: string): Promise<boolean> {
+  const existing = await directus.getItemById<EquipoRow>('equipos', id);
   await directus.deleteItem('equipos', id);
+  if (existing?.imagen_url) {
+    await cleanupOrphanMediaIfUnused(existing.imagen_url);
+  }
   return true;
 }
 
@@ -274,6 +320,9 @@ export async function getAplicacionesFromDB(): Promise<AppItem[]> {
 export async function insertAplicacionInDB(app: AppItem): Promise<boolean> {
   const estadoVal: 'Activa' | 'Inactiva' =
     app.status === 'Inactiva' ? 'Inactiva' : 'Activa';
+  const previous = await directus.getItemById<AplicacionRow>('aplicaciones', app.id);
+  const nextImageUrl = app.imageUrl || null;
+
   await directus.upsertItem<AplicacionRow>('aplicaciones', app.id, {
     id: app.id,
     nombre: app.name,
@@ -283,15 +332,24 @@ export async function insertAplicacionInDB(app: AppItem): Promise<boolean> {
     plataforma: app.platform || 'Meta Quest',
     clasificacion_edad: app.ageRating || 'Todas las edades',
     descripcion: app.description || '',
-    imagen_url: app.imageUrl || null,
+    imagen_url: nextImageUrl,
     equipos_instalados: Number(app.devicesInstalled ?? 1),
     estado: estadoVal,
   });
+
+  if (previous?.imagen_url && previous.imagen_url !== nextImageUrl) {
+    await cleanupOrphanMediaIfUnused(previous.imagen_url);
+  }
+
   return true;
 }
 
 export async function deleteAplicacionInDB(id: string): Promise<boolean> {
+  const existing = await directus.getItemById<AplicacionRow>('aplicaciones', id);
   await directus.deleteItem('aplicaciones', id);
+  if (existing?.imagen_url) {
+    await cleanupOrphanMediaIfUnused(existing.imagen_url);
+  }
   return true;
 }
 
@@ -647,8 +705,26 @@ export async function updateReservacionInDB(
   const nextEstado = update.estado ?? existing.estado;
   const targetEquipoId = update.equipoId ?? existing.equipo_id ?? undefined;
 
+  // 0. Validar la máquina de estados de la reservación ANTES de tocar equipos o Directus
+  const estadoValidation = validateReservacionTransition(prevEstado, nextEstado);
+  if (!estadoValidation.valid) {
+    throw new EquipoStateConflictError(estadoValidation.message);
+  }
+
+  // Mientras una reservación está "En uso", no se puede cambiar el equipo asignado
+  if (
+    prevEstado === 'En uso' &&
+    update.equipoId &&
+    existing.equipo_id &&
+    update.equipoId !== existing.equipo_id
+  ) {
+    throw new EquipoStateConflictError(
+      'No se puede cambiar el equipo asignado mientras la reservación se encuentra "En uso".'
+    );
+  }
+
   // 1. Validar y aplicar transición de estado del equipo ANTES de guardar la reservación
-  if (update.estado && targetEquipoId) {
+  if (nextEstado && targetEquipoId) {
     if (nextEstado === 'Aprobada') {
       // Solo exige Disponible si aún no estaba Aprobada con ese mismo equipo
       const alreadyApprovedSameDevice =
@@ -663,6 +739,24 @@ export async function updateReservacionInDB(
           allowFrom: ['Disponible'],
           contextLabel: 'aprobar reservación',
         });
+
+        // Si se reasignó de un equipo previamente Aprobado a otro nuevo, liberar el anterior
+        if (prevEstado === 'Aprobada' && existing.equipo_id && existing.equipo_id !== targetEquipoId) {
+          const prevEq = await directus.getItemById<EquipoRow>('equipos', existing.equipo_id);
+          const prevHasLoan = await hasActiveBitacoraLoanInDB(existing.equipo_id);
+          if (prevEq && prevEq.estado === 'Reservado' && !prevHasLoan) {
+            const otherHolders = await directus.getItems<ReservacionRow>('reservaciones', {
+              'filter[equipo_id][_eq]': existing.equipo_id,
+              'filter[estado][_eq]': 'Aprobada',
+            });
+            if (!otherHolders.some((r) => r.id !== id)) {
+              await transitionEquipoStatusInDB(existing.equipo_id, 'Disponible', {
+                allowFrom: ['Reservado'],
+                contextLabel: 'liberar equipo anterior por reasignación',
+              });
+            }
+          }
+        }
       }
     } else if (nextEstado === 'En uso') {
       const alreadyInUseSameDevice =
@@ -702,28 +796,20 @@ export async function updateReservacionInDB(
         }
       }
     } else if (nextEstado === 'Completada') {
-      // Solo libera el equipo si esta misma reservación realmente lo tenía en uso o reservado,
-      // respetando estados como 'En mantenimiento' o préstamos activos de otra persona.
-      if (
-        (prevEstado === 'En uso' || prevEstado === 'Aprobada') &&
-        existing.equipo_id === targetEquipoId
-      ) {
+      // Solo libera el equipo si esta misma reservación estaba Aprobada (las En uso se cierran por Bitácora)
+      if (prevEstado === 'Aprobada' && existing.equipo_id === targetEquipoId) {
         const currentEq = await directus.getItemById<EquipoRow>('equipos', targetEquipoId);
         const hasLoan = await hasActiveBitacoraLoanInDB(targetEquipoId);
-        if (currentEq && !hasLoan) {
-          const expectedSource: DeviceItem['status'] =
-            prevEstado === 'En uso' ? 'En uso' : 'Reservado';
-          if (currentEq.estado === expectedSource) {
-            const otherActive = await directus.getItems<ReservacionRow>('reservaciones', {
-              'filter[equipo_id][_eq]': targetEquipoId,
-              'filter[estado][_in]': 'Aprobada,En uso',
+        if (currentEq && !hasLoan && currentEq.estado === 'Reservado') {
+          const otherActive = await directus.getItems<ReservacionRow>('reservaciones', {
+            'filter[equipo_id][_eq]': targetEquipoId,
+            'filter[estado][_in]': 'Aprobada,En uso',
+          });
+          if (!otherActive.some((r) => r.id !== id)) {
+            await transitionEquipoStatusInDB(targetEquipoId, 'Disponible', {
+              allowFrom: ['Reservado'],
+              contextLabel: 'completar reservación',
             });
-            if (!otherActive.some((r) => r.id !== id)) {
-              await transitionEquipoStatusInDB(targetEquipoId, 'Disponible', {
-                allowFrom: [expectedSource],
-                contextLabel: 'completar reservación',
-              });
-            }
           }
         }
       }

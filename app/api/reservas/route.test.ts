@@ -5,6 +5,8 @@ import { rateLimiter, RATE_LIMIT_MUTATION } from '../../../lib/rateLimit';
 import { addDaysToYmd, getMexicoTodayYmd } from '../../../lib/dateMexico';
 import * as nextAuth from 'next-auth';
 
+let mockMaxReservationHours = 2;
+
 vi.mock('../../../lib/directus', () => ({
   directus: {
     getItemById: vi.fn(async (collection: string) => {
@@ -12,7 +14,7 @@ vi.mock('../../../lib/directus', () => ({
         return {
           id: 'general',
           valor: {
-            maxReservationHours: 2,
+            maxReservationHours: mockMaxReservationHours,
             maxAdvanceDays: 14,
           },
         };
@@ -51,6 +53,7 @@ describe('POST /api/reservas Route Handler', () => {
   const getServerSessionMock = vi.mocked(nextAuth.getServerSession);
 
   beforeEach(() => {
+    mockMaxReservationHours = 2;
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     rateLimiter.reset();
@@ -113,7 +116,7 @@ describe('POST /api/reservas Route Handler', () => {
       userName: 'L',
       date: 'invalid-date',
       startTime: '10:00',
-      endTime: '13:30', // más de 2 horas
+      endTime: '19:30', // excede tope técnico de 8 horas
       activity: '',
       acceptPrivacy: false,
     };
@@ -170,6 +173,41 @@ describe('POST /api/reservas Route Handler', () => {
       })
     );
     expect(farRes.status).toBe(400);
+  });
+
+  it('respeta maxReservationHours configurado en Directus (tanto <= 2 h como > 2 h)', async () => {
+    const validDate = addDaysToYmd(getMexicoTodayYmd(), 2);
+    const threeHourBody = {
+      deviceId: 'vr-01',
+      userName: 'Laura Martinez',
+      date: validDate,
+      startTime: '10:00',
+      endTime: '13:00', // 3 horas
+      activity: 'Sesión extendida de simulación',
+      acceptPrivacy: true,
+    };
+
+    // Con límite por defecto (2 h), 3 h debe rechazarse con 400
+    mockMaxReservationHours = 2;
+    const rejected = await POST(
+      new NextRequest('http://localhost:3000/api/reservas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(threeHourBody),
+      })
+    );
+    expect(rejected.status).toBe(400);
+
+    // Al subir configuración a 4 h, 3 h debe aceptarse con 201
+    mockMaxReservationHours = 4;
+    const accepted = await POST(
+      new NextRequest('http://localhost:3000/api/reservas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(threeHourBody),
+      })
+    );
+    expect(accepted.status).toBe(201);
   });
 
   it('rechaza peticiones con código 429 cuando un cliente excede el rate limit normativo', async () => {

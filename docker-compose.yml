@@ -112,6 +112,9 @@ services:
       KEYCLOAK_SECRET_FILE: /run/secrets/plai_recursos_keycloak_secret
       DIRECTUS_URL: https://AQUI_HACER_CAMBIOS_CORRESPONDIENTES_CON_URL_DIRECTUS_ADMIN_PLAI
       DIRECTUS_COLLECTION_PREFIX: lab_recursos_
+      DIRECTUS_MEDIA_FOLDER: lab_recursos
+      # Opcional: fijar el UUID impreso por `pnpm directus:setup` para omitir lookup inicial
+      # DIRECTUS_MEDIA_FOLDER_ID: AQUI_UUID_CARPETA_LAB_RECURSOS
       DIRECTUS_TOKEN_FILE: /run/secrets/plai_recursos_directus_token
     secrets:
       - plai_recursos_nextauth_secret

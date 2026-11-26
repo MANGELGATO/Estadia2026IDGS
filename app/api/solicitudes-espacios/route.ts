@@ -103,8 +103,9 @@ export async function POST(req: NextRequest) {
       ? 'realidad-virtual'
       : 'computo-multimedia';
 
+    const maxReservationHours = Math.max(1, Math.min(8, Number(sysConfig.maxReservationHours || 2)));
     const [h, m] = parsed.data.hora.split(':').map(Number);
-    const endH = Math.min((h || 10) + 2, 20);
+    const endH = Math.min((h || 10) + maxReservationHours, 20);
     const horaFin = `${String(endH).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
 
     const authoritativeEmail = isStaffRole(auth.user.role)
